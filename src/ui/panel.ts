@@ -195,7 +195,7 @@ export class Panel {
         : h('p', { class: 'note' },
             `${startModeText(g.startMode)}.` +
               ((g.count ?? 0) > (g.maxCount ?? 0) ? ` ${fillModeText(g.fillMode)}.` : '') +
-              (g.count !== null && g.spawns.length > g.count ? ` It has ${g.spawns.length} possible spots but places only ${g.count}.` : '')),
+              (g.count !== null && g.spawns.length > g.count ? ` It has ${g.spawns.length} spots in its list and places its first ${g.count}, in order.` : '')),
       h('div', { class: 'sub' }, `Stats (${DIFFICULTY_LABEL[d]})`),
       this.enemyCard(e, g.row),
       this.dropTableEl(table, `Drops (${DIFFICULTY_LABEL[d]}, per kill)`),

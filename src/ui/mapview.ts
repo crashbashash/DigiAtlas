@@ -66,7 +66,7 @@ export class MapView {
       ...(Object.keys(KIND_COLOR) as EnemyKind[]).map((k) =>
         h('span', null, h('i', { style: `background:${KIND_COLOR[k]}` }), KIND_LABEL[k]),
       ),
-      h('span', { class: 'muted' }, 'Number = how many spawn · dashed circle = how close you must get'),
+      h('span', { class: 'muted' }, 'Dashed circle = how close you must get · number = enemies at that spot'),
     );
   }
 
@@ -190,7 +190,13 @@ export class MapView {
         this.drawTrigger(ctx, m);
       }
     }
-    for (const m of order) if (m.zone) this.drawZone(ctx, m);
+    const withOthers = new Set<number>();
+    for (const m of order) {
+      if (m.others && !withOthers.has(m.gi)) {
+        withOthers.add(m.gi);
+        this.drawOthers(ctx, m);
+      }
+    }
     for (const m of order) this.drawMarker(ctx, m);
   }
 
@@ -241,34 +247,18 @@ export class MapView {
     ctx.globalAlpha = 1;
   }
 
-  /** The spots of a numbered spawner, shown on hover or selection (and its extent when nothing triggers it). */
-  private drawZone(ctx: CanvasRenderingContext2D, m: Marker): void {
-    if (!m.zone) return;
-    const showSpots = m.gi === this.selected || m.gi === this.hover?.gi;
-    if (m.trigger && !showSpots) return;
-    const dim = this.highlight !== null && !this.highlight.has(m.gi);
-    const [sx, sy] = this.toScreen(m);
-    ctx.globalAlpha = dim ? 0.12 : 1;
-    if (!m.trigger) {
-      ctx.fillStyle = `${KIND_COLOR[m.kind]}${showSpots ? '33' : '14'}`;
-      ctx.strokeStyle = `${KIND_COLOR[m.kind]}${showSpots ? 'cc' : '55'}`;
-      ctx.lineWidth = 1.2;
-      ctx.setLineDash([2, 4]);
+  /** A spawner's unused spots, shown faintly on hover or selection so you can see where else it could place enemies. */
+  private drawOthers(ctx: CanvasRenderingContext2D, m: Marker): void {
+    if (!m.others || !(m.gi === this.selected || m.gi === this.hover?.gi)) return;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([2, 3]);
+    for (const [x, z] of m.others) {
       ctx.beginPath();
-      ctx.arc(sx, sy, m.zone.radius * this.view.scale + 6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(this.view.tx + x * this.view.scale, this.view.ty + z * this.view.scale, 5, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.setLineDash([]);
     }
-    if (showSpots) {
-      ctx.fillStyle = '#ffffff';
-      for (const [x, z] of m.zone.spots) {
-        ctx.beginPath();
-        ctx.arc(this.view.tx + x * this.view.scale, this.view.ty + z * this.view.scale, 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
   }
 
   private toScreen(m: Marker): [number, number] {
@@ -381,7 +371,7 @@ export class MapView {
     if (m === this.hover && m === null) return;
     const before = this.hover;
     this.hover = m;
-    if ((before?.zone || m?.zone) && before?.gi !== m?.gi) this.draw();
+    if ((before?.others || m?.others) && before?.gi !== m?.gi) this.draw();
     this.canvas.style.cursor = m ? 'pointer' : 'grab';
     if (!m) {
       this.tip.hidden = true;

@@ -37,37 +37,33 @@ describe('start text and triggers', () => {
 describe('makeMarkers', () => {
   it('draws one marker per spot when each spot holds one enemy', () => {
     const m = makeMarkers([gen(1, 2, [[0, 0], [10, 0]])], enemies);
-    expect(m.map((x) => [x.x, x.badge, x.zone])).toEqual([[0, 1, null], [10, 1, null]]);
+    expect(m.map((x) => [x.x, x.badge, x.others])).toEqual([[0, 1, null], [10, 1, null]]);
   });
 
-  it('collapses a spawner with more spots than enemies into one numbered marker and a zone', () => {
+  it('uses only the first spots when a spawner has more spots than enemies', () => {
     const m = makeMarkers([gen(1, 2, [[0, 0], [20, 0], [0, 20], [20, 20]])], enemies);
-    expect(m).toHaveLength(1);
-    expect(m[0].badge).toBe(2);
-    expect([m[0].x, m[0].z]).toEqual([10, 10]);
-    expect(m[0].zone?.spots).toHaveLength(4);
-    expect(m[0].zone?.radius).toBeCloseTo(Math.hypot(10, 10));
-    expect(m[0].detail).toMatch(/Spawns 2 among 4 spots/);
+    expect(m.map((x) => [x.x, x.z])).toEqual([[0, 0], [20, 0]]);
+    expect(m[0].others).toEqual([[0, 20], [20, 20]]);
+    expect(m.every((x) => x.badge === 1)).toBe(true);
+    expect(m[0].detail).toMatch(/first 2 of 4 spots/);
   });
 
   it('shares a wave total across the spots of a spawner that respawns', () => {
-    const m = makeMarkers([gen(1, 14, [[0, 0]])], enemies);
-    expect(m.map((x) => x.badge)).toEqual([14]);
+    expect(makeMarkers([gen(1, 14, [[0, 0]])], enemies).map((x) => x.badge)).toEqual([14]);
     expect(makeMarkers([gen(1, 12, [[0, 0], [5, 0], [9, 0]])], enemies).map((x) => x.badge)).toEqual([4, 4, 4]);
   });
 
   it('keeps every placed object as its own marker', () => {
     const m = makeMarkers([gen(9, 9, [[0, 0], [1, 0], [2, 0]])], enemies);
     expect(m).toHaveLength(3);
-    expect(m.every((x) => x.badge === 1 && x.kind === 'object')).toBe(true);
+    expect(m.every((x) => x.badge === 1 && x.kind === 'object' && x.others === null)).toBe(true);
   });
 
   it('falls back to one marker per spot when the count is unknown', () => {
     expect(makeMarkers([gen(1, null, [[0, 0], [1, 1]])], enemies)).toHaveLength(2);
   });
 
-  it('keeps a minimum zone size for tightly packed spots', () => {
-    const m = makeMarkers([gen(1, 1, [[0, 0], [1, 0]])], enemies);
-    expect(m[0].zone?.radius).toBe(10);
+  it('never uses fewer than the spawner has when objects have a short list', () => {
+    expect(makeMarkers([gen(9, 1, [[0, 0], [1, 0]])], enemies)).toHaveLength(2);
   });
 });

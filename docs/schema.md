@@ -73,6 +73,12 @@ Players see `name`, never the internal ids.
   coordinates (global generators) or offsets from a room anchor (dungeon rooms); the exporter resolves
   both, so `spawns` is always world space. Every spawn lands on the stage's terrain (checked on map
   coverage below).
+- **Which spots are used.** A spawner's `spawns` list is the list the game steps through: each enemy goes to
+  the next spot and the cursor wraps around the list, with no randomness (read from the spawn function's
+  code). So a spawner that places `count` enemies among more spots uses the first `count` of them, and a
+  spawner that spawns more than it has spots (respawn waves) cycles through all of them. The code never
+  sets the starting cursor, so a start at the first spot is an assumption; it can shift an enemy to a free
+  spot nearby if the exact one is occupied.
 - **Triggers** (`generators[].trigger`): a radar spawner starts when a player is within `radius` units of
   `center` (the game stores the squared radius; 20 to 150 units, one arena at 450). Only radar spawners have
   one. Script-started (`direct`) spawners start when a game script says so, which is not extracted yet.

@@ -203,6 +203,49 @@
                               }
                             }
                           }
+                        },
+                        "script": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "status"
+                          ],
+                          "description": "What the stage's own scripts do with this spawner, from the decompiled scripts.",
+                          "properties": {
+                            "status": {
+                              "enum": [
+                                "referenced",
+                                "dynamic",
+                                "unknown",
+                                "none"
+                              ],
+                              "description": "referenced: a script names it. dynamic: a script builds names (a loop) that match it. unknown: the stage has a script call whose spawner name cannot be read. none: no script mentions it."
+                            },
+                            "refs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "verb",
+                                  "when"
+                                ],
+                                "properties": {
+                                  "verb": {
+                                    "type": "string",
+                                    "description": "START, RESTART, STOP and so on"
+                                  },
+                                  "when": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "description": "Conditions the call sits under, outermost first, in words where the function is known."
+                                  }
+                                }
+                              }
+                            }
+                          }
                         }
                       }
                     }
@@ -357,6 +400,49 @@
                               }
                             }
                           }
+                        },
+                        "script": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "status"
+                          ],
+                          "description": "What the stage's own scripts do with this spawner, from the decompiled scripts.",
+                          "properties": {
+                            "status": {
+                              "enum": [
+                                "referenced",
+                                "dynamic",
+                                "unknown",
+                                "none"
+                              ],
+                              "description": "referenced: a script names it. dynamic: a script builds names (a loop) that match it. unknown: the stage has a script call whose spawner name cannot be read. none: no script mentions it."
+                            },
+                            "refs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "verb",
+                                  "when"
+                                ],
+                                "properties": {
+                                  "verb": {
+                                    "type": "string",
+                                    "description": "START, RESTART, STOP and so on"
+                                  },
+                                  "when": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "description": "Conditions the call sits under, outermost first, in words where the function is known."
+                                  }
+                                }
+                              }
+                            }
+                          }
                         }
                       }
                     }
@@ -508,6 +594,49 @@
                                   "type": "string"
                                 },
                                 "description": "difficulty (or slotN) -> pool name in drops.json"
+                              }
+                            }
+                          }
+                        },
+                        "script": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "status"
+                          ],
+                          "description": "What the stage's own scripts do with this spawner, from the decompiled scripts.",
+                          "properties": {
+                            "status": {
+                              "enum": [
+                                "referenced",
+                                "dynamic",
+                                "unknown",
+                                "none"
+                              ],
+                              "description": "referenced: a script names it. dynamic: a script builds names (a loop) that match it. unknown: the stage has a script call whose spawner name cannot be read. none: no script mentions it."
+                            },
+                            "refs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "verb",
+                                  "when"
+                                ],
+                                "properties": {
+                                  "verb": {
+                                    "type": "string",
+                                    "description": "START, RESTART, STOP and so on"
+                                  },
+                                  "when": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "description": "Conditions the call sits under, outermost first, in words where the function is known."
+                                  }
+                                }
                               }
                             }
                           }

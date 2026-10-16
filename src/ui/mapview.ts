@@ -100,7 +100,7 @@ export class MapView {
   }
 
   private buildMarkers(stage: Stage, d: Difficulty): Marker[] {
-    return makeMarkers(this.model.generators(stage, d), this.model.enemies);
+    return makeMarkers(this.model.generators(stage, d), this.model.enemies, this.model.hideUnused);
   }
 
   private computeBounds(stage: Stage): void {
@@ -271,7 +271,7 @@ export class MapView {
     const selected = m.gi === this.selected;
     const lit = this.highlight !== null && this.highlight.has(m.gi);
     const r = (selected ? 8 : lit ? 7.5 : 6) * (m.badge > 1 ? 1.5 : 1);
-    ctx.globalAlpha = dim ? 0.22 : 1;
+    ctx.globalAlpha = dim ? 0.22 : m.unused ? 0.4 : 1;
     ctx.fillStyle = KIND_COLOR[m.kind];
     ctx.strokeStyle = selected ? '#ffffff' : 'rgba(10,14,24,0.9)';
     ctx.lineWidth = selected ? 2.5 : 1.5;

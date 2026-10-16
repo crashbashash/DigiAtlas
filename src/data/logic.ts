@@ -1,4 +1,4 @@
-import type { DropEntry, DropPool, Enemy, Generator, Item } from './types';
+import type { DropEntry, DropPool, Enemy, Generator, Item, ScriptRef } from './types';
 
 export const itemKey = (category: string, id: number): string => `${category}:${id}`;
 
@@ -126,9 +126,10 @@ export interface EnemyGroup {
 }
 
 /** Spawn generators grouped by what they spawn, in first-seen order. */
-export function groupByEnemy(generators: Generator[], enemies: Map<number, Enemy>): EnemyGroup[] {
+export function groupByEnemy(generators: Generator[], enemies: Map<number, Enemy>, skip?: Set<number>): EnemyGroup[] {
   const groups = new Map<number, EnemyGroup>();
   generators.forEach((g, i) => {
+    if (skip?.has(i)) return;
     let grp = groups.get(g.row);
     if (!grp) {
       grp = { row: g.row, enemy: enemies.get(g.row), spawners: 0, points: 0, total: 0, generators: [] };
@@ -144,4 +145,47 @@ export function groupByEnemy(generators: Generator[], enemies: Map<number, Enemy
 
 export function itemMatchesQuery(item: Item, q: string): boolean {
   return item.name.toLowerCase().includes(q);
+}
+
+/**
+ * A spawner that has to be started by a script (it is not a radar spawner) but that no script in its
+ * stage mentions, so it most likely never appears. Boxes and crates are left out: they are placed
+ * objects, and their scripts start them in loops.
+ */
+export function isUnused(g: Generator, enemy: Enemy | undefined): boolean {
+  return (
+    enemy?.kind !== 'object' &&
+    (g.startMode === 'direct' || g.startMode === 'timer') &&
+    g.script?.status === 'none'
+  );
+}
+
+const VERB_TEXT: Record<string, string> = {
+  START: 'Started',
+  RESTART: 'Restarted',
+  STOP: 'Stopped',
+  STOPREVERS: 'Stopped',
+  RESET: 'Reset',
+};
+
+export function scriptRefText(r: ScriptRef): string {
+  const verb = VERB_TEXT[r.verb] ?? r.verb;
+  return r.when.length ? `${verb} when ${r.when.join(', and ')}` : `${verb} with no condition`;
+}
+
+/** One line for a tooltip about how a spawner starts. Empty for objects and radar spawners handled elsewhere. */
+export function startSummary(g: Generator, enemy: Enemy | undefined): string {
+  if (enemy?.kind === 'object') return '';
+  if (g.trigger) return `Appears when you get within ${g.trigger.radius} units`;
+  if (g.startMode !== 'direct' && g.startMode !== 'timer') return '';
+  const info = g.script;
+  if (!info) return 'Started by a game script';
+  if (info.status === 'none') return 'No script starts it (probably unused)';
+  if (info.status !== 'referenced') return 'Started by a script that builds spawner names in code';
+  const starts = (info.refs ?? []).filter((r) => r.verb === 'START' || r.verb === 'RESTART');
+  if (!starts.length) return 'A script controls it';
+  const first = starts[0];
+  const text = first.when.length ? `Started by a script when ${first.when.join(', and ')}` : 'Started by a script';
+  const more = starts.length > 1 ? ` (+${starts.length - 1} more)` : '';
+  return (text.length > 110 ? text.slice(0, 107) + '…' : text) + more;
 }

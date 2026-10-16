@@ -1,3 +1,4 @@
+import { isUnused, startSummary } from '../data/logic';
 import type { Enemy, EnemyKind, Generator } from '../data/types';
 
 /** One thing drawn on the map. A badge above 1 means that many enemies spawn there. */
@@ -9,17 +10,12 @@ export interface Marker {
   label: string;
   detail: string;
   badge: number;
+  /** No script starts this spawner (only present when unused ones are shown). */
+  unused: boolean;
   /** The spawner's other spots, which it does not use for its first enemies (world x, z). */
   others: [number, number][] | null;
   /** For a radar spawner: how close you must get for it to start (world units). */
   trigger: { x: number; z: number; radius: number } | null;
-}
-
-/** How the spawner starts, in words for a tooltip. */
-export function startText(g: Generator): string {
-  if (g.trigger) return `Appears when you get within ${g.trigger.radius} units`;
-  if (g.startMode === 'direct' || g.startMode === 'timer') return 'Started by a game script';
-  return '';
 }
 
 /**
@@ -32,7 +28,7 @@ export function startText(g: Generator): string {
  *  - boxes, barrels and crates are one marker per placed object.
  * The game starts counting from the first spot (assumed; the code never sets the cursor).
  */
-export function makeMarkers(generators: Generator[], enemies: Map<number, Enemy>): Marker[] {
+export function makeMarkers(generators: Generator[], enemies: Map<number, Enemy>, hideUnused = false): Marker[] {
   const out: Marker[] = [];
   generators.forEach((g, gi) => {
     const e = enemies.get(g.row);
@@ -41,7 +37,9 @@ export function makeMarkers(generators: Generator[], enemies: Map<number, Enemy>
     const spots = g.spawns;
     const count = g.count;
     const stat = e && kind !== 'object' ? `HP ${e.hp.toLocaleString('en-US')}` : '';
-    const start = kind === 'object' ? '' : startText(g);
+    const unused = isUnused(g, e);
+    if (unused && hideUnused) return;
+    const start = startSummary(g, e);
     const trigger = g.trigger ? { x: g.trigger.center[0], z: g.trigger.center[2], radius: g.trigger.radius } : null;
 
     const partial = kind !== 'object' && count !== null && count >= 1 && spots.length > count;
@@ -54,7 +52,7 @@ export function makeMarkers(generators: Generator[], enemies: Map<number, Enemy>
       per > 1 ? `${count} in total, over ${spots.length} spot${spots.length === 1 ? '' : 's'}` : '',
       start,
     ].filter(Boolean).join('\n');
-    for (const [x, , z] of used) out.push({ gi, x, z, kind, label, detail, badge: per, others, trigger });
+    for (const [x, , z] of used) out.push({ gi, x, z, kind, label, detail, badge: per, others, trigger, unused });
   });
   return out;
 }

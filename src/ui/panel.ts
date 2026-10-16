@@ -3,6 +3,7 @@ import type { Model } from '../data/model';
 import {
   categoryLabel,
   fillModeText,
+  scriptRefText,
   formatPercent,
   groupByEnemy,
   startModeText,
@@ -22,6 +23,7 @@ export interface PanelActions {
   selectSpecies(name: string): void;
   goToStage(stageId: string): void;
   setDifficulty(d: Difficulty): void;
+  showUnused(show: boolean): void;
   clearSelection(): void;
 }
 
@@ -149,7 +151,8 @@ export class Panel {
 
   private overview(stage: Stage, d: Difficulty): HTMLElement[] {
     const gens = this.model.generators(stage, d);
-    const groups = groupByEnemy(gens, this.model.enemies);
+    const hiddenSet = this.model.hidden(stage, d);
+    const groups = groupByEnemy(gens, this.model.enemies, hiddenSet);
     const byName = (a: EnemyGroup, b: EnemyGroup) =>
       (b.enemy?.kind === 'boss' ? 1 : 0) - (a.enemy?.kind === 'boss' ? 1 : 0) ||
       (a.enemy?.name ?? '').localeCompare(b.enemy?.name ?? '') ||
@@ -173,6 +176,13 @@ export class Panel {
       h('p', { class: 'note' },
         'Markers show every enemy spawn in the stage. Some only appear after game events such as traps, cutscenes or story progress.'),
     );
+    if (hiddenSet.size) {
+      out.push(
+        h('p', { class: 'note' },
+          `${hiddenSet.size} spawner${hiddenSet.size === 1 ? ' is' : 's are'} left out because no game script starts ${hiddenSet.size === 1 ? 'it' : 'them'}. `,
+          h('button', { class: 'link', onclick: () => this.act.showUnused(true) }, 'Show them')),
+      );
+    }
     if (!stage.map) out.push(h('p', { class: 'note' }, 'No map is available for this stage; markers are plotted on a plain grid.'));
     return out;
   }
@@ -196,6 +206,7 @@ export class Panel {
             `${startModeText(g.startMode)}.` +
               ((g.count ?? 0) > (g.maxCount ?? 0) ? ` ${fillModeText(g.fillMode)}.` : '') +
               (g.count !== null && g.spawns.length > g.count ? ` It has ${g.spawns.length} spots in its list and places its first ${g.count}, in order.` : '')),
+      isObject ? null : this.startBlock(g),
       h('div', { class: 'sub' }, `Stats (${DIFFICULTY_LABEL[d]})`),
       this.enemyCard(e, g.row),
       this.dropTableEl(table, `Drops (${DIFFICULTY_LABEL[d]}, per kill)`),
@@ -208,10 +219,31 @@ export class Panel {
     return out;
   }
 
+  /** What makes a spawner start, from its trigger circle and the stage's scripts. */
+  private startBlock(g: Generator): HTMLElement {
+    const info = g.script;
+    const lines: string[] = [];
+    if (g.trigger) {
+      lines.push(`Starts by itself when you get within ${g.trigger.radius} units of its anchor.`);
+    } else if (g.startMode === 'direct' || g.startMode === 'timer') {
+      if (!info || info.status === 'referenced') lines.push('Started by a game script:');
+      else if (info.status === 'none') lines.push('No script in this stage starts it, so it most likely never appears.');
+      else if (info.status === 'dynamic') lines.push('A script starts spawners in a loop by building their names, and this one fits the pattern:');
+      else lines.push('A script in this stage starts spawners by a name it builds in code, so it cannot be told whether this one is started.');
+    }
+    const refs = info?.refs ?? [];
+    if (g.trigger && refs.length) lines.push('Scripts also control it:');
+    return h('div', { class: 'starts' },
+      h('div', { class: 'sub' }, 'What starts it'),
+      ...lines.map((t) => h('p', { class: 'note tight' }, t)),
+      refs.length ? h('ul', null, ...refs.map((r) => h('li', null, scriptRefText(r)))) : null,
+    );
+  }
+
   private groupView(stage: Stage, d: Difficulty, row: number): HTMLElement[] {
     const gens = this.model.generators(stage, d);
     const e = this.model.enemies.get(row);
-    const group = groupByEnemy(gens, this.model.enemies).find((x) => x.row === row);
+    const group = groupByEnemy(gens, this.model.enemies, this.model.hidden(stage, d)).find((x) => x.row === row);
     const out: HTMLElement[] = [this.back(), this.titleFor(e, row)];
     if (group) {
       out.push(h('p', { class: 'note' },
@@ -295,7 +327,10 @@ export class Panel {
     const kind = rows[0]?.kind ?? 'enemy';
     const rowSet = new Set(rows.map((r) => r.row));
     const found = this.model.stages
-      .map((s) => ({ s, gens: this.model.generators(s, d).filter((g) => rowSet.has(g.row)) }))
+      .map((s) => {
+        const hidden = this.model.hidden(s, d);
+        return { s, gens: this.model.generators(s, d).filter((g, i) => rowSet.has(g.row) && !hidden.has(i)) };
+      })
       .filter((x) => x.gens.length > 0);
     // Which stat rows this enemy actually uses on this difficulty, weakest first.
     const used = new Map<number, number>();

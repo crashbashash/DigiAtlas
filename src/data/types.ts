@@ -63,6 +63,17 @@ export interface DropPool {
   difficulty?: Difficulty;
 }
 
+export interface ScriptRef {
+  verb: string;
+  when: string[];
+}
+
+/** What the stage's scripts do with a spawner. */
+export interface ScriptInfo {
+  status: 'referenced' | 'dynamic' | 'unknown' | 'none';
+  refs?: ScriptRef[];
+}
+
 export interface PlayerSlot {
   count: number | null;
   maxCount: number | null;
@@ -86,6 +97,7 @@ export interface Generator {
   lastDrops?: Record<string, string>;
   /** One entry per player count (index 0 = one player); absent when it makes no difference. */
   players?: PlayerSlot[];
+  script?: ScriptInfo;
 }
 
 export interface StageMap {

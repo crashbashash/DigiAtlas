@@ -7,6 +7,7 @@ export interface View {
   stageId: string | null;
   difficulty: Difficulty | null;
   players: number | null;
+  showUnused: boolean;
   item: string | null;
   enemy: string | null;
   spawner: string | null;
@@ -20,6 +21,7 @@ export function viewFromHash(hash: string): View {
     stageId: path || null,
     difficulty: DIFFICULTIES.includes(d as Difficulty) ? (d as Difficulty) : null,
     players: [1, 2, 3, 4].includes(Number(q.get('p'))) ? Number(q.get('p')) : null,
+    showUnused: q.get('u') === '1',
     item: q.get('item'),
     enemy: q.get('enemy'),
     spawner: q.get('spawner'),
@@ -29,6 +31,7 @@ export function viewFromHash(hash: string): View {
 export function hashFor(model: Model, s: State): string {
   const q = new URLSearchParams({ d: s.difficulty });
   if (s.players !== 1) q.set('p', String(s.players));
+  if (s.showUnused) q.set('u', '1');
   const sel = s.selection;
   if (sel.kind === 'item') q.set('item', sel.key);
   else if (sel.kind === 'species') q.set('enemy', sel.name);
@@ -55,7 +58,7 @@ export function stateFromView(model: Model, v: View, fallback: State): State {
     const index = model.generators(target, difficulty).findIndex((g) => g.name === v.spawner);
     if (index >= 0) selection = { kind: 'generator', index };
   }
-  return { ...fallback, stageId, difficulty, players: v.players ?? fallback.players, selection };
+  return { ...fallback, stageId, difficulty, players: v.players ?? fallback.players, showUnused: v.showUnused || fallback.showUnused, selection };
 }
 
 const KEY = 'digiatlas.view';

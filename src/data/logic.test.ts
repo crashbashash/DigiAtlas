@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dropTable, formatPercent, groupByEnemy, startModeText } from './logic';
+import { dropTable, formatPercent, groupByEnemy, isUnused, scriptRefText, startModeText } from './logic';
 import type { Enemy, Generator } from './types';
 
 describe('dropTable', () => {
@@ -68,5 +68,25 @@ describe('startModeText', () => {
     expect(startModeText('radar')).toMatch(/close/);
     expect(startModeText('direct')).toMatch(/script/);
     expect(startModeText('weird')).toBe('weird');
+  });
+});
+
+describe('script helpers', () => {
+  const base: Generator = {
+    name: 'G', row: 1, count: 1, maxCount: 1, spawns: [[0, 0, 0]], rotations: [], startMode: 'direct', fillMode: 'wipeout',
+  };
+  const enemy = { kind: 'enemy' } as Enemy;
+
+  it('flags only script-started spawners that nothing starts', () => {
+    expect(isUnused({ ...base, script: { status: 'none' } }, enemy)).toBe(true);
+    expect(isUnused({ ...base, script: { status: 'referenced' } }, enemy)).toBe(false);
+    expect(isUnused({ ...base, startMode: 'radar', script: { status: 'none' } }, enemy)).toBe(false);
+    expect(isUnused({ ...base, script: { status: 'none' } }, { kind: 'object' } as Enemy)).toBe(false);
+    expect(isUnused(base, enemy)).toBe(false);
+  });
+
+  it('turns a script call into a sentence', () => {
+    expect(scriptRefText({ verb: 'RESTART', when: ['event 339 not done yet'] })).toBe('Restarted when event 339 not done yet');
+    expect(scriptRefText({ verb: 'START', when: [] })).toBe('Started with no condition');
   });
 });

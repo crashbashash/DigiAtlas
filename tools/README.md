@@ -26,6 +26,7 @@ Output stays out of git (`data/generated/` is ignored).
 | `manifest.py` | Archive entry names from `NDMW.IGB` (finds each stage's USA banner pack) |
 | `textures.py`, `banners.py`, `png.py` | 8-bit paletted texture decode, loading banners, PNG writer |
 | `scene.py` | Scene graphs: transforms, `igGeometry` nodes, vertex and primitive streams to triangles |
+| `luadec.py`, `scripts.py` | Lua 4.0.1 decompiler (adapted from the decomp) and the analysis of spawner START/RESTART/STOP calls with their conditions |
 | `render.py`, `maps.py` | Top-down raster of the terrain scene (floors shaded by height, walls as lines) and the choice of terrain scene per stage |
 
 `igbpack.py` and `generators.py` are adapted from the DW4 decompilation tooling (`igb_inst.py`,

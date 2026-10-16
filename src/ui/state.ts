@@ -12,6 +12,8 @@ export interface State {
   difficulty: Difficulty;
   /** Number of players (1 to 4) the spawn counts and drops are shown for. */
   players: number;
+  /** Also show spawners that no script starts. */
+  showUnused: boolean;
   selection: Selection;
   query: string;
 }

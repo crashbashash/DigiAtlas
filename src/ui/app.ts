@@ -29,11 +29,12 @@ export class App {
     private readonly onChangeData: (() => void) | null,
   ) {
     const first = model.byId.has(DEFAULT_STAGE) ? DEFAULT_STAGE : (model.stages[0]?.id ?? null);
-    const base: State = { stageId: first, difficulty: 'hard', players: 1, selection: { kind: 'none' }, query: '' };
+    const base: State = { stageId: first, difficulty: 'hard', players: 1, showUnused: false, selection: { kind: 'none' }, query: '' };
     // The address wins, then the last view, then the default.
     const view = location.hash.length > 2 ? viewFromHash(location.hash) : { ...viewFromHash(''), ...loadSaved() };
     const initial = stateFromView(model, view, base);
     model.players = initial.players;
+    model.hideUnused = !initial.showUnused;
     this.store = new Store(initial);
 
     this.map = new MapView(model, source, {
@@ -50,6 +51,7 @@ export class App {
       selectSpecies: (name) => this.store.set({ selection: { kind: 'species', name } }),
       goToStage: (id) => this.goToStage(id),
       setDifficulty: (d) => this.setDifficulty(d),
+      showUnused: (show) => this.store.set({ showUnused: show }),
       clearSelection: () => this.store.set({ selection: { kind: 'none' } }),
     });
     this.sidebar = new Sidebar(
@@ -120,7 +122,9 @@ export class App {
     const gens = this.model.generators(stage, s.difficulty);
     const sel = s.selection;
     const out = new Set<number>();
+    const hidden = this.model.hidden(stage, s.difficulty);
     gens.forEach((g, i) => {
+      if (hidden.has(i)) return;
       if (sel.kind === 'group' && g.row === sel.row) out.add(i);
       else if (sel.kind === 'species' && this.model.enemies.get(g.row)?.name === sel.name) out.add(i);
       else if (sel.kind === 'item' && this.model.tableFor(g, s.difficulty).rows.some((r) => r.key === sel.key)) out.add(i);
@@ -157,6 +161,7 @@ export class App {
 
   private update(s: State, prev: State | null): void {
     this.model.players = s.players;
+    this.model.hideUnused = !s.showUnused;
     this.syncAddress(s, prev);
     const stage = this.stage(s);
     if (!prev || prev.query !== s.query || prev.stageId !== s.stageId) this.sidebar.render(s.query, s.stageId);
@@ -185,6 +190,17 @@ export class App {
       ...[1, 2, 3, 4].map((n) => h('option', { value: String(n), selected: n === s.players }, `${n} player${n === 1 ? '' : 's'}`)),
     );
     players.value = String(s.players);
-    this.diffs.append(h('label', null, h('span', { class: 'muted' }, 'Players'), players), h('label', null, h('span', { class: 'muted' }, 'Difficulty'), select));
+    const unusedCount = this.model.unusedCount(stage, s.difficulty);
+    const unused = h('input', { type: 'checkbox', onchange: () => this.store.set({ showUnused: unused.checked }) });
+    unused.checked = s.showUnused;
+    this.diffs.append(
+      h('label', null, h('span', { class: 'muted' }, 'Players'), players),
+      h('label', null, h('span', { class: 'muted' }, 'Difficulty'), select),
+    );
+    if (unusedCount) {
+      this.diffs.append(
+        h('label', { class: 'check', title: 'Spawners that no game script starts. They most likely never appear, so they are hidden unless you ask.' }, unused, `Show ${unusedCount} unused`),
+      );
+    }
   }
 }

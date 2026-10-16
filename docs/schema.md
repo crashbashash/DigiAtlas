@@ -73,6 +73,17 @@ Players see `name`, never the internal ids.
   coordinates (global generators) or offsets from a room anchor (dungeon rooms); the exporter resolves
   both, so `spawns` is always world space. Every spawn lands on the stage's terrain (checked on map
   coverage below).
+- **Scripts** (`generators[].script`): the exporter decompiles every Lua script in a stage's packs and
+  records what they do to each spawner. `status` is `referenced` (a script names it; `refs` lists each
+  START/RESTART/STOP with the conditions it sits under, in words), `dynamic` (a script builds names in
+  a loop, such as the box spawners, and this one fits the pattern), `unknown` (the stage starts
+  spawners by a name that cannot be read) or `none` (no script mentions it). Radar spawners start by
+  themselves, so `none` is normal for them (the decomp saw Abyss of Grief's radar goblins spawn live with
+  no script). A script-started spawner that is `none` is most likely never used; the app leaves those out
+  by default. Checks behind that: all 4,838 script chunks decompile, no spawner name appears in a script
+  outside a spawner command, dungeons come out 5% unused and boss arenas 0%, Humid Cave B2 gives exactly the
+  20 enemies of the original dungeon map, and Goblin Pass gives the two goblins seen in the game at the
+  bridge. Field stages are 67% unused, which is where the authored extras sit.
 - **Player count** (`generators[].players`): every spawner has four entries in the game, one per number of
   players, and in 13% of them the count, the alive-at-once cap or the drop pools differ (counts never fall
   as players are added, in 99.5% of cases they rise). The fields on the generator are the one-player case;

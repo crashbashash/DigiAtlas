@@ -14,6 +14,8 @@ Early development. The PS2 exporter, the data schema and a first working viewer 
 - Markers show every enemy, boss and breakable object a stage can spawn, with a difficulty dropdown
   (Normal, Hard, Very Hard) that switches the spawns, enemy stats and drop tables together, and a
   players dropdown (1 to 4) because spawn counts and some drops scale with the number of players.
+- Spawners that no game script starts are left out by default (a "Show unused" box brings them back), and the
+  spawner panel says what starts each one: the trigger circle, or the script condition, in words.
 - Click a marker or an enemy in the list for its stats, resistances, how many spawn and a drop table
   with chances (including the chance of nothing).
 - Search an item to see every enemy and object that drops it, with the chance, and jump to the stage.

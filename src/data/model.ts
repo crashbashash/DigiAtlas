@@ -1,5 +1,5 @@
 import type { DataSource } from './source';
-import { dropTable, itemKey, type DropRow } from './logic';
+import { dropTable, isUnused, itemKey, type DropRow } from './logic';
 import type { DropPool, Difficulty, Enemy, EnemyKind, Generator, Item, RawData, Stage } from './types';
 import { DIFFICULTIES } from './types';
 
@@ -44,6 +44,7 @@ export class Model {
   readonly worlds: World[];
   private readonly sourceCache = new Map<string, Map<string, ItemSource[]>>();
   private playerCount = 1;
+  private hide = true;
 
   constructor(readonly raw: RawData) {
     for (const e of raw.enemies.rows) this.enemies.set(e.row, e);
@@ -119,6 +120,30 @@ export class Model {
     this.playerCount = Math.min(4, Math.max(1, Math.round(n)));
   }
 
+  /** Leave out spawners that no script starts (they most likely never appear). */
+  get hideUnused(): boolean {
+    return this.hide;
+  }
+
+  set hideUnused(v: boolean) {
+    this.hide = v;
+  }
+
+  /** Indices of the spawners that are currently left out. */
+  hidden(stage: Stage, d: Difficulty): Set<number> {
+    const out = new Set<number>();
+    if (!this.hide) return out;
+    this.generators(stage, d).forEach((g, i) => {
+      if (isUnused(g, this.enemies.get(g.row))) out.add(i);
+    });
+    return out;
+  }
+
+  /** How many spawners no script starts in a stage, whether or not they are hidden. */
+  unusedCount(stage: Stage, d: Difficulty): number {
+    return this.generators(stage, d).filter((g) => isUnused(g, this.enemies.get(g.row))).length;
+  }
+
   /** A spawner as it behaves for the chosen number of players. */
   forPlayers(g: Generator): Generator {
     const slot = g.players?.[this.playerCount - 1];
@@ -154,7 +179,7 @@ export class Model {
 
   /** Where an item drops (per kill) for one difficulty, best chance first. */
   sourcesOf(key: string, d: Difficulty): ItemSource[] {
-    const cacheKey = `${d}:${this.playerCount}`;
+    const cacheKey = `${d}:${this.playerCount}:${this.hide}`;
     let index = this.sourceCache.get(cacheKey);
     if (!index) {
       index = this.buildSources(d);
@@ -173,6 +198,7 @@ export class Model {
       const rows = new Map<string, Set<number>>();
       gens.forEach((g, gi) => {
         const enemy = this.enemies.get(g.row);
+        if (this.hide && isUnused(g, enemy)) return;
         const name = enemy?.name ?? `Row ${g.row}`;
         for (const row of this.tableFor(g, d).rows as DropRow[]) {
           const k = `${row.key}|${stage.id}|${name}|${row.rate}`;

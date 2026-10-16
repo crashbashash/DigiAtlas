@@ -43,6 +43,32 @@ function model(): Model {
   return new Model(raw);
 }
 
+describe('unused spawners', () => {
+  const withUnused = (): Model => {
+    const raw = model().raw;
+    raw.stages.stages[1].difficulties.hard!.generators[1].script = { status: 'none' };
+    return new Model(raw);
+  };
+
+  it('are hidden by default and counted either way', () => {
+    const m = withUnused();
+    const stage = m.byId.get('stag0102')!;
+    expect([...m.hidden(stage, 'hard')]).toEqual([1]);
+    expect(m.unusedCount(stage, 'hard')).toBe(1);
+    m.hideUnused = false;
+    expect(m.hidden(stage, 'hard').size).toBe(0);
+    expect(m.unusedCount(stage, 'hard')).toBe(1);
+  });
+
+  it('do not count as item sources unless shown', () => {
+    const m = withUnused();
+    const stageOf = (list: ReturnType<Model['sourcesOf']>) => list.filter((s) => s.stage.id === 'stag0102' && s.enemyName === 'Goburimon');
+    expect(stageOf(m.sourcesOf('weapon:0', 'hard'))[0].generators).toEqual([0]);
+    m.hideUnused = false;
+    expect(stageOf(m.sourcesOf('weapon:0', 'hard'))[0].generators).toEqual([0, 1]);
+  });
+});
+
 describe('player counts', () => {
   const scaled = (): Model => {
     const raw = model().raw;

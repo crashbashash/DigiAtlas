@@ -54,7 +54,10 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .topbar { display: flex; align-items: center; gap: 16px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); min-height: 46px; }
 .title { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1; }
 .title strong { font-size: 16px; white-space: nowrap; }
-.diffs label { display: flex; align-items: center; gap: 8px; }
+.diffs { display: flex; align-items: center; gap: 16px; flex-wrap: nowrap; }
+.diffs .check { color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.diffs .check input { accent-color: var(--accent); }
+.diffs label { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .diffs select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 5px 28px 5px 10px; font: inherit; cursor: pointer; }
 .diffs select:focus { outline: 1px solid var(--accent); }
 .fit { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
@@ -75,6 +78,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .link:hover { text-decoration: underline; }
 .back { margin-bottom: 8px; display: block; }
 .banner { width: 100%; border-radius: 8px; margin: 4px 0 4px; border: 1px solid var(--line); image-rendering: auto; }
+.starts ul { margin: 4px 0 8px; padding-left: 18px; font-size: 12.5px; color: #c4cbd8; }
+.starts li { margin: 3px 0; }
+.note.tight { margin: 4px 0; }
 .note { color: var(--muted); font-size: 12.5px; margin: 10px 0; }
 .desc { white-space: pre-line; color: #c4cbd8; margin: 4px 0 10px; }
 .list { display: flex; flex-direction: column; }

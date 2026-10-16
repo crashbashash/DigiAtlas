@@ -15,7 +15,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import banners, database, generators, iso, maps, png, stages, stats
+from . import banners, database, generators, iso, maps, png, scripts, stages, stats
 from . import manifest as archive_manifest
 from .afs import Afs
 
@@ -66,7 +66,25 @@ def _drop_map(pools: list[generators.DropPool]) -> dict[str, str]:
     return out
 
 
-def _generator_record(g: generators.Generator) -> dict:
+def _script_info(g_name: str, stage_scripts: scripts.StageScripts | None) -> dict | None:
+    """What the stage's scripts say about a spawner (see ``scripts.StageScripts.status``)."""
+    if stage_scripts is None:
+        return None
+    status, refs = stage_scripts.status(g_name)
+    info: dict = {"status": status}
+    seen, out = set(), []
+    for r in refs:
+        key = (r.verb, tuple(r.when))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"verb": r.verb, "when": r.when})
+    if out:
+        info["refs"] = out[:8]
+    return info
+
+
+def _generator_record(g: generators.Generator, stage_scripts: scripts.StageScripts | None = None) -> dict:
     rec: dict = {
         "name": g.name,
         "row": g.row,
@@ -90,6 +108,9 @@ def _generator_record(g: generators.Generator) -> dict:
     players = _player_slots(g)
     if players:
         rec["players"] = players
+    info = _script_info(g.name, stage_scripts)
+    if info:
+        rec["script"] = info
     return rec
 
 
@@ -134,6 +155,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
     # --- text databases (English copy) -----------------------------------------------
     tables = database.read_tables(area.entry(database.DATABASE_ENTRY))
     models = database.enemy_models(tables)
+    player_digimon = {r["MODEL_NAME"]: r["NAME"] for r in tables.get("shinka", []) if r.get("MODEL_NAME") and r.get("NAME")}
 
     # --- enemies -----------------------------------------------------------------------
     table = stats.from_database(tables["enemy"])
@@ -194,6 +216,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
             "difficulties": {},
         }
         map_points: list[tuple[float, float, float]] = []
+        stage_scripts = scripts.analyse([ndmw.entry(pk) for pk in st.packs], player_digimon) if st.generator_packs else None
         for difficulty in DIFFICULTIES:
             idx = st.generator_packs.get(difficulty)
             if idx is None:
@@ -204,7 +227,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
                 for slot in g.slots or [generators.PlayerSlot(0, 0, g.pools, g.last_pools)]:
                     for pool in slot.pools + slot.last_pools:
                         pools.setdefault(pool.name, _pool_record(pool))
-            rec["difficulties"][difficulty] = {"generators": [_generator_record(g) for g in gens]}
+            rec["difficulties"][difficulty] = {"generators": [_generator_record(g, stage_scripts) for g in gens]}
         rec["map"] = None
         if with_maps:
             built = maps.build(ndmw, st.packs, map_points)

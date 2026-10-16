@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from ps2_export import banners, database, export, generators, igbpack, iso, maps, render, scene, stages, stats, textures  # noqa: E402
+from ps2_export import banners, database, export, generators, igbpack, iso, maps, render, scene, scripts, stages, stats, textures  # noqa: E402
 from ps2_export.afs import Afs  # noqa: E402
 
 try:
@@ -280,6 +280,67 @@ class PlayerSlotTests(unittest.TestCase):
         self.assertIsNone(export._player_slots(generator((0.0, 0.0, 0.0), [], True)))
 
 
+class ScriptTests(unittest.TestCase):
+    TRAP = """if be:MATisPlayer() == 1 and be:FLGisOn(339) == 0 then
+    be:sd("MODELCTRL", "g_rockdownz01", 2, "SQ_POWERON")
+    be:sd("GENERATER", nil, -1, "RESTART", "GENE-53")
+    be:FLGset(339, 1)
+end"""
+
+    def test_a_start_keeps_the_conditions_above_it_in_words(self):
+        [ref] = scripts.references(self.TRAP)
+        self.assertEqual((ref.verb, ref.target), ("RESTART", "GENE-53"))
+        self.assertEqual(ref.when, ["a player touches the trigger and event 339 not done yet"])
+
+    def test_commands_for_other_systems_are_ignored(self):
+        self.assertEqual(scripts.references('be:sd("MODELCTRL", nil, -1, "START", "GENE-01")'), [])
+
+    def test_a_trailing_delay_argument_does_not_hide_the_name(self):
+        [ref] = scripts.references('be:DMsetSD("GENERATER", nil, -1, "START", "GENE-22", 10)')
+        self.assertEqual((ref.target, ref.when), ("GENE-22", []))
+
+    def test_else_and_elseif_branches_carry_the_negated_earlier_conditions(self):
+        refs = scripts.references("""if be:FLGisOn(5) == 1 then
+    be:sd("GENERATER", nil, -1, "START", "GENE-a")
+elseif be:SYSgetPlayerNinzu() == 2 then
+    be:sd("GENERATER", nil, -1, "START", "GENE-b")
+else
+    be:sd("GENERATER", nil, -1, "START", "GENE-c")
+end""")
+        when = {r.target: r.when for r in refs}
+        self.assertEqual(when["GENE-a"], ["event 5 done"])
+        self.assertEqual(when["GENE-b"], ["not (event 5 done)", "exactly 2 players"])
+        self.assertEqual(when["GENE-c"], ["not (event 5 done)", "not (exactly 2 players)"])
+
+    def test_names_built_in_code_become_prefixes(self):
+        refs = scripts.references('be:sd("GENERATER", nil, -1, "START", format("GBOX-%02d", local_2))')
+        self.assertEqual((refs[0].target, refs[0].prefix), (None, "GBOX-"))
+
+    def test_status_of_a_spawner(self):
+        s = scripts.StageScripts()
+        s.add(scripts.references(self.TRAP))
+        s.add(scripts.references('be:sd("GENERATER", nil, -1, "START", format("GBOX-%02d", local_2))'))
+        self.assertEqual(s.status("GENE-53")[0], "referenced")
+        self.assertEqual(s.status("GBOX-04")[0], "dynamic")
+        self.assertEqual(s.status("GENE-01")[0], "none")
+        s.add(scripts.references('be:sd("GENERATER", nil, -1, "START", local_0)'))
+        self.assertEqual(s.status("GENE-01")[0], "unknown")
+
+    def test_runs_of_events_are_written_as_ranges(self):
+        self.assertEqual(scripts._ranges([598, 599, 600, 605, 607, 608]), "598-600, 605, 607-608")
+        self.assertEqual(scripts.describe("be:FLGisOn(1) == 1 and be:FLGisOn(2) == 1"), "events 1-2 done")
+
+    def test_the_digimon_you_play_is_named(self):
+        names = {"p_agumon": "Agumon"}
+        self.assertEqual(scripts.describe('local_0 == "p_agumon"', names), "you play as Agumon")
+        self.assertEqual(scripts.describe('local_0 ~= "p_agumon"', names), "you do not play as Agumon")
+        self.assertEqual(scripts.describe('local_0 == "p_agumon"'), 'local_0 == "p_agumon"')
+
+    def test_player_count_and_slot_conditions(self):
+        self.assertEqual(scripts.describe("be:SYSgetPlayerNinzu() ~= 1"), "2 or more players")
+        self.assertEqual(scripts.describe("be:MDLgetRamNo() == 1"), "player 2")
+
+
 class SceneTests(unittest.TestCase):
     def test_transform_uses_row_vectors_with_translation_in_last_row(self):
         move = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 30, 1)
@@ -486,6 +547,27 @@ class DiscTests(unittest.TestCase):
                 with_banner += 1
         self.assertEqual(with_banner, 92)
         self.assertEqual(len(list((self.out / "banners").glob("*.png"))), 92)
+
+    def test_goblin_pass_scripts_match_what_the_scripts_do(self):
+        # Hand-read from DW4_Decomp lua_cleaned/02-valley-overworld/01-stag0101-valley-entrance_e614.
+        stage = next(s for s in self.load("stages.json")["stages"] if s["id"] == "stag0101")
+        gens = {g["name"]: g for g in stage["difficulties"]["normal"]["generators"]}
+        for name in ("GENE-01", "GENE-02", "GENE-03", "GENE-04", "GENE-05", "GENE-14"):
+            self.assertEqual(gens[name]["script"]["status"], "none", name)
+        trap = gens["GENE-53"]["script"]
+        self.assertEqual(trap["status"], "referenced")
+        self.assertIn("event 339 not done yet", trap["refs"][0]["when"][0])
+        self.assertTrue(any("event 355 not done yet" in w for r in gens["GENE-22"]["script"]["refs"] for w in r["when"]))
+        epic = gens["GENE-e00"]["script"]["refs"][0]["when"][0]
+        self.assertIn("events 598-610 done", epic)
+        self.assertIn("you play as Agumon", gens["GENE-e00"]["script"]["refs"][0]["when"][1])
+        self.assertEqual(gens["GENE-00"]["startMode"], "radar")
+
+    def test_every_spawner_has_a_script_status(self):
+        for stage in self.load("stages.json")["stages"]:
+            for d in stage["difficulties"].values():
+                for g in d["generators"]:
+                    self.assertIn(g["script"]["status"], ("referenced", "dynamic", "unknown", "none"), stage["id"])
 
     def test_player_counts_scale_spawners(self):
         stage = next(s for s in self.load("stages.json")["stages"] if s["id"] == "stag0101")

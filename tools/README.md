@@ -22,6 +22,7 @@ Output stays out of git (`data/generated/` is ignored).
 | `database.py` | The game's databases from `AREA.AFS` entry 9 (English): named columns for items and enemies |
 | `stats.py` | Enemy stat rows built from the `enemy` database (649 rows) |
 | `names/enemies.json` | Curated enemy display names, by internal model |
+| `names/flags.json` | Story and quest flag meanings (from the decomp's flag table, high/medium confidence only) |
 | `names/stages.json` | Stage area/room names transcribed from the loading banners, with banner fingerprints |
 | `manifest.py` | Archive entry names from `NDMW.IGB` (finds each stage's USA banner pack) |
 | `textures.py`, `banners.py`, `png.py` | 8-bit paletted texture decode, loading banners, PNG writer |

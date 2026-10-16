@@ -24,6 +24,7 @@ export interface PanelActions {
   goToStage(stageId: string): void;
   setDifficulty(d: Difficulty): void;
   showUnused(show: boolean): void;
+  openItem(key: string): void;
   clearSelection(): void;
 }
 
@@ -45,7 +46,10 @@ export class Panel {
     clear(this.el);
     const d = state.difficulty;
     const sel = state.selection;
-    if (sel.kind === 'item') {
+    if (sel.kind === 'item' && stage) {
+      // In the main window the details live in their own window; here the item is highlighted on the map.
+      this.el.append(this.itemBanner(sel.key), ...this.overview(stage, d));
+    } else if (sel.kind === 'item') {
       if (sel.key !== this.lastItem) {
         this.showAllSources = false;
         this.sourceFilter = 'all';
@@ -64,6 +68,17 @@ export class Panel {
       this.el.append(h('p', { class: 'muted' }, 'Pick a stage from the list to begin.'));
     }
     this.el.scrollTop = 0;
+  }
+
+  private itemBanner(key: string): HTMLElement {
+    const item = this.model.items.get(key);
+    return h('div', { class: 'item-banner' },
+      h('div', null, 'Highlighting where ', h('strong', null, this.model.itemLabel(key)), ' drops',
+        item ? h('span', { class: 'muted' }, ` · ${categoryLabel(item.category)}`) : null),
+      h('div', { class: 'item-banner-actions' },
+        h('button', { class: 'link', onclick: () => this.act.openItem(key) }, 'Open details ↗'),
+        h('button', { class: 'link', onclick: () => this.act.clearSelection() }, 'Clear')),
+    );
   }
 
   // --- shared pieces -------------------------------------------------------------------------

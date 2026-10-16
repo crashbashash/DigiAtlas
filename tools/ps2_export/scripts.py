@@ -23,6 +23,15 @@ MAT = re.compile(r"be:MATisPlayer\(\)\s*(==|~=)\s*(\d+)")
 PLAYING = re.compile(r'local_\d+\s*(==|~=)\s*"(p_\w+)"')
 
 
+def load_flag_names() -> dict[int, str]:
+    """Meanings of the story and quest flags (``names/flags.json``)."""
+    import json
+    from pathlib import Path
+
+    raw = json.loads((Path(__file__).parent / "names" / "flags.json").read_text())
+    return {int(k): v["meaning"] for k, v in raw.items() if not k.startswith("_")}
+
+
 @dataclass
 class Ref:
     verb: str
@@ -44,20 +53,42 @@ def _ranges(numbers: list[int]) -> str:
     return ", ".join(out)
 
 
-def describe(cond: str, digimon: dict[str, str] | None = None) -> str:
+def _events(numbers: list[int], state: str, meanings: dict[int, str] | None) -> str:
+    """'events 598-610 done (600 Boss 1 story scene done; ...)', naming the ones the game's table knows."""
+    text = f"event{'s' if len(set(numbers)) > 1 else ''} {_ranges(numbers)} {state}"
+    known = [f"{n}: {meanings[n]}" for n in sorted(set(numbers)) if meanings and n in meanings]
+    if known:
+        text += " (" + "; ".join(known[:6]) + ("; ..." if len(known) > 6 else "") + ")"
+    return text
+
+
+def describe(
+    cond: str,
+    digimon: dict[str, str] | None = None,
+    meanings: dict[int, str] | None = None,
+    latched: frozenset[int] = frozenset(),
+) -> str:
     """One condition in words; unknown ones are returned as written.
 
-    ``digimon`` maps player model names (``p_agumon``) to display names ("Agumon").
+    ``digimon`` maps player model names (``p_agumon``) to display names ("Agumon"); ``meanings`` names
+    story flags; ``latched`` are flags the same script sets after testing them, which makes the test
+    "the first time" and not a story fact.
     """
     if m := re.fullmatch(r"not \((.*)\)", cond):
-        return "not (" + describe(m[1], digimon) + ")"
+        inner = describe(m[1], digimon, meanings, latched)
+        return inner.replace("this is the first time", "this is not the first time", 1) if "this is the first time" in inner else f"not ({inner})"
     parts: list[str] = []
     done: list[int] = []
     pending: list[int] = []
+    first: list[int] = []
     for piece in re.split(r"\s+and\s+", cond):
         piece = piece.strip().strip("()")
         if m := FLAG.fullmatch(piece):
-            (done if (m[2] == "==") == (m[3] != "0") else pending).append(int(m[1]))
+            n, is_done = int(m[1]), (m[2] == "==") == (m[3] != "0")
+            if not is_done and n in latched:
+                first.append(n)
+            else:
+                (done if is_done else pending).append(n)
         elif m := NINZU.fullmatch(piece):
             op, n = m[1], int(m[2])
             plural = "s" if n != 1 else ""
@@ -78,10 +109,12 @@ def describe(cond: str, digimon: dict[str, str] | None = None) -> str:
             parts.append(f"you play as {digimon[m[2]]}" if m[1] == "==" else f"you do not play as {digimon[m[2]]}")
         else:
             parts.append(piece)
+    if first:
+        parts.append(f"this is the first time (event {_ranges(first)})")
     if done:
-        parts.append(f"event{'s' if len(set(done)) > 1 else ''} {_ranges(done)} done")
+        parts.append(_events(done, "done", meanings))
     if pending:
-        parts.append(f"event{'s' if len(set(pending)) > 1 else ''} {_ranges(pending)} not done yet")
+        parts.append(_events(pending, "not done yet", meanings))
     return " and ".join(parts)
 
 
@@ -113,13 +146,15 @@ def _target(arg: str) -> tuple[str | None, str | None]:
     return None, (m[1] if m else "")
 
 
-def references(source: str, digimon: dict[str, str] | None = None) -> list[Ref]:
+def references(source: str, digimon: dict[str, str] | None = None, meanings: dict[int, str] | None = None) -> list[Ref]:
     """Every spawner command in one decompiled chunk with the conditions above it.
 
     ``elseif`` and ``else`` branches carry the negation of the branches before them, so a script that
     starts one spawner when a flag is set and another otherwise says so for both.
     """
     refs: list[Ref] = []
+    # A flag the chunk sets to 1 is a once-only latch when the same chunk tests it as not yet done.
+    latched = frozenset(int(n) for n in re.findall(r"be:FLGset\((\d+),\s*1\)", source))
     stack: list[tuple[str, list[str]]] = []  # per open block: (kind, raw conditions that hold inside)
     chain: dict[int, list[str]] = {}  # per level: the conditions of the if/elseif branches seen so far
     for line in source.split("\n"):
@@ -151,7 +186,7 @@ def references(source: str, digimon: dict[str, str] | None = None) -> list[Ref]:
                 continue
             name, prefix = _target(args[0])
             raw = [c for _kind, conds in stack for c in conds]
-            refs.append(Ref(m[2], name, prefix, [describe(c, digimon) for c in raw], raw))
+            refs.append(Ref(m[2], name, prefix, [describe(c, digimon, meanings, latched) for c in raw], raw))
     return refs
 
 
@@ -179,9 +214,9 @@ class StageScripts:
         return "none", []
 
 
-def analyse(packs: list[bytes], digimon: dict[str, str] | None = None) -> StageScripts:
+def analyse(packs: list[bytes], digimon: dict[str, str] | None = None, meanings: dict[int, str] | None = None) -> StageScripts:
     out = StageScripts()
     for blob in packs:
         for _offset, source in luadec.decompile_chunks(blob):
-            out.add(references(source, digimon))
+            out.add(references(source, digimon, meanings))
     return out

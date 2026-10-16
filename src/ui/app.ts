@@ -3,6 +3,7 @@ import type { Model } from '../data/model';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty, type Stage } from '../data/types';
 import { clear, h } from './dom';
 import { MapView } from './mapview';
+import { onGoto, openItemWindow } from './ipc';
 import { Panel } from './panel';
 import { sidebarBrand } from './brand';
 import { Sidebar } from './sidebar';
@@ -47,7 +48,8 @@ export class App {
     this.panel = new Panel(model, source, {
       selectGenerator: (index) => this.store.set({ selection: { kind: 'generator', index } }),
       selectGroup: (row) => this.store.set({ selection: { kind: 'group', row } }),
-      selectItem: (key) => this.store.set({ selection: { kind: 'item', key } }),
+      selectItem: (key) => this.showItem(key),
+      openItem: (key) => this.openItem(key),
       selectSpecies: (name) => this.store.set({ selection: { kind: 'species', name } }),
       goToStage: (id) => this.goToStage(id),
       setDifficulty: (d) => this.setDifficulty(d),
@@ -62,7 +64,7 @@ export class App {
           this.store.set({ query: '' });
           this.goToStage(id, true);
         },
-        selectItem: (key) => this.store.set({ selection: { kind: 'item', key } }),
+        selectItem: (key) => this.showItem(key),
         selectSpecies: (name) => this.store.set({ selection: { kind: 'species', name } }),
       },
       sidebarBrand(model.raw.manifest, onChangeData),
@@ -86,6 +88,11 @@ export class App {
       save(this.store.state);
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
+    void onGoto((m) => {
+      this.store.set({ difficulty: m.difficulty, players: m.players });
+      this.goToStage(m.stageId);
+      if (m.itemKey) this.store.set({ selection: { kind: 'item', key: m.itemKey } });
+    });
   }
 
   private goToStage(id: string, resetSelection = false): void {
@@ -96,6 +103,17 @@ export class App {
     const sel = this.store.state.selection;
     const keep = !resetSelection && (sel.kind === 'item' || sel.kind === 'species');
     this.store.set({ stageId: id, difficulty: d, selection: keep ? sel : { kind: 'none' } });
+  }
+
+  /** Highlight an item on the map and open its details in a window of their own. */
+  private showItem(key: string): void {
+    this.store.set({ selection: { kind: 'item', key } });
+    this.openItem(key);
+  }
+
+  private openItem(key: string): void {
+    const s = this.store.state;
+    void openItemWindow(key, this.model.itemLabel(key), { difficulty: s.difficulty, players: s.players, showUnused: s.showUnused });
   }
 
   private setDifficulty(d: Difficulty): void {

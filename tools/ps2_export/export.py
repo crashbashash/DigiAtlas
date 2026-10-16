@@ -155,6 +155,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
     # --- text databases (English copy) -----------------------------------------------
     tables = database.read_tables(area.entry(database.DATABASE_ENTRY))
     models = database.enemy_models(tables)
+    flag_names = scripts.load_flag_names()
     player_digimon = {r["MODEL_NAME"]: r["NAME"] for r in tables.get("shinka", []) if r.get("MODEL_NAME") and r.get("NAME")}
 
     # --- enemies -----------------------------------------------------------------------
@@ -216,7 +217,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
             "difficulties": {},
         }
         map_points: list[tuple[float, float, float]] = []
-        stage_scripts = scripts.analyse([ndmw.entry(pk) for pk in st.packs], player_digimon) if st.generator_packs else None
+        stage_scripts = scripts.analyse([ndmw.entry(pk) for pk in st.packs], player_digimon, flag_names) if st.generator_packs else None
         for difficulty in DIFFICULTIES:
             idx = st.generator_packs.get(difficulty)
             if idx is None:

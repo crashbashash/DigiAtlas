@@ -1,0 +1,339 @@
+{
+ "_note": "Story and quest flag meanings from DW4_Decomp docs/systems/flags/flag-meanings.tsv, keeping only entries marked high or medium confidence. Flags 100-319 are per-stage scratch values and are left out. Flags the table only guesses at are not here; scripts that set a flag in the same block as they test it are described as 'first time' instead.",
+ "1": {
+  "meaning": "intro step 0 (game start)",
+  "confidence": "high"
+ },
+ "2": {
+  "meaning": "intro step 1",
+  "confidence": "high"
+ },
+ "3": {
+  "meaning": "intro step 2",
+  "confidence": "high"
+ },
+ "4": {
+  "meaning": "intro step 3",
+  "confidence": "high"
+ },
+ "5": {
+  "meaning": "intro step 4",
+  "confidence": "high"
+ },
+ "6": {
+  "meaning": "main story underway (intro done)",
+  "confidence": "high"
+ },
+ "20": {
+  "meaning": "intro flag (checked with 2 in e0820)",
+  "confidence": "medium"
+ },
+ "22": {
+  "meaning": "intro sub-step",
+  "confidence": "medium"
+ },
+ "27": {
+  "meaning": "shop NPC dialogue (bank)",
+  "confidence": "medium"
+ },
+ "28": {
+  "meaning": "shop NPC dialogue (disk)",
+  "confidence": "medium"
+ },
+ "30": {
+  "meaning": "shop NPC dialogue",
+  "confidence": "medium"
+ },
+ "31": {
+  "meaning": "shop NPC dialogue",
+  "confidence": "medium"
+ },
+ "32": {
+  "meaning": "shop NPC dialogue",
+  "confidence": "medium"
+ },
+ "35": {
+  "meaning": "shop NPC dialogue",
+  "confidence": "medium"
+ },
+ "64": {
+  "meaning": "shop counter interaction",
+  "confidence": "medium"
+ },
+ "67": {
+  "meaning": "Boss 1 (Apocalymon) defeated",
+  "confidence": "high"
+ },
+ "68": {
+  "meaning": "Boss 2 (BelialVamdemon) defeated",
+  "confidence": "high"
+ },
+ "69": {
+  "meaning": "Boss 3 (Lucemon) defeated",
+  "confidence": "high"
+ },
+ "70": {
+  "meaning": "Final boss (Devimon) defeated",
+  "confidence": "high"
+ },
+ "71": {
+  "meaning": "city gate/lever state 1",
+  "confidence": "medium"
+ },
+ "72": {
+  "meaning": "city gate/lever state 2",
+  "confidence": "medium"
+ },
+ "83": {
+  "meaning": "Dungeon 4 (LordKnightmon) cleared",
+  "confidence": "high"
+ },
+ "85": {
+  "meaning": "lobby story beat",
+  "confidence": "medium"
+ },
+ "86": {
+  "meaning": "Final boss / main story cleared",
+  "confidence": "high"
+ },
+ "89": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "90": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "91": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "92": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "93": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "94": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "95": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "96": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "97": {
+  "meaning": "valley river event",
+  "confidence": "medium"
+ },
+ "98": {
+  "meaning": "valley river story event done",
+  "confidence": "high"
+ },
+ "362": {
+  "meaning": "city intro battle (Infermon/Megadramon) done",
+  "confidence": "high"
+ },
+ "371": {
+  "meaning": "shop quest state",
+  "confidence": "medium"
+ },
+ "375": {
+  "meaning": "shop story event",
+  "confidence": "medium"
+ },
+ "376": {
+  "meaning": "quest 1 done",
+  "confidence": "high"
+ },
+ "377": {
+  "meaning": "quest 2 done",
+  "confidence": "high"
+ },
+ "378": {
+  "meaning": "quest 3 done",
+  "confidence": "high"
+ },
+ "379": {
+  "meaning": "quest 4 done",
+  "confidence": "high"
+ },
+ "380": {
+  "meaning": "quest 5 done",
+  "confidence": "high"
+ },
+ "381": {
+  "meaning": "quest chain complete (final gate)",
+  "confidence": "high"
+ },
+ "384": {
+  "meaning": "quest 1 sub-step",
+  "confidence": "medium"
+ },
+ "385": {
+  "meaning": "quest 2 sub-step",
+  "confidence": "medium"
+ },
+ "386": {
+  "meaning": "quest 3 sub-step",
+  "confidence": "medium"
+ },
+ "387": {
+  "meaning": "quest 4 sub-step",
+  "confidence": "medium"
+ },
+ "388": {
+  "meaning": "quest 5 sub-step",
+  "confidence": "medium"
+ },
+ "389": {
+  "meaning": "quest final sub-step",
+  "confidence": "medium"
+ },
+ "392": {
+  "meaning": "shop event sub-flag",
+  "confidence": "medium"
+ },
+ "393": {
+  "meaning": "shop event sub-flag",
+  "confidence": "medium"
+ },
+ "409": {
+  "meaning": "quest/act in-progress marker (1=done, 0=reset)",
+  "confidence": "high"
+ },
+ "415": {
+  "meaning": "quest board completion sub-flag",
+  "confidence": "medium"
+ },
+ "416": {
+  "meaning": "quest board completion sub-flag",
+  "confidence": "medium"
+ },
+ "417": {
+  "meaning": "quest board completion sub-flag",
+  "confidence": "medium"
+ },
+ "418": {
+  "meaning": "quest board completion sub-flag",
+  "confidence": "medium"
+ },
+ "419": {
+  "meaning": "quest board completion sub-flag",
+  "confidence": "medium"
+ },
+ "420": {
+  "meaning": "quest board completion sub-flag",
+  "confidence": "medium"
+ },
+ "424": {
+  "meaning": "quest/act in-progress marker",
+  "confidence": "high"
+ },
+ "430": {
+  "meaning": "quest board completion sub-flag",
+  "confidence": "medium"
+ },
+ "469": {
+  "meaning": "quest board reward 1",
+  "confidence": "medium"
+ },
+ "471": {
+  "meaning": "quest board reward 2",
+  "confidence": "medium"
+ },
+ "473": {
+  "meaning": "quest board reward 3",
+  "confidence": "medium"
+ },
+ "508": {
+  "meaning": "stage-intro tutorial gate",
+  "confidence": "high"
+ },
+ "571": {
+  "meaning": "quest/act in-progress marker",
+  "confidence": "high"
+ },
+ "572": {
+  "meaning": "quest board chain progress 1",
+  "confidence": "medium"
+ },
+ "573": {
+  "meaning": "quest board chain progress 2",
+  "confidence": "medium"
+ },
+ "574": {
+  "meaning": "quest board chain progress 3",
+  "confidence": "medium"
+ },
+ "575": {
+  "meaning": "quest board chain progress 4",
+  "confidence": "medium"
+ },
+ "576": {
+  "meaning": "quest board chain progress 5",
+  "confidence": "medium"
+ },
+ "594": {
+  "meaning": "shop story flag",
+  "confidence": "medium"
+ },
+ "600": {
+  "meaning": "Boss 1 story scene done",
+  "confidence": "high"
+ },
+ "603": {
+  "meaning": "Boss 2 story scene done",
+  "confidence": "high"
+ },
+ "607": {
+  "meaning": "Boss 3 story scene done",
+  "confidence": "high"
+ },
+ "609": {
+  "meaning": "Dungeon 4 story scene done",
+  "confidence": "high"
+ },
+ "610": {
+  "meaning": "Final boss story scene done",
+  "confidence": "high"
+ },
+ "905": {
+  "meaning": "city entryway state",
+  "confidence": "medium"
+ },
+ "908": {
+  "meaning": "level gate: player Lv >= 16",
+  "confidence": "high"
+ },
+ "909": {
+  "meaning": "level gate: player Lv >= 46",
+  "confidence": "high"
+ },
+ "910": {
+  "meaning": "level gate: player Lv >= 76",
+  "confidence": "high"
+ },
+ "931": {
+  "meaning": "quest board slot 1 availability",
+  "confidence": "medium"
+ },
+ "932": {
+  "meaning": "quest board slot 2 availability",
+  "confidence": "medium"
+ },
+ "933": {
+  "meaning": "quest board slot 3 availability",
+  "confidence": "medium"
+ },
+ "934": {
+  "meaning": "quest board slot 4 availability",
+  "confidence": "medium"
+ }
+}

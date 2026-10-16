@@ -290,7 +290,7 @@ end"""
     def test_a_start_keeps_the_conditions_above_it_in_words(self):
         [ref] = scripts.references(self.TRAP)
         self.assertEqual((ref.verb, ref.target), ("RESTART", "GENE-53"))
-        self.assertEqual(ref.when, ["a player touches the trigger and event 339 not done yet"])
+        self.assertEqual(ref.when, ["a player touches the trigger and this is the first time (event 339)"])
 
     def test_commands_for_other_systems_are_ignored(self):
         self.assertEqual(scripts.references('be:sd("MODELCTRL", nil, -1, "START", "GENE-01")'), [])
@@ -329,6 +329,31 @@ end""")
     def test_runs_of_events_are_written_as_ranges(self):
         self.assertEqual(scripts._ranges([598, 599, 600, 605, 607, 608]), "598-600, 605, 607-608")
         self.assertEqual(scripts.describe("be:FLGisOn(1) == 1 and be:FLGisOn(2) == 1"), "events 1-2 done")
+
+    def test_a_flag_the_script_sets_itself_is_a_first_time_latch(self):
+        names = scripts.load_flag_names()
+        [ref] = scripts.references(self.TRAP, None, names)
+        self.assertEqual(ref.when, ["a player touches the trigger and this is the first time (event 339)"])
+        # Without the FLGset in the chunk, the same test is a plain "not done yet".
+        plain = self.TRAP.replace("    be:FLGset(339, 1)\n", "")
+        self.assertIn("event 339 not done yet", scripts.references(plain, None, names)[0].when[0])
+
+    def test_the_else_of_a_first_time_latch_is_not_the_first_time(self):
+        src = """if be:FLGisOn(355) == 0 then
+    be:FLGset(355, 1)
+    be:sd("GENERATER", nil, -1, "START", "GENE-21")
+else
+    be:sd("GENERATER", nil, -1, "START", "GENE-22")
+end"""
+        when = {r.target: r.when for r in scripts.references(src)}
+        self.assertEqual(when["GENE-21"], ["this is the first time (event 355)"])
+        self.assertEqual(when["GENE-22"], ["this is not the first time (event 355)"])
+
+    def test_story_flags_use_the_decomp_meanings(self):
+        names = scripts.load_flag_names()
+        self.assertEqual(names[610], "Final boss story scene done")
+        self.assertNotIn(150, names)  # per-stage scratch flags are not named
+        self.assertIn("(600: Boss 1 story scene done; 610: Final boss story scene done)", scripts.describe("be:FLGisOn(600) == 1 and be:FLGisOn(610) == 1", None, names))
 
     def test_the_digimon_you_play_is_named(self):
         names = {"p_agumon": "Agumon"}
@@ -556,10 +581,11 @@ class DiscTests(unittest.TestCase):
             self.assertEqual(gens[name]["script"]["status"], "none", name)
         trap = gens["GENE-53"]["script"]
         self.assertEqual(trap["status"], "referenced")
-        self.assertIn("event 339 not done yet", trap["refs"][0]["when"][0])
-        self.assertTrue(any("event 355 not done yet" in w for r in gens["GENE-22"]["script"]["refs"] for w in r["when"]))
+        self.assertIn("this is the first time (event 339)", trap["refs"][0]["when"][0])
+        self.assertTrue(any("this is the first time (event 355)" in w for r in gens["GENE-22"]["script"]["refs"] for w in r["when"]))
         epic = gens["GENE-e00"]["script"]["refs"][0]["when"][0]
         self.assertIn("events 598-610 done", epic)
+        self.assertIn("610: Final boss story scene done", epic)
         self.assertIn("you play as Agumon", gens["GENE-e00"]["script"]["refs"][0]["when"][1])
         self.assertEqual(gens["GENE-00"]["startMode"], "radar")
 

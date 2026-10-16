@@ -84,6 +84,11 @@ Players see `name`, never the internal ids.
   outside a spawner command, dungeons come out 5% unused and boss arenas 0%, Humid Cave B2 gives exactly the
   20 enemies of the original dungeon map, and Goblin Pass gives the two goblins seen in the game at the
   bridge. Field stages are 67% unused, which is where the authored extras sit.
+  Conditions are written in words. Story and quest flags are named from the decomp's flag table (only its
+  high and medium confidence entries; per-stage scratch flags are not named): "events 598-610 done (600: Boss 1
+  story scene done; ...; 610: Final boss story scene done)". A flag a script tests as "not done yet" and
+  sets itself in the same script is a once-only latch and reads "this is the first time (event 339)".
+  The Digimon you play is named from the game's own evolution table.
 - **Player count** (`generators[].players`): every spawner has four entries in the game, one per number of
   players, and in 13% of them the count, the alive-at-once cap or the drop pools differ (counts never fall
   as players are added, in 99.5% of cases they rise). The fields on the generator are the one-player case;

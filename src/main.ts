@@ -2,6 +2,7 @@ import './style.css';
 import { chooseFolder, inDesktopApp, openRemembered, requestedView, type DataSource } from './data/source';
 import { loadModel } from './data/model';
 import { App } from './ui/app';
+import { isPopout, startPopout } from './ui/popout';
 import { h } from './ui/dom';
 
 const root = document.getElementById('app')!;
@@ -20,6 +21,7 @@ function message(title: string, body: string, action?: { label: string; run: () 
 async function start(source: DataSource): Promise<void> {
   message('Loading data…', source.label);
   try {
+    if (isPopout(location.hash)) return await startPopout(root, source);
     const model = await loadModel(source);
     const wanted = await requestedView();
     if (wanted && wanted.startsWith('#')) history.replaceState(null, '', wanted);

@@ -76,6 +76,8 @@ def describe(
     """
     if m := re.fullmatch(r"not \((.*)\)", cond):
         inner = describe(m[1], digimon, meanings, latched)
+        if re.match(r"events? [\d, -]+ not done yet", inner):  # "not (X not done yet)" is just "X done"
+            return inner.replace(" not done yet", " done", 1)
         return inner.replace("this is the first time", "this is not the first time", 1) if "this is the first time" in inner else f"not ({inner})"
     parts: list[str] = []
     done: list[int] = []
@@ -110,7 +112,8 @@ def describe(
         else:
             parts.append(piece)
     if first:
-        parts.append(f"this is the first time (event {_ranges(first)})")
+        named = [f"{n}: {meanings[n]}" for n in first if meanings and n in meanings]
+        parts.append(f"this is the first time (event {_ranges(first)}{': ' + meanings[first[0]] if len(first) == 1 and named else ''})")
     if done:
         parts.append(_events(done, "done", meanings))
     if pending:

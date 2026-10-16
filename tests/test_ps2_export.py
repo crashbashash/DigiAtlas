@@ -281,6 +281,16 @@ class PlayerSlotTests(unittest.TestCase):
 
 
 class ScriptTests(unittest.TestCase):
+    def test_a_negated_not_done_yet_reads_as_done(self):
+        meanings = {38: "lever pulled"}
+        self.assertEqual(
+            scripts.describe("not (be:FLGisOn(38) == 0)", None, meanings), "event 38 done (38: lever pulled)"
+        )
+
+    def test_first_time_names_the_flag_when_known(self):
+        text = scripts.describe("be:FLGisOn(38) == 0", None, {38: "lever pulled"}, frozenset({38}))
+        self.assertEqual(text, "this is the first time (event 38: lever pulled)")
+
     TRAP = """if be:MATisPlayer() == 1 and be:FLGisOn(339) == 0 then
     be:sd("MODELCTRL", "g_rockdownz01", 2, "SQ_POWERON")
     be:sd("GENERATER", nil, -1, "RESTART", "GENE-53")
@@ -743,6 +753,12 @@ class DiscTests(unittest.TestCase):
         # Each difficulty has its own table.
         self.assertNotEqual(agumons[0]["tables"]["normal"], agumons[0]["tables"]["hard"])
         self.assertEqual(stages_out["stag0101"]["trades"], [])
+
+    def test_goblin_pass_field_box_is_gated_by_the_lever(self):
+        stage = next(s for s in self.load("stages.json")["stages"] if s["id"] == "stag0101")
+        box = next(g for g in stage["difficulties"]["normal"]["generators"] if g["name"] == "GBOX-01")
+        whens = " ".join(w for r in box["script"]["refs"] for w in r["when"])
+        self.assertIn("lever", whens)
 
     def test_banner_fingerprints(self):
         from ps2_export import manifest as archive_manifest

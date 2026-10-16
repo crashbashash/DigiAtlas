@@ -56,6 +56,10 @@
   "meaning": "shop NPC dialogue",
   "confidence": "medium"
  },
+ "38": {
+  "meaning": "Goblin Pass lever pulled (lift raised, Field Box appears)",
+  "confidence": "high"
+ },
  "64": {
   "meaning": "shop counter interaction",
   "confidence": "medium"

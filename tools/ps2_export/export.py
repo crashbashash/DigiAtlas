@@ -15,7 +15,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import banners, database, generators, iso, png, stages, stats
+from . import banners, database, generators, iso, maps, png, stages, stats
 from . import manifest as archive_manifest
 from .afs import Afs
 
@@ -27,7 +27,7 @@ KNOWN_GAPS = [
     "enemies[].name: Machinedramon, Devimon/Lucemon form and object names are not in the game text",
     "items[].stats: attack delay, upgrade costs and item flags are not exported (meaning unconfirmed)",
     "stages[]: stage names for 3 system scenes (stagIS07, stagIS08, stagIS20) are unknown",
-    "maps: floor maps and coordinate-to-map placement are not extracted yet",
+    "maps: top-down footprints only (floors and walls from the terrain mesh); no room names or icons",
     "trigger-placed item spawns (scripted pickups) are not extracted yet",
 ]
 ENEMY_NAMES = json.loads((Path(__file__).parent / "names" / "enemies.json").read_text())
@@ -72,10 +72,8 @@ def _generator_record(g: generators.Generator) -> dict:
         "row": g.row,
         "count": g.gene_count,
         "maxCount": g.gene_max_count,
-        "position": list(g.position),
-        "positions": [list(p) for p in g.positions],
+        "spawns": [[round(v, 3) for v in p] for p in g.spawns()],
         "rotations": g.rotations,
-        "positionIsGlobal": g.is_global,
         "startMode": g.start_mode,
         "fillMode": g.fill_mode,
     }
@@ -88,7 +86,7 @@ def _generator_record(g: generators.Generator) -> dict:
     return rec
 
 
-def export(iso_path: str, out_dir: Path) -> dict:
+def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
     files = iso.list_files(iso_path)
     for needed in ("/SYSTEM.CNF", "/AREA.AFS", "/NDMW.AFS", "/NDMW.IGB", "/SLUS_208.36"):
         if needed not in files:
@@ -139,6 +137,7 @@ def export(iso_path: str, out_dir: Path) -> dict:
     # --- stages, generators, drop pools -----------------------------------------------
     stage_records, pools = [], {}
     names = archive_manifest.read_names(src("NDMW.IGB").read(0, files["/NDMW.IGB"].size))
+    map_dir = out_dir / "maps"
     banner_dir = out_dir / "banners"
     banner_dir.mkdir(parents=True, exist_ok=True)
     all_stages = stages.list_stages(ndmw)
@@ -161,15 +160,33 @@ def export(iso_path: str, out_dir: Path) -> dict:
             "generatorPacks": st.generator_packs or None,
             "difficulties": {},
         }
+        map_points: list[tuple[float, float]] = []
         for difficulty in DIFFICULTIES:
             idx = st.generator_packs.get(difficulty)
             if idx is None:
                 continue
             gens = generators.Pack(ndmw.entry(idx)).generators()
+            map_points.extend((x, z) for g in gens for x, _y, z in g.spawns())
             for g in gens:
                 for pool in g.pools + g.last_pools:
                     pools.setdefault(pool.name, _pool_record(pool))
             rec["difficulties"][difficulty] = {"generators": [_generator_record(g) for g in gens]}
+        rec["map"] = None
+        if with_maps:
+            built = maps.build(ndmw, st.packs, map_points)
+            if built is not None:
+                map_dir.mkdir(parents=True, exist_ok=True)
+                (map_dir / f"{st.id}.png").write_bytes(built.png())
+                min_x, max_x, min_z, max_z = built.bounds
+                rec["map"] = {
+                    "image": f"maps/{st.id}.png",
+                    "bounds": {"minX": min_x, "maxX": max_x, "minZ": min_z, "maxZ": max_z},
+                    "width": built.raster.width,
+                    "height": built.raster.height,
+                    "pixelsPerUnit": round(built.raster.pixels_per_unit, 4),
+                    "coverage": round(built.coverage, 3),
+                    "fill": round(built.raster.fill, 3),
+                }
         stage_records.append(rec)
 
     # --- items (every item in the game database) ---------------------------------------
@@ -203,6 +220,7 @@ def export(iso_path: str, out_dir: Path) -> dict:
             "enemyRows": len(enemies["rows"]),
             "stages": len(stage_records),
             "stagesWithGenerators": sum(1 for s in stage_records if s["difficulties"]),
+            "stageMaps": sum(1 for s in stage_records if s["map"]),
             "generators": sum(
                 len(d["generators"]) for s in stage_records for d in s["difficulties"].values()
             ),
@@ -210,7 +228,7 @@ def export(iso_path: str, out_dir: Path) -> dict:
             "items": len(items),
         },
         "files": ["enemies.json", "stages.json", "drops.json", "items.json"],
-        "assets": ["banners/"],
+        "assets": ["banners/"] + (["maps/"] if with_maps else []),
         "knownGaps": KNOWN_GAPS,
     }
 
@@ -231,8 +249,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("iso", help="Digimon World 4 (USA) PS2 disc image")
     ap.add_argument("--out", default="data/generated/ps2", help="output directory")
+    ap.add_argument("--maps", action="store_true", help="also render top-down stage maps (a few minutes)")
     args = ap.parse_args(argv)
-    manifest = export(args.iso, Path(args.out))
+    manifest = export(args.iso, Path(args.out), args.maps)
     print(json.dumps(manifest["counts"], indent=1))
     if not manifest["source"]["statTableVerified"]:
         print("warning: stat table anchors did not match; disc may be modified or not vanilla USA",

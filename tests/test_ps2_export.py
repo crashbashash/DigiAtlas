@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from ps2_export import banners, database, export, generators, igbpack, iso, stages, stats, textures  # noqa: E402
+from ps2_export import banners, database, export, generators, igbpack, iso, maps, render, scene, stages, stats, textures  # noqa: E402
 from ps2_export.afs import Afs  # noqa: E402
 
 try:
@@ -222,6 +222,88 @@ class StageTests(unittest.TestCase):
         self.assertEqual(struct.unpack(">II", data[16:24]), (1, 1))
 
 
+def generator(position, positions, is_global):
+    return generators.Generator(
+        name="GENE-00", row=1, position=position, positions=positions, rotations=[], is_global=is_global,
+        start_mode="", fill_mode="", lua="", gene_count=1, gene_max_count=1, pools=[], last_pools=[],
+    )
+
+
+class SpawnTests(unittest.TestCase):
+    def test_global_generator_lists_world_positions(self):
+        g = generator((5.0, 10.0, 15.0), [(5.0, 10.0, 15.0), (30.0, 10.0, 0.0)], True)
+        self.assertEqual(g.spawns(), [(5.0, 10.0, 15.0), (30.0, 10.0, 0.0)])
+
+    def test_global_without_list_falls_back_to_position(self):
+        self.assertEqual(generator((1.0, 2.0, 3.0), [], True).spawns(), [(1.0, 2.0, 3.0)])
+
+    def test_room_generator_adds_offsets_to_the_anchor(self):
+        g = generator((-180.0, 40.0, 60.0), [(-20.0, 0.0, -55.0), (20.0, 0.0, -55.0)], False)
+        self.assertEqual(g.spawns(), [(-200.0, 40.0, 5.0), (-160.0, 40.0, 5.0)])
+
+    def test_room_generator_without_offsets_spawns_at_the_anchor(self):
+        self.assertEqual(generator((7.0, 0.0, 9.0), [], False).spawns(), [(7.0, 0.0, 9.0)])
+
+
+class SceneTests(unittest.TestCase):
+    def test_transform_uses_row_vectors_with_translation_in_last_row(self):
+        move = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 30, 1)
+        self.assertEqual(scene.transform_point(move, (1, 2, 3)), (11, 22, 33))
+
+    def test_multiply_applies_first_matrix_first(self):
+        move = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 0, 0, 1)
+        scale = (2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1)
+        both = scene.multiply(move, scale)  # move, then scale
+        self.assertEqual(scene.transform_point(both, (1, 0, 0)), (22, 0, 0))
+
+    def test_identity_is_neutral(self):
+        self.assertEqual(scene.transform_point(scene.IDENTITY, (4, 5, 6)), (4, 5, 6))
+
+
+class RenderTests(unittest.TestCase):
+    FLOOR = ((0.0, 5.0, 0.0), (0.0, 5.0, 10.0), (10.0, 5.0, 0.0))
+    WALL = ((20.0, 0.0, 20.0), (30.0, 0.0, 20.0), (30.0, 9.0, 20.0))
+
+    def test_floor_triangle_is_filled_and_clipped(self):
+        r = render.render([self.FLOOR], (0.0, 40.0, 0.0, 40.0), max_side=80)
+        self.assertEqual(r.pixels_per_unit, 2.0)
+        self.assertTrue(r.covered(2.0, 2.0))
+        self.assertFalse(r.covered(9.0, 9.0))  # beyond the hypotenuse
+        self.assertFalse(r.covered(35.0, 35.0))
+
+    def test_fill_reports_the_covered_share(self):
+        r = render.render([self.FLOOR], (0.0, 20.0, 0.0, 20.0), max_side=40)
+        self.assertAlmostEqual(r.fill, 0.125, delta=0.02)  # half of a quarter of the crop
+
+    def test_triangle_outside_the_crop_is_ignored(self):
+        r = render.render([self.FLOOR], (100.0, 140.0, 100.0, 140.0), max_side=80)
+        self.assertFalse(any(r.rgba[3::4]))
+
+    def test_vertical_triangle_is_drawn_as_a_line(self):
+        r = render.render([self.WALL], (0.0, 40.0, 0.0, 40.0), max_side=80)
+        self.assertTrue(r.covered(25.0, 20.0))
+        self.assertFalse(r.covered(25.0, 30.0))
+
+
+class MapChoiceTests(unittest.TestCase):
+    @staticmethod
+    def tri_scene(name, size, count=300):
+        t = ((0.0, 0.0, 0.0), (size, 0.0, 0.0), (0.0, 0.0, size))
+        return scene.Scene(0, name, [t] * count)
+
+    def test_prefers_the_scene_covering_the_spawn_points(self):
+        small, big = self.tri_scene("", 50), self.tri_scene("", 500)
+        self.assertIs(maps.choose_scene([small, big], [(100.0, 100.0)]), big)
+
+    def test_skips_interface_effect_and_tiny_scenes(self):
+        scenes = [self.tri_scene("i_hud", 900), self.tri_scene("x_fx", 900), self.tri_scene("", 900, count=5)]
+        self.assertIsNone(maps.choose_scene(scenes, [(10.0, 10.0)]))
+
+    def test_ties_go_to_the_larger_mesh(self):
+        a, b = self.tri_scene("", 900, count=300), self.tri_scene("", 900, count=900)
+        self.assertIs(maps.choose_scene([a, b], [(10.0, 10.0)]), b)
+
+
 class PoolTests(unittest.TestCase):
     def test_pool_record_parses_name_and_totals(self):
         pool = generators.DropPool(
@@ -343,6 +425,21 @@ class DiscTests(unittest.TestCase):
                 with_banner += 1
         self.assertEqual(with_banner, 92)
         self.assertEqual(len(list((self.out / "banners").glob("*.png"))), 92)
+
+    def test_stage_maps_cover_their_spawn_points(self):
+        # Three stage types: field, dungeon floor and fortress room, each cropped to its spawn area.
+        from ps2_export.afs import Afs
+
+        ndmw = Afs(iso.open_disc_file(os.environ["DIGIATLAS_PS2_ISO"], "NDMW.AFS"))
+        stages_out = {s["id"]: s for s in self.load("stages.json")["stages"]}
+        for sid in ("stag0102", "dng101b1", "stagGF01"):
+            st = stages_out[sid]
+            points = [(p[0], p[2]) for d in st["difficulties"].values() for g in d["generators"] for p in g["spawns"]]
+            built = maps.build(ndmw, st["packs"], points)
+            self.assertIsNotNone(built, sid)
+            self.assertGreaterEqual(built.coverage, 0.95, sid)
+            self.assertGreater(built.raster.fill, 0.0, sid)
+            self.assertTrue(built.png().startswith(b"\x89PNG"))
 
     def test_banner_fingerprints(self):
         from ps2_export import manifest as archive_manifest

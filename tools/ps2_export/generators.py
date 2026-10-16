@@ -62,6 +62,17 @@ class Generator:
     pools: list[DropPool]
     last_pools: list[DropPool]
 
+    def spawns(self) -> list[tuple[float, float, float]]:
+        """World positions where this generator places things.
+
+        A global generator lists world coordinates. Otherwise ``position`` is the room anchor and
+        the list holds offsets from it (dungeon rooms).
+        """
+        if self.is_global:
+            return list(self.positions) or [self.position]
+        x, y, z = self.position
+        return [(x + dx, y + dy, z + dz) for dx, dy, dz in (self.positions or [(0.0, 0.0, 0.0)])]
+
 
 def has_generators(data: bytes) -> bool:
     """Cheap test: does this AFS entry carry a ``beGeneraterData`` class?"""

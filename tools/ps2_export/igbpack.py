@@ -152,6 +152,8 @@ def decode_record(b, p, dirs, reflection=None):
             vals.append([fname, [round(x, 4) for x in struct.unpack_from("<4f", b, q)], ty])
         elif ty == 16:
             vals.append([fname, round(struct.unpack_from("<f", b, q)[0], 4), ty])
+        elif ty == 40:
+            vals.append([fname, list(struct.unpack_from("<16f", b, q)), ty])
         elif ty in (2, 3, 8, 34):
             vals.append([fname, b[q], ty])
         elif ty in (12, 31):
@@ -296,13 +298,15 @@ class Graph:
         off, self.id_count, self.obj_of_id = find_table(data, self.s1, self.s2)
         self.pool_start = self.s2[-1]["end"]
         self._block: dict[int, int] = {}
+        self._block_size: dict[int, int] = {}
         cursor = self.pool_start
         for gid in range(self.id_count):
             entry = self.s1[struct.unpack_from("<H", data, off + 8 + 2 * gid)[0]]
             if entry["class"] != "igMemoryDirEntry":
                 continue
             self._block[gid] = cursor
-            cursor += (field_map(entry)["slot7"] + 3) & ~3
+            self._block_size[gid] = field_map(entry)["slot7"]
+            cursor += (self._block_size[gid] + 3) & ~3
         self.pool_end = cursor
         if cursor != len(data):
             raise ValueError(f"memory blocks end at {cursor}, pack is {len(data)} bytes")
@@ -321,6 +325,9 @@ class Graph:
         if start + size > len(self.b):
             raise ValueError(f"block {memory_id} ({size} bytes) runs past the pack")
         return self.b[start : start + size]
+
+    def block_size(self, memory_id: int) -> int:
+        return self._block_size[memory_id]
 
     def block_offset(self, k: int) -> int:
         """File offset of list record ``k``'s elements."""

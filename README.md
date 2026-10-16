@@ -28,7 +28,8 @@ cd tools && python3 -m ps2_export.export "/path/to/Digimon World 4 (USA).iso" --
 ```
 
 The PS2 reader exports 580 enemy and object rows with names and stats, 590 items with names and
-descriptions, 85 stages of spawn generators across all three difficulties, and 344 drop pools. See [tools/README.md](tools/README.md) for what it can and cannot read yet.
+descriptions, 98 named stages, 85 stages of spawn generators across all three difficulties (with world
+positions), 344 drop pools, loading banners, and top-down maps for 82 stages (`--maps`). See [tools/README.md](tools/README.md) for what it can and cannot read yet.
 
 ## License
 

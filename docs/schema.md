@@ -69,6 +69,19 @@ Players see `name`, never the internal ids.
   Notes: the area on the Goblin Fortress banners reads "Fortress", and `stag0000` is the Japanese-text
   debug stage.
 
+- **Spawn positions** (`generators[].spawns`): world positions `[x, y, z]`. The game stores either world
+  coordinates (global generators) or offsets from a room anchor (dungeon rooms); the exporter resolves
+  both, so `spawns` is always world space. Every spawn lands on the stage's terrain (checked on map
+  coverage below).
+- **Maps** (`stages[].map`, export option `--maps`): a top-down footprint of each stage's terrain mesh,
+  written to `maps/<id>.png` (transparent where there is no geometry) with its world `bounds` and
+  `pixelsPerUnit`, so `pixel = (world - min) * pixelsPerUnit`. Image x is world x and image y is world
+  z (z grows downward); the in-game compass direction has not been checked. Floors are shaded by
+  height and walls are drawn as lines. The map is cropped to the spawn area plus a margin and is
+  shared by all three difficulties. `coverage` is the share of spawn points on drawn geometry (1.0 for
+  all but one stage). `fill` is the share of the image that has geometry: boss arenas, the debug and
+  practice stages and two dungeon floors are above 0.97, meaning a flat floor with little to show.
+
 ## Not extracted yet
 
 Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, never invented:
@@ -76,7 +89,9 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
 - Stage names for `stagIS07`, `stagIS08` and `stagIS20`: system scenes with no banner (`stagIS09` and
   `stagIS10` are the Bandai logo and the opening, from the decomp's loading-screen tour, as is
   `stagML14`, which has no banner image of its own).
-- Floor maps and the placement of spawn coordinates on them.
+- Trader Hall (`dngq5b1e/h/v`) has no map: its rooms are assembled by script at load, so the static
+  terrain does not cover its spawn points. Hubs and system scenes have no spawns and no map.
+- Room names, doors and icons on the maps; the maps are geometry only.
 - Scripted pickups placed by triggers are not extracted; destructibles are (as generators).
 
 ## Data quirks

@@ -24,7 +24,8 @@
           "kind",
           "floor",
           "variant",
-          "banner"
+          "banner",
+          "map"
         ],
         "properties": {
           "id": {
@@ -69,12 +70,10 @@
                         "row",
                         "count",
                         "maxCount",
-                        "position",
-                        "positions",
                         "rotations",
-                        "positionIsGlobal",
                         "startMode",
-                        "fillMode"
+                        "fillMode",
+                        "spawns"
                       ],
                       "additionalProperties": false,
                       "properties": {
@@ -98,33 +97,11 @@
                             "null"
                           ]
                         },
-                        "position": {
-                          "type": "array",
-                          "items": {
-                            "type": "number"
-                          },
-                          "minItems": 3,
-                          "maxItems": 3
-                        },
-                        "positions": {
-                          "type": "array",
-                          "items": {
-                            "type": "array",
-                            "items": {
-                              "type": "number"
-                            },
-                            "minItems": 3,
-                            "maxItems": 3
-                          }
-                        },
                         "rotations": {
                           "type": "array",
                           "items": {
                             "type": "number"
                           }
-                        },
-                        "positionIsGlobal": {
-                          "type": "boolean"
                         },
                         "startMode": {
                           "type": "string"
@@ -148,6 +125,19 @@
                             "type": "string"
                           },
                           "description": "difficulty (or slotN) -> pool name in drops.json"
+                        },
+                        "spawns": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 3,
+                            "maxItems": 3
+                          },
+                          "minItems": 1,
+                          "description": "World positions [x, y, z] where this generator places enemies or objects. For dungeon rooms the game stores offsets from a room anchor; they are already added here."
                         }
                       }
                     }
@@ -169,12 +159,10 @@
                         "row",
                         "count",
                         "maxCount",
-                        "position",
-                        "positions",
                         "rotations",
-                        "positionIsGlobal",
                         "startMode",
-                        "fillMode"
+                        "fillMode",
+                        "spawns"
                       ],
                       "additionalProperties": false,
                       "properties": {
@@ -198,33 +186,11 @@
                             "null"
                           ]
                         },
-                        "position": {
-                          "type": "array",
-                          "items": {
-                            "type": "number"
-                          },
-                          "minItems": 3,
-                          "maxItems": 3
-                        },
-                        "positions": {
-                          "type": "array",
-                          "items": {
-                            "type": "array",
-                            "items": {
-                              "type": "number"
-                            },
-                            "minItems": 3,
-                            "maxItems": 3
-                          }
-                        },
                         "rotations": {
                           "type": "array",
                           "items": {
                             "type": "number"
                           }
-                        },
-                        "positionIsGlobal": {
-                          "type": "boolean"
                         },
                         "startMode": {
                           "type": "string"
@@ -248,6 +214,19 @@
                             "type": "string"
                           },
                           "description": "difficulty (or slotN) -> pool name in drops.json"
+                        },
+                        "spawns": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 3,
+                            "maxItems": 3
+                          },
+                          "minItems": 1,
+                          "description": "World positions [x, y, z] where this generator places enemies or objects. For dungeon rooms the game stores offsets from a room anchor; they are already added here."
                         }
                       }
                     }
@@ -269,12 +248,10 @@
                         "row",
                         "count",
                         "maxCount",
-                        "position",
-                        "positions",
                         "rotations",
-                        "positionIsGlobal",
                         "startMode",
-                        "fillMode"
+                        "fillMode",
+                        "spawns"
                       ],
                       "additionalProperties": false,
                       "properties": {
@@ -298,33 +275,11 @@
                             "null"
                           ]
                         },
-                        "position": {
-                          "type": "array",
-                          "items": {
-                            "type": "number"
-                          },
-                          "minItems": 3,
-                          "maxItems": 3
-                        },
-                        "positions": {
-                          "type": "array",
-                          "items": {
-                            "type": "array",
-                            "items": {
-                              "type": "number"
-                            },
-                            "minItems": 3,
-                            "maxItems": 3
-                          }
-                        },
                         "rotations": {
                           "type": "array",
                           "items": {
                             "type": "number"
                           }
-                        },
-                        "positionIsGlobal": {
-                          "type": "boolean"
                         },
                         "startMode": {
                           "type": "string"
@@ -348,6 +303,19 @@
                             "type": "string"
                           },
                           "description": "difficulty (or slotN) -> pool name in drops.json"
+                        },
+                        "spawns": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 3,
+                            "maxItems": 3
+                          },
+                          "minItems": 1,
+                          "description": "World positions [x, y, z] where this generator places enemies or objects. For dungeon rooms the game stores offsets from a room anchor; they are already added here."
                         }
                       }
                     }
@@ -401,6 +369,76 @@
               "null"
             ],
             "description": "Loading-screen picture, relative to the export directory."
+          },
+          "map": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Top-down terrain map, present when the export was run with --maps and the stage has spawn points.",
+            "additionalProperties": false,
+            "required": [
+              "image",
+              "bounds",
+              "width",
+              "height",
+              "pixelsPerUnit",
+              "coverage",
+              "fill"
+            ],
+            "properties": {
+              "image": {
+                "type": "string",
+                "description": "PNG relative to the export directory; transparent where there is no geometry."
+              },
+              "bounds": {
+                "type": "object",
+                "required": [
+                  "minX",
+                  "maxX",
+                  "minZ",
+                  "maxZ"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "minX": {
+                    "type": "number"
+                  },
+                  "maxX": {
+                    "type": "number"
+                  },
+                  "minZ": {
+                    "type": "number"
+                  },
+                  "maxZ": {
+                    "type": "number"
+                  }
+                },
+                "description": "World rectangle the image covers. Image x grows with world x and image y grows with world z."
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              },
+              "pixelsPerUnit": {
+                "type": "number",
+                "description": "Pixels per world unit: pixel = (world - min) * pixelsPerUnit."
+              },
+              "coverage": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Share of spawn points that land on drawn geometry."
+              },
+              "fill": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Share of the image covered by geometry. Values near 1 (boss arenas, a few dungeon floors) are flat floors with little structure to show."
+              }
+            }
           }
         }
       }

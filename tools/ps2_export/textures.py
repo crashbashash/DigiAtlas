@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from . import igbpack
 
-IMAGE_W, IMAGE_H, IMAGE_PIXELS = 0, 1, 11  # positions in an igImage record
+IMAGE_W, IMAGE_H, IMAGE_PIXELS, IMAGE_CLUT = 0, 1, 11, 15  # positions in an igImage record
 CLUT_COLORS, CLUT_DATA = 1, 3  # positions in an igClut record
 PALETTE_BYTES = 1024
 
@@ -45,13 +45,21 @@ def decode(graph: igbpack.Graph, image: int, clut: int) -> Texture:
     return Texture(graph.s2[image]["name"], w, h, bytes(out))
 
 
+def clut_of(graph: igbpack.Graph, image: int) -> int:
+    """Record index of the palette an image points at (an object-id reference)."""
+    k = graph.ref(graph.vals(image)[IMAGE_CLUT])
+    if k is None or graph.s2[k]["class"] != "igClut":
+        raise ValueError(f"image record {image} has no resolvable palette")
+    return k
+
+
 def decode_all(graph: igbpack.Graph) -> list[Texture]:
-    """Every igImage paired with the igClut that follows its texture attribute (single-image packs)."""
-    images = [k for k, r in enumerate(graph.s2) if r["class"] == "igImage"]
-    cluts = [k for k, r in enumerate(graph.s2) if r["class"] == "igClut"]
-    if len(images) != len(cluts):
-        raise ValueError(f"{len(images)} images but {len(cluts)} palettes")
-    return [decode(graph, i, c) for i, c in zip(images, cluts)]
+    """Every igImage in the pack, each decoded with the palette it references."""
+    return [
+        decode(graph, k, clut_of(graph, k))
+        for k, r in enumerate(graph.s2)
+        if r["class"] == "igImage"
+    ]
 
 
 def region_sha1(texture: Texture, x0: int, y0: int, x1: int, y1: int) -> str:

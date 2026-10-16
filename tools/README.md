@@ -10,7 +10,8 @@ cd tools
 python3 -m ps2_export.export "/path/to/Digimon World 4 (USA).iso" --out ../data/generated/ps2
 ```
 
-It takes a few seconds. Output stays out of git (`data/generated/` is ignored).
+It takes a few seconds. Add `--maps` to also render a top-down map for each stage (about 5 minutes).
+Output stays out of git (`data/generated/` is ignored).
 
 | Module | Reads |
 |---|---|
@@ -24,6 +25,8 @@ It takes a few seconds. Output stays out of git (`data/generated/` is ignored).
 | `names/stages.json` | Stage area/room names transcribed from the loading banners, with banner fingerprints |
 | `manifest.py` | Archive entry names from `NDMW.IGB` (finds each stage's USA banner pack) |
 | `textures.py`, `banners.py`, `png.py` | 8-bit paletted texture decode, loading banners, PNG writer |
+| `scene.py` | Scene graphs: transforms, `igGeometry` nodes, vertex and primitive streams to triangles |
+| `render.py`, `maps.py` | Top-down raster of the terrain scene (floors shaded by height, walls as lines) and the choice of terrain scene per stage |
 
 `igbpack.py` and `generators.py` are adapted from the DW4 decompilation tooling (`igb_inst.py`,
 `igb_ids.py`, `igb_generators.py`).

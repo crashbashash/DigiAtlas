@@ -186,14 +186,16 @@ export class Panel {
     const isObject = e?.kind === 'object';
     const parts: (HTMLElement | null)[] = [
       h('div', { class: 'facts' },
-        h('div', null, h('span', { class: 'k' }, isObject ? 'Placed at' : 'Spawn points'), h('span', { class: 'v' }, `${g.spawns.length}`)),
+        h('div', null, h('span', { class: 'k' }, isObject ? 'Placed at' : 'Spots'), h('span', { class: 'v' }, `${g.spawns.length}`)),
         isObject ? null : h('div', null, h('span', { class: 'k' }, 'Total spawned'), h('span', { class: 'v' }, g.count === null ? '?' : `${g.count}`)),
         isObject ? null : h('div', null, h('span', { class: 'k' }, 'At once (max)'), h('span', { class: 'v' }, g.maxCount === null ? '?' : `${g.maxCount}`)),
       ),
       isObject
         ? null
         : h('p', { class: 'note' },
-            `${startModeText(g.startMode)}.` + ((g.count ?? 0) > (g.maxCount ?? 0) ? ` ${fillModeText(g.fillMode)}.` : '')),
+            `${startModeText(g.startMode)}.` +
+              ((g.count ?? 0) > (g.maxCount ?? 0) ? ` ${fillModeText(g.fillMode)}.` : '') +
+              (g.count !== null && g.spawns.length > g.count ? ` It has ${g.spawns.length} possible spots but places only ${g.count}.` : '')),
       h('div', { class: 'sub' }, `Stats (${DIFFICULTY_LABEL[d]})`),
       this.enemyCard(e, g.row),
       this.dropTableEl(table, `Drops (${DIFFICULTY_LABEL[d]}, per kill)`),

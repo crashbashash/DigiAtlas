@@ -17,6 +17,10 @@ interface Marker {
   kind: EnemyKind;
   label: string;
   detail: string;
+  /** Appears when you get close (solid) or only when a script starts it (ring). */
+  scripted: boolean;
+  /** One of several spots for a spawner that places fewer enemies than it has spots. */
+  shared: boolean;
 }
 
 /** Maps this full are a flat floor with nothing to show; the plain grid reads better. */
@@ -69,13 +73,14 @@ export class MapView {
   }
 
   private legend(): HTMLElement {
-    return h(
-      'div',
-      { class: 'legend' },
-      ...(Object.keys(KIND_COLOR) as EnemyKind[]).map((k) =>
-        h('span', null, h('i', { style: `background:${KIND_COLOR[k]}` }), KIND_LABEL[k]),
-      ),
-    );
+    const kinds = (Object.keys(KIND_COLOR) as EnemyKind[]).map((k) =>
+      h('span', null, h('i', { style: `background:${KIND_COLOR[k]}` }), KIND_LABEL[k]));
+    const styles = [
+      h('span', null, h('i', { class: 'solid' }), 'Appears when you get close'),
+      h('span', null, h('i', { class: 'ring' }), 'Started by a script'),
+      h('span', null, h('i', { class: 'small' }), 'One of several spots'),
+    ];
+    return h('div', { class: 'legend' }, h('div', null, ...kinds), h('div', null, ...styles));
   }
 
   show(stage: Stage, d: Difficulty, highlight: Set<number> | null, selected: number | null): void {
@@ -112,8 +117,17 @@ export class MapView {
     this.model.generators(stage, d).forEach((g, gi) => {
       const e: Enemy | undefined = this.model.enemies.get(g.row);
       const kind: EnemyKind = e?.kind ?? 'enemy';
-      const detail = !e || e.kind === 'object' ? '' : `HP ${e.hp.toLocaleString('en-US')} · ${g.count ?? '?'} total`;
-      for (const [x, , z] of g.spawns) out.push({ gi, x, z, kind, label: e?.name ?? `Row ${g.row}`, detail });
+      const spots = g.spawns.length;
+      const shared = e?.kind !== 'object' && g.count !== null && spots > g.count;
+      const scripted = g.startMode === 'direct' || g.startMode === 'timer';
+      const lines = [
+        e && e.kind !== 'object' ? `HP ${e.hp.toLocaleString('en-US')} · ${g.count ?? '?'} total` : '',
+        e?.kind === 'object' ? '' : scripted ? 'Started by a script' : 'Appears when you get close',
+        shared ? `One of ${spots} spots; places ${g.count}` : '',
+      ].filter(Boolean);
+      for (const [x, , z] of g.spawns) {
+        out.push({ gi, x, z, kind, label: e?.name ?? `Row ${g.row}`, detail: lines.join('\n'), scripted: scripted && e?.kind !== 'object', shared });
+      }
     });
     return out;
   }
@@ -233,11 +247,12 @@ export class MapView {
     const dim = this.highlight !== null && !this.highlight.has(m.gi);
     const selected = m.gi === this.selected;
     const lit = this.highlight !== null && this.highlight.has(m.gi);
-    const r = selected ? 8 : lit ? 7.5 : 6;
+    const r = (selected ? 8 : lit ? 7.5 : 6) * (m.shared ? 0.72 : 1);
     ctx.globalAlpha = dim ? 0.22 : 1;
-    ctx.fillStyle = KIND_COLOR[m.kind];
-    ctx.strokeStyle = selected ? '#ffffff' : 'rgba(10,14,24,0.9)';
-    ctx.lineWidth = selected ? 2.5 : 1.5;
+    // Script-started spawners are rings so they read as "may not be there"; shared spots are smaller.
+    ctx.fillStyle = m.scripted ? 'rgba(12,18,30,0.55)' : KIND_COLOR[m.kind];
+    ctx.strokeStyle = selected ? '#ffffff' : m.scripted ? KIND_COLOR[m.kind] : 'rgba(10,14,24,0.9)';
+    ctx.lineWidth = selected ? 2.5 : m.scripted ? 2 : 1.5;
     ctx.beginPath();
     if (m.kind === 'object') ctx.rect(sx - r * 0.85, sy - r * 0.85, r * 1.7, r * 1.7);
     else if (m.kind === 'boss') {
@@ -331,7 +346,7 @@ export class MapView {
       this.tip.hidden = true;
       return;
     }
-    this.tip.replaceChildren(h('strong', null, m.label), m.detail ? h('span', { class: 'muted' }, m.detail) : '');
+    this.tip.replaceChildren(h('strong', null, m.label), ...m.detail.split('\n').filter(Boolean).map((t) => h('span', { class: 'muted' }, t)));
     this.tip.hidden = false;
     this.tip.style.left = `${px + 14}px`;
     this.tip.style.top = `${py + 14}px`;

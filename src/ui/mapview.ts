@@ -268,10 +268,11 @@ export class MapView {
   private drawMarker(ctx: CanvasRenderingContext2D, m: Marker): void {
     const [sx, sy] = this.toScreen(m);
     const dim = this.highlight !== null && !this.highlight.has(m.gi);
-    const selected = m.gi === this.selected;
     const lit = this.highlight !== null && this.highlight.has(m.gi);
-    const r = (selected ? 8 : lit ? 7.5 : 6) * (m.badge > 1 ? 1.5 : 1);
-    ctx.globalAlpha = dim ? 0.22 : m.unused ? 0.4 : 1;
+    // Everything the current search or item matches is drawn as selected; the rest is only dimmed.
+    const selected = m.gi === this.selected || lit;
+    const r = (selected ? 8 : 6) * (m.badge > 1 ? 1.5 : 1);
+    ctx.globalAlpha = dim ? 0.3 : m.unused ? 0.4 : 1;
     ctx.fillStyle = KIND_COLOR[m.kind];
     ctx.strokeStyle = selected ? '#ffffff' : 'rgba(10,14,24,0.9)';
     ctx.lineWidth = selected ? 2.5 : 1.5;
@@ -293,7 +294,7 @@ export class MapView {
       ctx.textBaseline = 'middle';
       ctx.fillText(String(m.badge), sx, sy + 0.5);
     }
-    if (lit && !selected) {
+    if (lit) {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
       ctx.beginPath();

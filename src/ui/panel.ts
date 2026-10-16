@@ -6,6 +6,7 @@ import {
   scriptRefText,
   formatPercent,
   groupByEnemy,
+  itemKey,
   startModeText,
   statLabel,
   type DropTable,
@@ -51,7 +52,7 @@ export class Panel {
       // The item card lives in its own window; here the map highlights the droppers.
       this.el.append(...this.overview(stage, d));
     } else if (sel.kind === 'item') {
-      this.el.append(...this.itemInfo(sel.key), ...this.mapsList(sel.key, d));
+      this.el.append(...this.itemInfo(sel.key), ...this.mapsList(sel.key, d), ...this.tradesList(sel.key));
     } else if (sel.kind === 'species') {
       this.el.append(...this.speciesView(sel.name, d));
     } else if (stage && sel.kind === 'generator') {
@@ -162,6 +163,7 @@ export class Panel {
     const out: HTMLElement[] = [
       h('h2', null, this.model.stageTitle(stage), h('small', null, `${stage.area ?? ''}${gens.length ? ` · ${DIFFICULTY_LABEL[d]}` : ''}${gens.length && this.model.players > 1 ? ` · ${this.model.players} players` : ''}`)),
     ];
+    if (stage.trades?.length) out.push(...this.tradersBlock(stage));
     if (!gens.length) {
       out.push(h('p', { class: 'note' }, 'No enemies or breakable objects spawn here.'));
       return out;
@@ -283,6 +285,40 @@ export class Panel {
     return out.filter(Boolean) as HTMLElement[];
   }
 
+  /** The Digimon in a shop room and what each one swaps. */
+  private tradersBlock(stage: Stage): HTMLElement[] {
+    const total = stage.trades.reduce((n, t) => n + t.offers.length, 0);
+    const label = (t: Stage['trades'][number]) => (t.number ? `${t.trader} ${t.number}` : t.trader);
+    return [
+      h('div', { class: 'sub' }, `Traders (${stage.trades.length}) · ${total} trades`),
+      h('p', { class: 'note' }, 'Hand a trader the item on the left and they give you the one on the right. Which trader stands where is not known, so Digimon of the same kind are numbered.'),
+      ...stage.trades.map((t) =>
+        h('details', { class: 'trader' },
+          h('summary', null, label(t), h('span', { class: 'muted' }, ` · ${t.offers.length} trades`)),
+          h('div', { class: 'list' },
+            ...t.offers.map((o) =>
+              h('div', { class: 'trade' },
+                h('button', { class: 'link', onclick: () => this.act.selectItem(itemKey(o.give.category, o.give.id)) }, this.model.itemLabel(itemKey(o.give.category, o.give.id))),
+                h('span', { class: 'arrow muted' }, '→'),
+                h('button', { class: 'link', onclick: () => this.act.selectItem(itemKey(o.get.category, o.get.id)) }, this.model.itemLabel(itemKey(o.get.category, o.get.id))))))),
+      ),
+    ];
+  }
+
+  /** Traders who give an item, and ones who take it, listed in the item window. */
+  private tradesList(key: string): HTMLElement[] {
+    const { getFrom, giveTo } = this.model.tradesFor(key);
+    const rows = (links: ReturnType<Model['tradesFor']>['getFrom'], verb: string) =>
+      links.map((t) =>
+        h('button', { class: 'row', onclick: () => this.act.goToStage(t.stage.id) },
+          h('span', { class: 'grow' }, `${t.label} · ${verb} ${t.other}`),
+          h('span', { class: 'muted' }, this.model.stageTitle(t.stage).replace(/ \([ehv]\)$/, ''))));
+    const out: HTMLElement[] = [];
+    if (getFrom.length) out.push(h('div', { class: 'sub' }, `Trade for it (${getFrom.length})`), h('div', { class: 'list maps' }, ...rows(getFrom, 'wants')));
+    if (giveTo.length) out.push(h('div', { class: 'sub' }, `Trade it in (${giveTo.length})`), h('div', { class: 'list maps' }, ...rows(giveTo, 'gives')));
+    return out;
+  }
+
   /** The maps an item drops in; clicking one opens it in the main window with the droppers highlighted. */
   private mapsList(key: string, d: Difficulty): HTMLElement[] {
     const maps = this.model.mapsFor(key, d);
@@ -290,7 +326,7 @@ export class Panel {
     if (!maps.length) {
       return [
         h('div', { class: 'sub' }, `Drops in (${where})`),
-        h('p', { class: 'muted' }, 'No enemy or object drops this here. It may come from shops, quests or scripted rewards, or from another difficulty.'),
+        h('p', { class: 'muted' }, `No enemy or object drops this on ${where}.`),
       ];
     }
     return [

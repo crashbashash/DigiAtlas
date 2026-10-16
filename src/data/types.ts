@@ -112,6 +112,18 @@ export interface StageMap {
 
 export type StageKind = 'field' | 'dungeon' | 'boss' | 'hub' | 'system';
 
+export interface ItemRef {
+  category: string;
+  id: number;
+}
+
+/** A Digimon in a shop room who swaps one item for another. */
+export interface Trader {
+  trader: string;
+  number: number | null;
+  offers: { give: ItemRef; get: ItemRef }[];
+}
+
 export interface Stage {
   id: string;
   area: string | null;
@@ -121,6 +133,7 @@ export interface Stage {
   variant: 'e' | 'h' | 'v' | null;
   banner: string | null;
   map: StageMap | null;
+  trades: Trader[];
   difficulties: Partial<Record<Difficulty, { generators: Generator[] }>>;
 }
 

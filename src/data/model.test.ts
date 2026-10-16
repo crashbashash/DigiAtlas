@@ -14,7 +14,7 @@ const gen = (name: string, row: number, drops: Record<string, string> | undefine
 });
 
 const stage = (id: string, area: string, room: string, kind: Stage['kind'], gens: Generator[] | null): Stage => ({
-  id, area, room, kind, floor: null, variant: null, banner: null, map: null,
+  id, area, room, kind, floor: null, variant: null, banner: null, map: null, trades: [],
   difficulties: gens ? { normal: { generators: gens }, hard: { generators: gens } } : {},
 });
 
@@ -42,6 +42,34 @@ function model(): Model {
   };
   return new Model(raw);
 }
+
+describe('tradesFor', () => {
+  it('finds the traders who hand over an item and what they want for it', () => {
+    const m = model();
+    const hall = m.byId.get('stag0102')!;
+    hall.trades = [
+      { trader: 'Agumon', number: 1, offers: [{ give: { category: 'conItem', id: 0 }, get: { category: 'weapon', id: 0 } }] },
+      { trader: 'Agumon', number: 2, offers: [{ give: { category: 'weapon', id: 0 }, get: { category: 'conItem', id: 0 } }] },
+    ];
+    const got = m.tradesFor('weapon:0');
+    expect(got.getFrom.map((t) => [t.stage.id, t.label, t.other])).toEqual([['stag0102', 'Agumon 1', 'HP Disk α']]);
+    expect(got.giveTo.map((t) => [t.label, t.other])).toEqual([['Agumon 2', 'HP Disk α']]);
+  });
+});
+
+describe('tradesFor variants', () => {
+  it('lists a trade once when a room has several variants with the same traders', () => {
+    const m = model();
+    const a = m.byId.get('stag0102')!;
+    const b = m.byId.get('dng101b1')!;
+    const offer = [{ trader: 'Agumon', number: null, offers: [{ give: { category: 'conItem', id: 0 }, get: { category: 'weapon', id: 0 } }] }];
+    a.trades = offer;
+    b.trades = offer;
+    a.room = b.room = 'Trader Hall';
+    a.floor = b.floor = 'B1';
+    expect(m.tradesFor('weapon:0').getFrom).toHaveLength(1);
+  });
+});
 
 describe('mapsFor', () => {
   it('lists each map once with its best chance and how many spawners drop the item', () => {

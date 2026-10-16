@@ -25,7 +25,8 @@
           "floor",
           "variant",
           "banner",
-          "map"
+          "map",
+          "trades"
         ],
         "properties": {
           "id": {
@@ -761,6 +762,97 @@
                 "minimum": 0,
                 "maximum": 1,
                 "description": "Share of the image covered by geometry. Values near 1 (boss arenas, a few dungeon floors) are flat floors with little structure to show."
+              }
+            }
+          },
+          "trades": {
+            "type": "array",
+            "description": "Item traders in this room (Trader Hall). Each is a Digimon who swaps one item you hold for another.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "trader",
+                "number",
+                "offers"
+              ],
+              "properties": {
+                "trader": {
+                  "type": "string",
+                  "description": "Display name of the Digimon."
+                },
+                "number": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Which of several traders of the same Digimon (1, 2, ...); null when there is one."
+                },
+                "offers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "give",
+                      "get"
+                    ],
+                    "properties": {
+                      "give": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "category",
+                          "id"
+                        ],
+                        "properties": {
+                          "category": {
+                            "enum": [
+                              "weapon",
+                              "armor1",
+                              "armor2",
+                              "abChip",
+                              "conItem",
+                              "insItem",
+                              "impItem"
+                            ],
+                            "description": "Item database; with `id` it is the key of an entry in items.json."
+                          },
+                          "id": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        }
+                      },
+                      "get": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "category",
+                          "id"
+                        ],
+                        "properties": {
+                          "category": {
+                            "enum": [
+                              "weapon",
+                              "armor1",
+                              "armor2",
+                              "abChip",
+                              "conItem",
+                              "insItem",
+                              "impItem"
+                            ],
+                            "description": "Item database; with `id` it is the key of an entry in items.json."
+                          },
+                          "id": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }

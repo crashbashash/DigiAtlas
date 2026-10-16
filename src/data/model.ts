@@ -20,6 +20,14 @@ export interface ItemMap {
   droppedBy: string[];
 }
 
+/** A trade offer seen from one item: which trader, in which room, and the item on the other side. */
+export interface TradeLink {
+  stage: Stage;
+  /** "Agumon", or "Agumon 2" when the room has several. */
+  label: string;
+  other: string;
+}
+
 export interface World {
   area: string;
   rooms: Room[];
@@ -246,6 +254,28 @@ export class Model {
       if (!m.droppedBy.includes(src.enemyName)) m.droppedBy.push(src.enemyName);
     }
     return [...byStage.values()].sort((a, b) => b.percent - a.percent || a.stage.id.localeCompare(b.stage.id));
+  }
+
+  /** The traders who hand an item over (`getFrom`) and the ones who take it in (`giveTo`). */
+  tradesFor(key: string): { getFrom: TradeLink[]; giveTo: TradeLink[] } {
+    const out = { getFrom: [] as TradeLink[], giveTo: [] as TradeLink[] };
+    for (const stage of this.stages) {
+      for (const t of stage.trades ?? []) {
+        const label = t.number ? `${t.trader} ${t.number}` : t.trader;
+        for (const o of t.offers) {
+          const give = itemKey(o.give.category, o.give.id);
+          const get = itemKey(o.get.category, o.get.id);
+          // The three variants of a room (e/h/v) repeat the same traders; list each trade once.
+          const add = (list: TradeLink[], other: string) => {
+            const same = list.find((t) => t.label === label && t.other === other && t.stage.room === stage.room && t.stage.floor === stage.floor);
+            if (!same) list.push({ stage, label, other });
+          };
+          if (get === key) add(out.getFrom, this.itemLabel(give));
+          if (give === key) add(out.giveTo, this.itemLabel(get));
+        }
+      }
+    }
+    return out;
   }
 
   stageTitle(s: Stage): string {

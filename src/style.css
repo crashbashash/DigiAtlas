@@ -143,3 +143,10 @@ td { padding: 3px 6px; vertical-align: top; border-top: 1px solid rgba(255, 255,
 .sources-section { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; }
 .sources-section summary { cursor: pointer; font-weight: 600; }
 .sources-section[open] summary { margin-bottom: 8px; }
+
+/* traders */
+.trader { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: 0 0 6px; }
+.trader summary { cursor: pointer; font-weight: 600; }
+.trader[open] summary { margin-bottom: 6px; }
+.trade { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; }
+.trade .arrow { flex: none; }

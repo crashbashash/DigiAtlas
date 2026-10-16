@@ -15,7 +15,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import banners, database, generators, iso, maps, png, scripts, stages, stats
+from . import banners, database, generators, iso, maps, png, scripts, stages, stats, trades
 from . import manifest as archive_manifest
 from .afs import Afs
 
@@ -82,6 +82,24 @@ def _script_info(g_name: str, stage_scripts: scripts.StageScripts | None) -> dic
     if out:
         info["refs"] = out[:8]
     return info
+
+
+def _trades(found: list) -> list[dict]:
+    """Traders as JSON; several of one Digimon are numbered so they can be told apart."""
+    totals = {t.name: sum(1 for x in found if x.name == t.name) for t in found}
+    seen: dict[str, int] = {}
+    out = []
+    for t in found:
+        seen[t.name] = seen.get(t.name, 0) + 1
+        out.append({
+            "trader": t.name,
+            "number": seen[t.name] if totals[t.name] > 1 else None,
+            "offers": [
+                {"give": {"category": o.give[0], "id": o.give[1]}, "get": {"category": o.get[0], "id": o.get[1]}}
+                for o in t.offers
+            ],
+        })
+    return out
 
 
 def _generator_record(g: generators.Generator, stage_scripts: scripts.StageScripts | None = None) -> dict:
@@ -229,6 +247,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
                     for pool in slot.pools + slot.last_pools:
                         pools.setdefault(pool.name, _pool_record(pool))
             rec["difficulties"][difficulty] = {"generators": [_generator_record(g, stage_scripts) for g in gens]}
+        rec["trades"] = _trades(trades.extract([ndmw.entry(pk) for pk in st.packs], player_digimon))
         rec["map"] = None
         if with_maps and not (rec["kind"] == "system" and not map_points):
             built = maps.build(ndmw, st.packs, map_points)

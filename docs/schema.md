@@ -121,6 +121,11 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
 - Stage names for `stagIS07`, `stagIS08` and `stagIS20`: system scenes with no banner (`stagIS09` and
   `stagIS10` are the Bandai logo and the opening, from the decomp's loading-screen tour, as is
   `stagML14`, which has no banner image of its own).
+- Trades: `stages[].trades` lists each trader Digimon in a shop room and its offers (hand over `give`, get
+  `get`, both `{category, id}` keys into `items.json`). Trader Hall has 24 traders (Agumon, Guilmon,
+  Dorumon, Veemon, WereGarurumon, BK WarGreymon, Mamemon), identical across its three variants. The first
+  offer of each is "Offering" (important item 11) for equipment. Which trader is where in the room is not
+  extracted, so same-species traders are numbered.
 - Trader Hall (`dngq5b1e/h/v`) and the Home Server lobbies have no spawners. Their maps are the largest
   terrain scene cropped to the rooms (no markers). System scenes (logo, opening) have no map.
   Stage packs are followed on disc by their own generator packs only; Trader Hall's neighbours' packs

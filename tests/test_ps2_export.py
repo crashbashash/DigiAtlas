@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from ps2_export import banners, database, export, generators, igbpack, iso, maps, render, scene, scripts, stages, stats, textures  # noqa: E402
+from ps2_export import banners, database, export, generators, igbpack, iso, maps, render, scene, scripts, stages, stats, textures, trades  # noqa: E402
 from ps2_export.afs import Afs  # noqa: E402
 
 try:
@@ -474,6 +474,52 @@ class PoolTests(unittest.TestCase):
         )
 
 
+class TradeTests(unittest.TestCase):
+    SOURCE = '''g_SItemDB = 0
+funcOpenMessage("talk", "n_agumon", "AO")
+if be:SYSctlFlagFolder("IS", 11) == 1 then
+    g_SItemDB = "impItem"
+    g_SItemID = 11
+    g_TItemDB = "weapon"
+    g_TItemID = 10
+elseif be:SYSctlDeviceFolder("IS", 0, "weapon", 85, 0, 0) == 1 then
+    g_SItemDB = "weapon"
+    g_SItemID = 85
+    g_TItemDB = "armor2"
+    g_TItemID = 12
+else
+    funcCloseMessage("talk", "n_agumon", "AO")
+end
+if g_SItemDB ~= 0 then
+    be:DMsetLua("itemchange40.lua")
+end
+be:DMrun()'''
+
+    def test_a_trade_script_lists_what_you_give_and_get(self):
+        t = trades.parse(self.SOURCE, {"p_agumon": "Agumon"})
+        self.assertEqual(t.name, "Agumon")
+        self.assertEqual(
+            [(o.give, o.get) for o in t.offers],
+            [(("impItem", 11), ("weapon", 10)), (("weapon", 85), ("armor2", 12))],
+        )
+
+    def test_other_scripts_are_not_traders(self):
+        self.assertIsNone(trades.parse('funcOpenMessage("talk", "n_agumon", "AO")\nbe:DMrun()'))
+        self.assertIsNone(trades.parse('g_SItemDB = "weapon"\ng_SItemID = 1\ng_TItemDB = "weapon"\ng_TItemID = 2'))
+
+    def test_traders_without_a_playable_form_are_named(self):
+        t = trades.parse(self.SOURCE.replace("n_agumon", "n_prmame"))
+        self.assertEqual(t.name, "Mamemon")
+
+    def test_several_traders_of_one_digimon_are_numbered(self):
+        a = trades.Trader("Agumon", (trades.Offer(("weapon", 1), ("weapon", 2)),))
+        b = trades.Trader("Agumon", (trades.Offer(("weapon", 3), ("weapon", 4)),))
+        c = trades.Trader("Dorumon", ())
+        out = export._trades([a, b, c])
+        self.assertEqual([(x["trader"], x["number"]) for x in out], [("Agumon", 1), ("Agumon", 2), ("Dorumon", None)])
+        self.assertEqual(out[0]["offers"][0], {"give": {"category": "weapon", "id": 1}, "get": {"category": "weapon", "id": 2}})
+
+
 @unittest.skipUnless(os.environ.get("DIGIATLAS_PS2_ISO"), "set DIGIATLAS_PS2_ISO to run")
 class DiscTests(unittest.TestCase):
     @classmethod
@@ -659,6 +705,25 @@ class DiscTests(unittest.TestCase):
             built = maps.build(ndmw, stages_out[sid]["packs"], [])
             self.assertIsNotNone(built, sid)
             self.assertLess(built.raster.fill, 0.9, sid)  # an outline, not a flat arena
+
+    def test_trader_hall_trades(self):
+        stages_out = {s["id"]: s for s in self.load("stages.json")["stages"]}
+        items = {(i["category"], i["id"]): i["name"] for i in self.load("items.json")["items"]}
+        names = {}
+        for sid in ("dngq5b1e", "dngq5b1h", "dngq5b1v"):
+            traders = stages_out[sid]["trades"]
+            self.assertEqual(len(traders), 24, sid)
+            self.assertEqual(sum(len(t["offers"]) for t in traders), 224, sid)
+            names[sid] = sorted((t["trader"], str(t["offers"])) for t in traders)
+            for t in traders:
+                for o in t["offers"]:
+                    for side in ("give", "get"):
+                        self.assertIn((o[side]["category"], o[side]["id"]), items, (sid, o))
+        self.assertEqual(names["dngq5b1e"], names["dngq5b1h"])
+        self.assertEqual(names["dngq5b1h"], names["dngq5b1v"])
+        first = stages_out["dngq5b1h"]["trades"][0]["offers"][0]
+        self.assertEqual(items[(first["give"]["category"], first["give"]["id"])], "Offering")
+        self.assertEqual(stages_out["stag0101"]["trades"], [])
 
     def test_banner_fingerprints(self):
         from ps2_export import manifest as archive_manifest

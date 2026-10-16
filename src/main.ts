@@ -1,5 +1,5 @@
 import './style.css';
-import { chooseFolder, inDesktopApp, openRemembered, type DataSource } from './data/source';
+import { chooseFolder, inDesktopApp, openRemembered, requestedView, type DataSource } from './data/source';
 import { loadModel } from './data/model';
 import { App } from './ui/app';
 import { h } from './ui/dom';
@@ -21,6 +21,8 @@ async function start(source: DataSource): Promise<void> {
   message('Loading data…', source.label);
   try {
     const model = await loadModel(source);
+    const wanted = await requestedView();
+    if (wanted && wanted.startsWith('#')) history.replaceState(null, '', wanted);
     new App(root, model, source, inDesktopApp() ? pickAgain : null);
   } catch (e) {
     message('Could not load the data', String(e instanceof Error ? e.message : e), inDesktopApp() ? { label: 'Choose a different folder', run: pickAgain } : undefined);

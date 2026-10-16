@@ -55,6 +55,13 @@ fn initial_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
         .find(|p| is_export(p))
 }
 
+/// `--open "#/stag0101?d=hard&enemy=Numemon"` starts the app on that view (same format as the address bar).
+#[tauri::command]
+fn start_view() -> Option<String> {
+    let args: Vec<String> = std::env::args().collect();
+    args.iter().position(|a| a == "--open").and_then(|i| args.get(i + 1)).cloned()
+}
+
 #[tauri::command]
 fn get_data_dir(state: State<DataDir>) -> Option<String> {
     state.0.lock().ok()?.as_ref().map(|p| p.to_string_lossy().into_owned())
@@ -108,7 +115,7 @@ fn main() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_data_dir, choose_data_dir, read_data_file])
+        .invoke_handler(tauri::generate_handler![get_data_dir, choose_data_dir, read_data_file, start_view])
         .run(tauri::generate_context!())
         .expect("Could not start DigiAtlas");
 }

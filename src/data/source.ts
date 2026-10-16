@@ -65,3 +65,9 @@ export async function chooseFolder(): Promise<DataSource | null> {
   const dir = await invoke<string | null>('choose_data_dir');
   return dir ? new TauriSource(invoke, dir) : null;
 }
+
+/** A view requested on the command line (`--open "#/stag0101?d=hard"`), desktop app only. */
+export async function requestedView(): Promise<string | null> {
+  if (!inDesktopApp()) return null;
+  return (await tauriInvoke())<string | null>('start_view');
+}

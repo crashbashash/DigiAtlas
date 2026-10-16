@@ -82,6 +82,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .row:hover { background: var(--panel2); }
 .grow { flex: 1; min-width: 0; }
 .row .detail { flex-basis: 100%; padding-left: 18px; font-size: 12px; margin-top: -2px; }
+.variants { table-layout: auto; font-size: 12px; }
+.variants td, .variants th { padding-left: 3px; padding-right: 3px; }
 .variants th { font-size: 11px; color: var(--muted); font-weight: 500; text-align: right; padding: 2px 6px; }
 .variants th.l, .variants td.l { text-align: left; white-space: nowrap; }
 .variants td.n { text-align: right; font-variant-numeric: tabular-nums; }

@@ -311,7 +311,7 @@ export class Panel {
         h('table', { class: 'variants' },
           h('tr', null, h('th', { class: 'l' }, 'Variant'), ...['HP', 'Str', 'Def', 'Wis', 'Spi', 'Spd', 'EXP'].map((c) => h('th', null, c))),
           ...variants.map((e) =>
-            h('tr', null, h('td', { class: 'l' }, e.rarity ? `Crown ${e.rarity}` : 'Standard', h('span', { class: 'muted' }, ` ×${used.get(e.row)}`)), num(e.hp), num(e.stats.strength), num(e.stats.defense), num(e.stats.wisdom), num(e.stats.spirit), num(e.stats.speed), num(e.stats.exp))),
+            h('tr', null, h('td', { class: 'l' }, e.rarity ? `Crown ${e.rarity}` : 'Base', h('span', { class: 'muted' }, ` ×${used.get(e.row)}`)), num(e.hp), num(e.stats.strength), num(e.stats.defense), num(e.stats.wisdom), num(e.stats.spirit), num(e.stats.speed), num(e.stats.exp))),
         ),
         variants.length > 1
           ? h('p', { class: 'note' }, `${variants.length} stat variants appear (area tiers and crown ranks). Open a stage and click a marker for the exact one, resistances included.`)

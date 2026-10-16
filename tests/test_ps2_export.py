@@ -511,13 +511,27 @@ be:DMrun()'''
         t = trades.parse(self.SOURCE.replace("n_agumon", "n_prmame"))
         self.assertEqual(t.name, "Mamemon")
 
+    def test_placements_give_model_instance_position_and_facing(self):
+        src = (
+            'be:sd("MODELCTRL", "n_agumon", 0, "GENERATE", "V<-80,10,20>/V<0,90,0>")\n'
+            'be:sd("MODELCTRL", "n_girumon", 1, "GENERATE", "V<-240.5,10,-180>/V<0,-45,0>")\n'
+            'be:sd("MODELCTRL", "g_dreturngate", 0, "GENERATE", "V<0,10,-210>/V<0,0,0>")'
+        )
+        self.assertEqual(
+            trades.placements(src),
+            [("agumon", 0, (-80.0, 10.0, 20.0), 90.0), ("girumon", 1, (-240.5, 10.0, -180.0), -45.0)],
+        )
+
     def test_several_traders_of_one_digimon_are_numbered(self):
-        a = trades.Trader("Agumon", (trades.Offer(("weapon", 1), ("weapon", 2)),))
-        b = trades.Trader("Agumon", (trades.Offer(("weapon", 3), ("weapon", 4)),))
-        c = trades.Trader("Dorumon", ())
+        offer = (trades.Offer(("weapon", 1), ("weapon", 2)),)
+        a = trades.Placed("Agumon", 0, (-80.0, 10.0, 20.0), 90.0, {"hard": offer})
+        b = trades.Placed("Agumon", 1, (240.0, 10.0, -180.0), -45.0, {"hard": offer})
+        c = trades.Placed("Dorumon", 0, (0.0, 10.0, 0.0), 0.0, {})
         out = export._trades([a, b, c])
         self.assertEqual([(x["trader"], x["number"]) for x in out], [("Agumon", 1), ("Agumon", 2), ("Dorumon", None)])
-        self.assertEqual(out[0]["offers"][0], {"give": {"category": "weapon", "id": 1}, "get": {"category": "weapon", "id": 2}})
+        self.assertEqual(out[0]["position"], {"x": -80.0, "y": 10.0, "z": 20.0})
+        self.assertEqual(out[0]["facing"], 90.0)
+        self.assertEqual(out[0]["tables"]["hard"][0], {"give": {"category": "weapon", "id": 1}, "get": {"category": "weapon", "id": 2}})
 
 
 @unittest.skipUnless(os.environ.get("DIGIATLAS_PS2_ISO"), "set DIGIATLAS_PS2_ISO to run")
@@ -709,20 +723,25 @@ class DiscTests(unittest.TestCase):
     def test_trader_hall_trades(self):
         stages_out = {s["id"]: s for s in self.load("stages.json")["stages"]}
         items = {(i["category"], i["id"]): i["name"] for i in self.load("items.json")["items"]}
-        names = {}
+        counts = {}
         for sid in ("dngq5b1e", "dngq5b1h", "dngq5b1v"):
             traders = stages_out[sid]["trades"]
-            self.assertEqual(len(traders), 24, sid)
-            self.assertEqual(sum(len(t["offers"]) for t in traders), 224, sid)
-            names[sid] = sorted((t["trader"], str(t["offers"])) for t in traders)
+            counts[sid] = len(traders)
             for t in traders:
-                for o in t["offers"]:
-                    for side in ("give", "get"):
-                        self.assertIn((o[side]["category"], o[side]["id"]), items, (sid, o))
-        self.assertEqual(names["dngq5b1e"], names["dngq5b1h"])
-        self.assertEqual(names["dngq5b1h"], names["dngq5b1v"])
-        first = stages_out["dngq5b1h"]["trades"][0]["offers"][0]
-        self.assertEqual(items[(first["give"]["category"], first["give"]["id"])], "Offering")
+                self.assertTrue(t["tables"], (sid, t["trader"]))
+                for offers in t["tables"].values():
+                    for o in offers:
+                        for side in ("give", "get"):
+                            self.assertIn((o[side]["category"], o[side]["id"]), items, (sid, o))
+        # Everyone stands in the room, and the variants differ in who is there.
+        self.assertEqual(counts, {"dngq5b1e": 10, "dngq5b1h": 8, "dngq5b1v": 10})
+        agumons = [t for t in stages_out["dngq5b1h"]["trades"] if t["trader"] == "Agumon"]
+        self.assertEqual([t["number"] for t in agumons], [1, 2])
+        self.assertEqual(agumons[0]["position"], {"x": -80.0, "y": 10.0, "z": 20.0})
+        first = agumons[0]["tables"]["hard"][0]["give"]
+        self.assertEqual(items[(first["category"], first["id"])], "Offering")
+        # Each difficulty has its own table.
+        self.assertNotEqual(agumons[0]["tables"]["normal"], agumons[0]["tables"]["hard"])
         self.assertEqual(stages_out["stag0101"]["trades"], [])
 
     def test_banner_fingerprints(self):

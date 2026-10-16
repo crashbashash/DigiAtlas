@@ -1,6 +1,6 @@
 import type { DataSource } from './source';
 import { dropTable, isUnused, itemKey, type DropRow } from './logic';
-import type { DropPool, Difficulty, Enemy, EnemyKind, Generator, Item, RawData, Stage } from './types';
+import type { DropPool, Difficulty, Enemy, EnemyKind, Generator, Item, RawData, Stage, Trader } from './types';
 import { DIFFICULTIES } from './types';
 
 export interface Room {
@@ -26,6 +26,13 @@ export interface TradeLink {
   /** "Agumon", or "Agumon 2" when the room has several. */
   label: string;
   other: string;
+  /** The difficulties on which the trader offers it. */
+  difficulties: Difficulty[];
+}
+
+/** "Agumon", or "Agumon 2" when a room has several. */
+export function traderLabel(t: Trader): string {
+  return t.number ? `${t.trader} ${t.number}` : t.trader;
 }
 
 export interface World {
@@ -184,7 +191,8 @@ export class Model {
 
   /** Difficulties a stage actually has data for. */
   available(stage: Stage): Difficulty[] {
-    return DIFFICULTIES.filter((d) => (stage.difficulties[d]?.generators.length ?? 0) > 0);
+    // A shop has no spawners, but its traders still differ by difficulty.
+    return DIFFICULTIES.filter((d) => (stage.difficulties[d]?.generators.length ?? 0) > 0 || this.tradersAt(stage, d).length > 0);
   }
 
   poolFor(g: Generator, d: Difficulty, last = false): DropPool | null {
@@ -261,21 +269,34 @@ export class Model {
     const out = { getFrom: [] as TradeLink[], giveTo: [] as TradeLink[] };
     for (const stage of this.stages) {
       for (const t of stage.trades ?? []) {
-        const label = t.number ? `${t.trader} ${t.number}` : t.trader;
-        for (const o of t.offers) {
-          const give = itemKey(o.give.category, o.give.id);
-          const get = itemKey(o.get.category, o.get.id);
-          // The three variants of a room (e/h/v) repeat the same traders; list each trade once.
-          const add = (list: TradeLink[], other: string) => {
-            const same = list.find((t) => t.label === label && t.other === other && t.stage.room === stage.room && t.stage.floor === stage.floor);
-            if (!same) list.push({ stage, label, other });
-          };
-          if (get === key) add(out.getFrom, this.itemLabel(give));
-          if (give === key) add(out.giveTo, this.itemLabel(get));
+        const label = traderLabel(t);
+        for (const d of DIFFICULTIES) {
+          for (const o of t.tables[d] ?? []) {
+            const give = itemKey(o.give.category, o.give.id);
+            const get = itemKey(o.get.category, o.get.id);
+            // The variants of a room (e/h/v) share traders; list each trade once, with the difficulties it applies on.
+            const add = (list: TradeLink[], other: string) => {
+              const same = list.find((l) => l.label === label && l.other === other && l.stage.room === stage.room && l.stage.floor === stage.floor);
+              if (!same) list.push({ stage, label, other, difficulties: [d] });
+              else if (!same.difficulties.includes(d)) same.difficulties.push(d);
+            };
+            if (get === key) add(out.getFrom, this.itemLabel(give));
+            if (give === key) add(out.giveTo, this.itemLabel(get));
+          }
         }
       }
     }
     return out;
+  }
+
+  /** The traders in a room that have something to swap on this difficulty. */
+  tradersAt(stage: Stage, d: Difficulty): Trader[] {
+    return (stage.trades ?? []).filter((t) => (t.tables[d]?.length ?? 0) > 0);
+  }
+
+  /** Whether anything spawns in the room on any difficulty. */
+  hasSpawns(stage: Stage): boolean {
+    return DIFFICULTIES.some((d) => (stage.difficulties[d]?.generators.length ?? 0) > 0);
   }
 
   stageTitle(s: Stage): string {

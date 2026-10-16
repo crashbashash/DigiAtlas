@@ -43,31 +43,56 @@ function model(): Model {
   return new Model(raw);
 }
 
+const at = { position: { x: 0, y: 0, z: 0 }, facing: 0 };
+const swap = (give: [string, number], get: [string, number]) => ({ give: { category: give[0], id: give[1] }, get: { category: get[0], id: get[1] } });
+
 describe('tradesFor', () => {
   it('finds the traders who hand over an item and what they want for it', () => {
     const m = model();
     const hall = m.byId.get('stag0102')!;
     hall.trades = [
-      { trader: 'Agumon', number: 1, offers: [{ give: { category: 'conItem', id: 0 }, get: { category: 'weapon', id: 0 } }] },
-      { trader: 'Agumon', number: 2, offers: [{ give: { category: 'weapon', id: 0 }, get: { category: 'conItem', id: 0 } }] },
+      { trader: 'Agumon', number: 1, ...at, tables: { hard: [swap(['conItem', 0], ['weapon', 0])] } },
+      { trader: 'Agumon', number: 2, ...at, tables: { hard: [swap(['weapon', 0], ['conItem', 0])] } },
     ];
     const got = m.tradesFor('weapon:0');
     expect(got.getFrom.map((t) => [t.stage.id, t.label, t.other])).toEqual([['stag0102', 'Agumon 1', 'HP Disk α']]);
     expect(got.giveTo.map((t) => [t.label, t.other])).toEqual([['Agumon 2', 'HP Disk α']]);
   });
-});
 
-describe('tradesFor variants', () => {
+  it('records which difficulties a trade is on', () => {
+    const m = model();
+    m.byId.get('stag0102')!.trades = [
+      { trader: 'Agumon', number: null, ...at, tables: { normal: [swap(['conItem', 0], ['weapon', 0])], veryhard: [swap(['conItem', 0], ['weapon', 0])], hard: [swap(['conItem', 0], ['weapon', 1])] } },
+    ];
+    expect(m.tradesFor('weapon:0').getFrom.map((t) => t.difficulties)).toEqual([['normal', 'veryhard']]);
+  });
+
   it('lists a trade once when a room has several variants with the same traders', () => {
     const m = model();
     const a = m.byId.get('stag0102')!;
     const b = m.byId.get('dng101b1')!;
-    const offer = [{ trader: 'Agumon', number: null, offers: [{ give: { category: 'conItem', id: 0 }, get: { category: 'weapon', id: 0 } }] }];
-    a.trades = offer;
-    b.trades = offer;
+    const traders = [{ trader: 'Agumon', number: null, ...at, tables: { hard: [swap(['conItem', 0], ['weapon', 0])] } }];
+    a.trades = traders;
+    b.trades = traders;
     a.room = b.room = 'Trader Hall';
     a.floor = b.floor = 'B1';
     expect(m.tradesFor('weapon:0').getFrom).toHaveLength(1);
+  });
+});
+
+describe('traders by difficulty', () => {
+  it('offers the difficulty selector in a shop and lists only the traders with a table there', () => {
+    const m = model();
+    const hall = m.byId.get('dng101b1')!;
+    hall.difficulties = {};
+    hall.trades = [
+      { trader: 'Agumon', number: 1, ...at, tables: { normal: [swap(['conItem', 0], ['weapon', 0])], hard: [swap(['conItem', 0], ['weapon', 1])] } },
+      { trader: 'BK WarGreymon', number: null, ...at, tables: { veryhard: [swap(['conItem', 0], ['weapon', 2])] } },
+    ];
+    expect(m.available(hall)).toEqual(['normal', 'hard', 'veryhard']);
+    expect(m.tradersAt(hall, 'hard').map((t) => t.trader)).toEqual(['Agumon']);
+    expect(m.tradersAt(hall, 'veryhard').map((t) => t.trader)).toEqual(['BK WarGreymon']);
+    expect(m.hasSpawns(hall)).toBe(false);
   });
 });
 

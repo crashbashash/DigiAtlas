@@ -150,3 +150,6 @@ td { padding: 3px 6px; vertical-align: top; border-top: 1px solid rgba(255, 255,
 .trader[open] summary { margin-bottom: 6px; }
 .trade { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; }
 .trade .arrow { flex: none; }
+
+.trader.flash { animation: trader-flash 1.2s ease-out; }
+@keyframes trader-flash { from { background: rgba(185, 140, 255, 0.35); } to { background: transparent; } }

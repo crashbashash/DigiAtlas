@@ -767,14 +767,16 @@
           },
           "trades": {
             "type": "array",
-            "description": "Item traders in this room (Trader Hall). Each is a Digimon who swaps one item you hold for another.",
+            "description": "Item traders in this room (Trader Hall): Digimon who swap one item you hold for another.",
             "items": {
               "type": "object",
               "additionalProperties": false,
               "required": [
                 "trader",
                 "number",
-                "offers"
+                "position",
+                "facing",
+                "tables"
               ],
               "properties": {
                 "trader": {
@@ -788,68 +790,233 @@
                   ],
                   "description": "Which of several traders of the same Digimon (1, 2, ...); null when there is one."
                 },
-                "offers": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "give",
-                      "get"
-                    ],
-                    "properties": {
-                      "give": {
+                "position": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y",
+                    "z"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "z": {
+                      "type": "number"
+                    }
+                  },
+                  "description": "Where the Digimon stands, in the same world coordinates as spawn points."
+                },
+                "facing": {
+                  "type": "number",
+                  "description": "Rotation about the vertical axis, in degrees."
+                },
+                "tables": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "The trade table the trader uses on each difficulty. A difficulty with no entry means the trader has no table there.",
+                  "properties": {
+                    "normal": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
                         "additionalProperties": false,
                         "required": [
-                          "category",
-                          "id"
+                          "give",
+                          "get"
                         ],
                         "properties": {
-                          "category": {
-                            "enum": [
-                              "weapon",
-                              "armor1",
-                              "armor2",
-                              "abChip",
-                              "conItem",
-                              "insItem",
-                              "impItem"
+                          "give": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "category",
+                              "id"
                             ],
-                            "description": "Item database; with `id` it is the key of an entry in items.json."
+                            "properties": {
+                              "category": {
+                                "enum": [
+                                  "weapon",
+                                  "armor1",
+                                  "armor2",
+                                  "abChip",
+                                  "conItem",
+                                  "insItem",
+                                  "impItem"
+                                ],
+                                "description": "Item database; with `id` it is the key of an entry in items.json."
+                              },
+                              "id": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            }
                           },
-                          "id": {
-                            "type": "integer",
-                            "minimum": 0
+                          "get": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "category",
+                              "id"
+                            ],
+                            "properties": {
+                              "category": {
+                                "enum": [
+                                  "weapon",
+                                  "armor1",
+                                  "armor2",
+                                  "abChip",
+                                  "conItem",
+                                  "insItem",
+                                  "impItem"
+                                ],
+                                "description": "Item database; with `id` it is the key of an entry in items.json."
+                              },
+                              "id": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            }
                           }
                         }
                       },
-                      "get": {
+                      "description": "What this trader swaps, in game order."
+                    },
+                    "hard": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
                         "additionalProperties": false,
                         "required": [
-                          "category",
-                          "id"
+                          "give",
+                          "get"
                         ],
                         "properties": {
-                          "category": {
-                            "enum": [
-                              "weapon",
-                              "armor1",
-                              "armor2",
-                              "abChip",
-                              "conItem",
-                              "insItem",
-                              "impItem"
+                          "give": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "category",
+                              "id"
                             ],
-                            "description": "Item database; with `id` it is the key of an entry in items.json."
+                            "properties": {
+                              "category": {
+                                "enum": [
+                                  "weapon",
+                                  "armor1",
+                                  "armor2",
+                                  "abChip",
+                                  "conItem",
+                                  "insItem",
+                                  "impItem"
+                                ],
+                                "description": "Item database; with `id` it is the key of an entry in items.json."
+                              },
+                              "id": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            }
                           },
-                          "id": {
-                            "type": "integer",
-                            "minimum": 0
+                          "get": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "category",
+                              "id"
+                            ],
+                            "properties": {
+                              "category": {
+                                "enum": [
+                                  "weapon",
+                                  "armor1",
+                                  "armor2",
+                                  "abChip",
+                                  "conItem",
+                                  "insItem",
+                                  "impItem"
+                                ],
+                                "description": "Item database; with `id` it is the key of an entry in items.json."
+                              },
+                              "id": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            }
                           }
                         }
-                      }
+                      },
+                      "description": "What this trader swaps, in game order."
+                    },
+                    "veryhard": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "give",
+                          "get"
+                        ],
+                        "properties": {
+                          "give": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "category",
+                              "id"
+                            ],
+                            "properties": {
+                              "category": {
+                                "enum": [
+                                  "weapon",
+                                  "armor1",
+                                  "armor2",
+                                  "abChip",
+                                  "conItem",
+                                  "insItem",
+                                  "impItem"
+                                ],
+                                "description": "Item database; with `id` it is the key of an entry in items.json."
+                              },
+                              "id": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            }
+                          },
+                          "get": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "category",
+                              "id"
+                            ],
+                            "properties": {
+                              "category": {
+                                "enum": [
+                                  "weapon",
+                                  "armor1",
+                                  "armor2",
+                                  "abChip",
+                                  "conItem",
+                                  "insItem",
+                                  "impItem"
+                                ],
+                                "description": "Item database; with `id` it is the key of an entry in items.json."
+                              },
+                              "id": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "description": "What this trader swaps, in game order."
                     }
                   }
                 }

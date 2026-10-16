@@ -1,5 +1,5 @@
 import type { DataSource } from '../data/source';
-import type { Model } from '../data/model';
+import { traderLabel, type Model } from '../data/model';
 import {
   categoryLabel,
   fillModeText,
@@ -161,9 +161,9 @@ export class Panel {
     const fights = groups.filter((g) => g.enemy?.kind !== 'object').sort(byName);
     const objects = groups.filter((g) => g.enemy?.kind === 'object').sort(byName);
     const out: HTMLElement[] = [
-      h('h2', null, this.model.stageTitle(stage), h('small', null, `${stage.area ?? ''}${gens.length ? ` · ${DIFFICULTY_LABEL[d]}` : ''}${gens.length && this.model.players > 1 ? ` · ${this.model.players} players` : ''}`)),
+      h('h2', null, this.model.stageTitle(stage), h('small', null, `${stage.area ?? ''}${this.model.available(stage).length ? ` · ${DIFFICULTY_LABEL[d]}` : ''}${gens.length && this.model.players > 1 ? ` · ${this.model.players} players` : ''}`)),
     ];
-    if (stage.trades?.length) out.push(...this.tradersBlock(stage));
+    if (this.model.tradersAt(stage, d).length) out.push(...this.tradersBlock(stage, d));
     if (!gens.length) {
       out.push(h('p', { class: 'note' }, 'No enemies or breakable objects spawn here.'));
       return out;
@@ -285,24 +285,35 @@ export class Panel {
     return out.filter(Boolean) as HTMLElement[];
   }
 
-  /** The Digimon in a shop room and what each one swaps. */
-  private tradersBlock(stage: Stage): HTMLElement[] {
-    const total = stage.trades.reduce((n, t) => n + t.offers.length, 0);
-    const label = (t: Stage['trades'][number]) => (t.number ? `${t.trader} ${t.number}` : t.trader);
+  /** The Digimon in a shop room and what each one swaps on the chosen difficulty. */
+  private tradersBlock(stage: Stage, d: Difficulty): HTMLElement[] {
+    const traders = this.model.tradersAt(stage, d);
+    const total = traders.reduce((n, t) => n + (t.tables[d]?.length ?? 0), 0);
     return [
-      h('div', { class: 'sub' }, `Traders (${stage.trades.length}) · ${total} trades`),
-      h('p', { class: 'note' }, 'Hand a trader the item on the left and they give you the one on the right. Which trader stands where is not known, so Digimon of the same kind are numbered.'),
-      ...stage.trades.map((t) =>
-        h('details', { class: 'trader' },
-          h('summary', null, label(t), h('span', { class: 'muted' }, ` · ${t.offers.length} trades`)),
+      h('div', { class: 'sub' }, `Traders (${traders.length}) · ${total} trades`),
+      h('p', { class: 'note' }, `Hand a trader the item on the left and they give you the one on the right. Each stands where its pin is on the map, and what it swaps depends on the difficulty (${DIFFICULTY_LABEL[d]} is shown).`),
+      ...traders.map((t, i) =>
+        h('details', { class: 'trader', 'data-trader': String(i) },
+          h('summary', null, traderLabel(t), h('span', { class: 'muted' }, ` · ${t.tables[d]!.length} trades`)),
           h('div', { class: 'list' },
-            ...t.offers.map((o) =>
+            ...t.tables[d]!.map((o) =>
               h('div', { class: 'trade' },
                 h('button', { class: 'link', onclick: () => this.act.selectItem(itemKey(o.give.category, o.give.id)) }, this.model.itemLabel(itemKey(o.give.category, o.give.id))),
                 h('span', { class: 'arrow muted' }, '→'),
                 h('button', { class: 'link', onclick: () => this.act.selectItem(itemKey(o.get.category, o.get.id)) }, this.model.itemLabel(itemKey(o.get.category, o.get.id))))))),
       ),
     ];
+  }
+
+  /** Open one trader's list and bring it into view (a pin was clicked on the map). */
+  revealTrader(index: number): void {
+    const el = this.el.querySelector<HTMLDetailsElement>(`details.trader[data-trader="${index}"]`);
+    if (!el) return;
+    el.open = true;
+    el.scrollIntoView({ block: 'nearest' });
+    el.classList.remove('flash');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('flash');
   }
 
   /** Traders who give an item, and ones who take it, listed in the item window. */
@@ -312,7 +323,7 @@ export class Panel {
       links.map((t) =>
         h('button', { class: 'row', onclick: () => this.act.goToStage(t.stage.id) },
           h('span', { class: 'grow' }, `${t.label} · ${verb} ${t.other}`),
-          h('span', { class: 'muted' }, this.model.stageTitle(t.stage).replace(/ \([ehv]\)$/, ''))));
+          h('span', { class: 'muted' }, `${this.model.stageTitle(t.stage).replace(/ \([ehv]\)$/, '')}${t.difficulties.length < DIFFICULTIES.length ? ` · ${t.difficulties.map((x) => DIFFICULTY_LABEL[x]).join(', ')}` : ''}`)));
     const out: HTMLElement[] = [];
     if (getFrom.length) out.push(h('div', { class: 'sub' }, `Trade for it (${getFrom.length})`), h('div', { class: 'list maps' }, ...rows(getFrom, 'wants')));
     if (giveTo.length) out.push(h('div', { class: 'sub' }, `Trade it in (${giveTo.length})`), h('div', { class: 'list maps' }, ...rows(giveTo, 'gives')));

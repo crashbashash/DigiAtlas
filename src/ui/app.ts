@@ -9,6 +9,7 @@ import { sidebarBrand } from './brand';
 import { Sidebar } from './sidebar';
 import { hashFor, loadSaved, save, stateFromView, viewFromHash } from './router';
 import { Store, type State } from './state';
+import { itemKey } from '../data/logic';
 
 const DEFAULT_STAGE = 'stag0102';
 
@@ -21,6 +22,7 @@ export class App {
   private readonly diffs = h('div', { class: 'diffs' });
   private readonly zoom: HTMLButtonElement;
   private matches: Set<number> | null = null;
+  private litPins: Set<number> | null = null;
   private applying = false;
 
   constructor(
@@ -44,6 +46,7 @@ export class App {
         if (gi !== null) this.store.set({ selection: { kind: 'generator', index: gi } });
         else if (sel.kind === 'generator' || sel.kind === 'group') this.store.set({ selection: { kind: 'none' } });
       },
+      onTrader: (index) => this.panel.revealTrader(index),
     });
     this.panel = new Panel(model, source, {
       selectGenerator: (index) => this.store.set({ selection: { kind: 'generator', index } }),
@@ -70,7 +73,7 @@ export class App {
       sidebarBrand(model.raw.manifest, onChangeData),
     );
 
-    this.zoom = h('button', { class: 'fit', hidden: true, title: 'Zoom the map to the highlighted spawners', onclick: () => this.matches && this.map.zoomTo(this.matches) }, 'Zoom to matches');
+    this.zoom = h('button', { class: 'fit', hidden: true, title: 'Zoom the map to the highlighted spawners', onclick: () => this.matches && this.map.zoomTo(this.matches, this.litPins) }, 'Zoom to matches');
     const topbar = h('div', { class: 'topbar' }, this.title, this.zoom, this.diffs,
       h('button', { class: 'fit', title: 'Fit the map to the window (double-click the map)', onclick: () => this.map.fit() }, 'Fit'));
     clear(root);
@@ -94,7 +97,7 @@ export class App {
       this.store.set({ difficulty: m.ctx.difficulty, players: m.ctx.players, showUnused: m.ctx.showUnused });
       this.goToStage(m.stageId);
       this.store.set({ selection: { kind: 'item', key: m.itemKey } });
-      if (this.matches && this.matches.size) this.map.zoomTo(this.matches);
+      if (this.matches?.size || this.litPins?.size) this.map.zoomTo(this.matches ?? new Set(), this.litPins);
       void focusThisWindow();
     });
   }
@@ -157,6 +160,18 @@ export class App {
     return sel.kind === 'group' || sel.kind === 'species' || sel.kind === 'item' ? out : null;
   }
 
+  /** The traders in the room who swap the selected item, in either direction. */
+  private traderMatches(s: State, stage: Stage | null): Set<number> | null {
+    if (!stage || s.selection.kind !== 'item') return null;
+    const key = s.selection.key;
+    const has = (o: { category: string; id: number }) => itemKey(o.category, o.id) === key;
+    const out = new Set<number>();
+    this.model.tradersAt(stage, s.difficulty).forEach((t, i) => {
+      if ((t.tables[s.difficulty] ?? []).some((o) => has(o.give) || has(o.get))) out.add(i);
+    });
+    return out;
+  }
+
   private onKey(e: KeyboardEvent): void {
     const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
     if (e.key === '/' && !typing) {
@@ -199,8 +214,9 @@ export class App {
       this.renderDifficulties(s, stage);
       const sel = s.selection;
       this.matches = this.highlight(s, stage);
-      this.zoom.hidden = !this.matches || this.matches.size === 0;
-      this.map.show(stage, s.difficulty, this.matches, sel.kind === 'generator' ? sel.index : null);
+      this.litPins = this.traderMatches(s, stage);
+      this.zoom.hidden = !(this.matches?.size || this.litPins?.size);
+      this.map.show(stage, s.difficulty, this.matches, sel.kind === 'generator' ? sel.index : null, this.litPins);
     }
     this.panel.render(s, stage);
   }
@@ -208,7 +224,8 @@ export class App {
   private renderDifficulties(s: State, stage: Stage): void {
     clear(this.diffs);
     const avail = this.model.available(stage);
-    if (!avail.length) return; // a shop or lobby: nothing spawns, so players and difficulty mean nothing
+    if (!avail.length) return; // a lobby: nothing spawns and nobody trades, so difficulty means nothing
+    const spawns = this.model.hasSpawns(stage);
     const select = h('select', { 'aria-label': 'Difficulty', onchange: () => this.setDifficulty(select.value as Difficulty) },
       ...(DIFFICULTIES as Difficulty[]).map((d) =>
         h('option', { value: d, selected: d === s.difficulty, disabled: !avail.includes(d) },
@@ -222,11 +239,10 @@ export class App {
     const unusedCount = this.model.unusedCount(stage, s.difficulty);
     const unused = h('input', { type: 'checkbox', onchange: () => this.store.set({ showUnused: unused.checked }) });
     unused.checked = s.showUnused;
-    this.diffs.append(
-      h('label', null, h('span', { class: 'muted' }, 'Players'), players),
-      h('label', null, h('span', { class: 'muted' }, 'Difficulty'), select),
-    );
-    if (unusedCount) {
+    // Players and unused spawners only matter where something spawns.
+    if (spawns) this.diffs.append(h('label', null, h('span', { class: 'muted' }, 'Players'), players));
+    this.diffs.append(h('label', null, h('span', { class: 'muted' }, 'Difficulty'), select));
+    if (spawns && unusedCount) {
       this.diffs.append(
         h('label', { class: 'check', title: 'Spawners that no game script starts. They most likely never appear, so they are hidden unless you ask.' }, unused, `Show ${unusedCount} unused`),
       );

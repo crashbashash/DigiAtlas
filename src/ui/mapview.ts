@@ -1,5 +1,5 @@
 import type { DataSource } from '../data/source';
-import type { Model } from '../data/model';
+import { traderLabel, type Model } from '../data/model';
 import type { Difficulty, Enemy, EnemyKind, Stage } from '../data/types';
 import { h } from './dom';
 import { makeMarkers, type Marker } from './markers';
@@ -19,6 +19,20 @@ interface View {
 
 export interface MapEvents {
   onSelect(generator: number | null): void;
+  /** A trader's pin was clicked; `index` is its place in `Model.tradersAt`. */
+  onTrader(index: number): void;
+}
+
+export const TRADER_COLOR = '#b98cff';
+
+/** A trader standing in a shop room. */
+interface Pin {
+  index: number;
+  x: number;
+  z: number;
+  label: string;
+  trades: number;
+  facing: number;
 }
 
 /** Maps this full are a flat floor with nothing to show; the plain grid reads better. */
@@ -42,6 +56,9 @@ export class MapView {
   private pendingFit = false;
   private drag: { x: number; y: number; moved: boolean } | null = null;
   private hover: Marker | null = null;
+  private pins: Pin[] = [];
+  private litPins: Set<number> | null = null;
+  private hoverPin: Pin | null = null;
 
   constructor(
     private readonly model: Model,
@@ -66,18 +83,29 @@ export class MapView {
       ...(Object.keys(KIND_COLOR) as EnemyKind[]).map((k) =>
         h('span', null, h('i', { style: `background:${KIND_COLOR[k]}` }), KIND_LABEL[k]),
       ),
+      h('span', null, h('i', { style: `background:${TRADER_COLOR}` }), 'Trader'),
       h('span', { class: 'muted' }, 'Dashed circle = how close you must get · number = enemies at that spot'),
     );
   }
 
-  show(stage: Stage, d: Difficulty, highlight: Set<number> | null, selected: number | null): void {
+  show(stage: Stage, d: Difficulty, highlight: Set<number> | null, selected: number | null, litPins: Set<number> | null = null): void {
     const stageChanged = stage.id !== this.stageId;
     this.stageId = stage.id;
     this.highlight = highlight;
     this.selected = selected;
+    this.litPins = litPins;
     this.markers = this.buildMarkers(stage, d);
+    this.pins = this.model.tradersAt(stage, d).map((t, index) => ({
+      index,
+      x: t.position.x,
+      z: t.position.z,
+      label: traderLabel(t),
+      trades: t.tables[d]?.length ?? 0,
+      facing: t.facing,
+    }));
     if (stageChanged) {
       this.setHover(null);
+      this.setHoverPin(null);
       this.image = null;
       this.computeBounds(stage);
       this.pendingFit = true;
@@ -108,8 +136,8 @@ export class MapView {
       this.bounds = { ...stage.map.bounds };
       return;
     }
-    const xs = this.markers.map((m) => m.x);
-    const zs = this.markers.map((m) => m.z);
+    const xs = [...this.markers.map((m) => m.x), ...this.pins.map((p) => p.x)];
+    const zs = [...this.markers.map((m) => m.z), ...this.pins.map((p) => p.z)];
     const pad = 120;
     this.bounds = {
       minX: Math.min(...xs, 0) - pad,
@@ -120,8 +148,11 @@ export class MapView {
   }
 
   /** Zoom so the spawners with these indices fill the view (at least a room's worth of map). */
-  zoomTo(generators: Set<number>): void {
-    const ms = this.markers.filter((m) => generators.has(m.gi));
+  zoomTo(generators: Set<number>, pins: Set<number> | null = null): void {
+    const ms: { x: number; z: number }[] = [
+      ...this.markers.filter((m) => generators.has(m.gi)),
+      ...this.pins.filter((p) => pins?.has(p.index)),
+    ];
     const w = this.canvas.clientWidth;
     const hgt = this.canvas.clientHeight;
     if (!ms.length || !w || !hgt) return;
@@ -198,6 +229,47 @@ export class MapView {
       }
     }
     for (const m of order) this.drawMarker(ctx, m);
+    for (const p of this.pins) this.drawPin(ctx, p);
+  }
+
+  /** A trader: a violet disc with a nose pointing the way it faces, and its name beside it. */
+  private drawPin(ctx: CanvasRenderingContext2D, p: Pin): void {
+    const sx = this.view.tx + p.x * this.view.scale;
+    const sy = this.view.ty + p.z * this.view.scale;
+    const lit = this.litPins?.has(p.index) ?? false;
+    const r = lit || this.hoverPin === p ? 10 : 8;
+    // Rotation is about the vertical axis; 0 faces +z (down the map) and positive turns toward +x.
+    const a = (p.facing * Math.PI) / 180;
+    const dx = Math.sin(a);
+    const dy = Math.cos(a);
+    ctx.fillStyle = TRADER_COLOR;
+    ctx.strokeStyle = lit ? '#ffffff' : 'rgba(10,14,24,0.9)';
+    ctx.lineWidth = lit ? 2.5 : 1.5;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx + dx * r, sy + dy * r);
+    ctx.lineTo(sx + dx * (r + 6) - dy * 4, sy + dy * (r + 6) + dx * 4);
+    ctx.lineTo(sx + dx * (r + 6) + dy * 4, sy + dy * (r + 6) - dx * 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = '600 12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(10,14,24,0.85)';
+    ctx.strokeText(p.label, sx, sy - r - 3);
+    ctx.fillStyle = lit ? '#ffffff' : '#e6dcff';
+    ctx.fillText(p.label, sx, sy - r - 3);
+    if (lit) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   private rank(m: Marker): number {
@@ -304,6 +376,19 @@ export class MapView {
 
   // --- interaction -------------------------------------------------------------------------
 
+  private pickPin(px: number, py: number): Pin | null {
+    let best: Pin | null = null;
+    let bestD = (HIT_RADIUS + 4) ** 2;
+    for (const p of this.pins) {
+      const d = (this.view.tx + p.x * this.view.scale - px) ** 2 + (this.view.ty + p.z * this.view.scale - py) ** 2;
+      if (d <= bestD) {
+        best = p;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
   private pick(px: number, py: number): Marker | null {
     let best: Marker | null = null;
     let bestD = HIT_RADIUS * HIT_RADIUS;
@@ -343,7 +428,10 @@ export class MapView {
       }
       return;
     }
-    this.setHover(this.pick(px, py), px, py);
+    const pin = this.pickPin(px, py);
+    this.setHoverPin(pin, px, py);
+    if (pin) this.setHover(null);
+    else this.setHover(this.pick(px, py), px, py);
   }
 
   private onUp(e: PointerEvent): void {
@@ -351,6 +439,11 @@ export class MapView {
     this.drag = null;
     if (wasClick) {
       const [px, py] = this.local(e);
+      const pin = this.pickPin(px, py);
+      if (pin) {
+        this.events.onTrader(pin.index);
+        return;
+      }
       const m = this.pick(px, py);
       this.events.onSelect(m ? m.gi : null);
     }
@@ -366,6 +459,21 @@ export class MapView {
     this.draw();
   }
 
+  private setHoverPin(p: Pin | null, px = 0, py = 0): void {
+    if (p === this.hoverPin) return;
+    this.hoverPin = p;
+    this.draw();
+    if (!p) {
+      if (!this.hover) this.tip.hidden = true;
+      return;
+    }
+    this.canvas.style.cursor = 'pointer';
+    this.tip.replaceChildren(h('strong', null, p.label), h('span', { class: 'muted' }, `${p.trades} trades on this difficulty`));
+    this.tip.hidden = false;
+    this.tip.style.left = `${px + 14}px`;
+    this.tip.style.top = `${py + 14}px`;
+  }
+
   private setHover(m: Marker | null, px = 0, py = 0): void {
     if (m === this.hover && m === null) return;
     const before = this.hover;
@@ -373,7 +481,7 @@ export class MapView {
     if ((before?.others || m?.others) && before?.gi !== m?.gi) this.draw();
     this.canvas.style.cursor = m ? 'pointer' : 'grab';
     if (!m) {
-      this.tip.hidden = true;
+      if (!this.hoverPin) this.tip.hidden = true;
       return;
     }
     this.tip.replaceChildren(h('strong', null, m.label), ...m.detail.split('\n').filter(Boolean).map((t) => h('span', { class: 'muted' }, t)));

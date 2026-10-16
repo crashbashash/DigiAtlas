@@ -64,13 +64,16 @@ def choose_scene(scenes: list[scene.Scene], points: list[tuple[float, float]]) -
     return best
 
 
-def build(ndmw: Afs, packs: list[int], spawns: list[tuple[float, float, float]]) -> StageMap | None:
+def build(
+    ndmw: Afs, packs: list[int], spawns: list[tuple[float, float, float]], extra: list[tuple[float, float]] | None = None
+) -> StageMap | None:
     """Render the map for one stage, or None when no terrain scene covers its spawn points.
 
-    A stage without spawn points (a shop or lobby) gets its largest terrain scene, cropped to the terrain.
+    A stage without spawn points (a shop or lobby) gets its largest terrain scene, cropped to the terrain and
+    widened to hold the ``extra`` (x, z) points, such as the Digimon standing in it.
     """
     if not spawns:
-        return _build_empty(ndmw, packs)
+        return _build_empty(ndmw, packs, extra or [])
     points = [(x, z) for x, _y, z in spawns]
     ys = sorted(y for _x, y, _z in spawns)
     best: tuple[tuple, int, scene.Scene] | None = None
@@ -98,7 +101,7 @@ def build(ndmw: Afs, packs: list[int], spawns: list[tuple[float, float, float]])
     return StageMap(pack, s.name, roi, raster, coverage)
 
 
-def _build_empty(ndmw: Afs, packs: list[int]) -> StageMap | None:
+def _build_empty(ndmw: Afs, packs: list[int], extra: list[tuple[float, float]]) -> StageMap | None:
     """Map of the biggest terrain scene in a stage that has nothing spawning in it."""
     best: tuple[int, int, scene.Scene] | None = None
     for pack in packs:
@@ -124,6 +127,10 @@ def _build_empty(ndmw: Afs, packs: list[int]) -> StageMap | None:
     tris = [t for pt in (inner or parts) for t in pt]
     x0, x1, z0, z1 = _bbox(tris)
     ys = sorted(p[1] for t in tris for p in t)
+    x0, x1 = min([x0] + [x for x, _ in extra]), max([x1] + [x for x, _ in extra])
+    z0, z1 = min([z0] + [z for _, z in extra]), max([z1] + [z for _, z in extra])
+    x0, x1 = min([x0] + [x for x, _ in extra]), max([x1] + [x for x, _ in extra])
+    z0, z1 = min([z0] + [z for _, z in extra]), max([z1] + [z for _, z in extra])
     roi = (x0 - MARGIN / 3, x1 + MARGIN / 3, z0 - MARGIN / 3, z1 + MARGIN / 3)
     raster = render.render(tris, roi, focus_y=ys[len(ys) // 2])
     return StageMap(pack, s.name, roi, raster, 1.0) if raster.fill >= 0.02 else None

@@ -91,13 +91,19 @@ def _trades(found: list) -> list[dict]:
     out = []
     for t in found:
         seen[t.name] = seen.get(t.name, 0) + 1
+        x, y, z = t.position
         out.append({
             "trader": t.name,
             "number": seen[t.name] if totals[t.name] > 1 else None,
-            "offers": [
-                {"give": {"category": o.give[0], "id": o.give[1]}, "get": {"category": o.get[0], "id": o.get[1]}}
-                for o in t.offers
-            ],
+            "position": {"x": round(x, 3), "y": round(y, 3), "z": round(z, 3)},
+            "facing": round(t.facing, 3),
+            "tables": {
+                difficulty: [
+                    {"give": {"category": o.give[0], "id": o.give[1]}, "get": {"category": o.get[0], "id": o.get[1]}}
+                    for o in offers
+                ]
+                for difficulty, offers in t.tables.items()
+            },
         })
     return out
 
@@ -247,10 +253,11 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
                     for pool in slot.pools + slot.last_pools:
                         pools.setdefault(pool.name, _pool_record(pool))
             rec["difficulties"][difficulty] = {"generators": [_generator_record(g, stage_scripts) for g in gens]}
-        rec["trades"] = _trades(trades.extract([ndmw.entry(pk) for pk in st.packs], player_digimon))
+        placed = trades.extract([ndmw.entry(pk) for pk in st.packs], player_digimon)
+        rec["trades"] = _trades(placed)
         rec["map"] = None
         if with_maps and not (rec["kind"] == "system" and not map_points):
-            built = maps.build(ndmw, st.packs, map_points)
+            built = maps.build(ndmw, st.packs, map_points, [(t.position[0], t.position[2]) for t in placed])
             if built is not None:
                 map_dir.mkdir(parents=True, exist_ok=True)
                 (map_dir / f"{st.id}.png").write_bytes(built.png())

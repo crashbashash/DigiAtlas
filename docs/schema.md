@@ -121,11 +121,15 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
 - Stage names for `stagIS07`, `stagIS08` and `stagIS20`: system scenes with no banner (`stagIS09` and
   `stagIS10` are the Bandai logo and the opening, from the decomp's loading-screen tour, as is
   `stagML14`, which has no banner image of its own).
-- Trades: `stages[].trades` lists each trader Digimon in a shop room and its offers (hand over `give`, get
-  `get`, both `{category, id}` keys into `items.json`). Trader Hall has 24 traders (Agumon, Guilmon,
-  Dorumon, Veemon, WereGarurumon, BK WarGreymon, Mamemon), identical across its three variants. The first
-  offer of each is "Offering" (important item 11) for equipment. Which trader is where in the room is not
-  extracted, so same-species traders are numbered.
+- Trades: `stages[].trades` lists each trader Digimon standing in a shop room: `position` (world x/y/z, the
+  same space as spawn points), `facing` (degrees) and `tables`, the offers it uses on each difficulty
+  (hand over `give`, get `get`, both `{category, id}` keys into `items.json`). Both come from the stage
+  script that places the Digimon (`GENERATE` with a model, an instance number, position and rotation) and
+  the per-difficulty trade scripts (`n_<model>_<instance><n|h|v>.lua`) it selects by instance number and
+  game difficulty. Trader Hall's three variants differ in who stands there (BK WarGreymon and a second
+  Mamemon in the annex only appear in `e` and `v`). The first offer of the Agumon,
+  Guilmon, Dorumon and Veemon tables takes an "Offering" (important item 11) for equipment. A Digimon with no table (chatter only) is left out; same-species
+  traders are numbered by instance.
 - Trader Hall (`dngq5b1e/h/v`) and the Home Server lobbies have no spawners. Their maps are the largest
   terrain scene cropped to the rooms (no markers). System scenes (logo, opening) have no map.
   Stage packs are followed on disc by their own generator packs only; Trader Hall's neighbours' packs

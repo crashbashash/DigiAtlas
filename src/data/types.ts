@@ -118,10 +118,20 @@ export interface ItemRef {
 }
 
 /** A Digimon in a shop room who swaps one item for another. */
+export interface Offer {
+  give: ItemRef;
+  get: ItemRef;
+}
+
 export interface Trader {
   trader: string;
   number: number | null;
-  offers: { give: ItemRef; get: ItemRef }[];
+  /** Where it stands, in the same world space as spawn points. */
+  position: { x: number; y: number; z: number };
+  /** Degrees about the vertical axis. */
+  facing: number;
+  /** What it swaps on each difficulty; a difficulty with no entry has no trades. */
+  tables: Partial<Record<Difficulty, Offer[]>>;
 }
 
 export interface Stage {

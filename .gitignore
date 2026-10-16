@@ -1,0 +1,22 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+.local/
+test-results/
+
+# Game-derived data and assets stay out of the repo
+*.AFS
+*.afs
+*.iso
+*.igb
+*.bin
+*.elf
+data/generated/
+data/game/
+
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*

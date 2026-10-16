@@ -250,9 +250,9 @@ export class MapView {
     const r = (selected ? 8 : lit ? 7.5 : 6) * (m.shared ? 0.72 : 1);
     ctx.globalAlpha = dim ? 0.22 : 1;
     // Script-started spawners are rings so they read as "may not be there"; shared spots are smaller.
-    ctx.fillStyle = m.scripted ? 'rgba(12,18,30,0.55)' : KIND_COLOR[m.kind];
+    ctx.fillStyle = m.scripted ? `${KIND_COLOR[m.kind]}33` : KIND_COLOR[m.kind];
     ctx.strokeStyle = selected ? '#ffffff' : m.scripted ? KIND_COLOR[m.kind] : 'rgba(10,14,24,0.9)';
-    ctx.lineWidth = selected ? 2.5 : m.scripted ? 2 : 1.5;
+    ctx.lineWidth = selected ? 2.5 : m.scripted ? 2.5 : 1.5;
     ctx.beginPath();
     if (m.kind === 'object') ctx.rect(sx - r * 0.85, sy - r * 0.85, r * 1.7, r * 1.7);
     else if (m.kind === 'boss') {

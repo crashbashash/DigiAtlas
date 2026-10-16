@@ -65,7 +65,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .legend { position: absolute; left: 12px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; background: rgba(10, 13, 20, 0.78); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font-size: 12px; pointer-events: none; }
 .legend > div { display: flex; gap: 14px; }
 .legend i.solid { background: #c9d2e3; }
-.legend i.ring { background: rgba(12,18,30,0.55); border: 2px solid #c9d2e3; width: 10px; height: 10px; }
+.legend i.ring { background: transparent; border: 2.5px solid #c9d2e3; width: 10px; height: 10px; }
 .legend i.small { background: #c9d2e3; width: 7px; height: 7px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i, .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }

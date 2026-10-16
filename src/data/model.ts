@@ -1,7 +1,7 @@
 import type { DataSource } from './source';
 import { dropTable, isUnused, itemKey, type DropRow } from './logic';
 import type { DropPool, Difficulty, Enemy, EnemyKind, Generator, Item, RawData, Stage, Trader } from './types';
-import { DIFFICULTIES, DIFFICULTY_LABEL, VARIANT_DIFFICULTY } from './types';
+import { DIFFICULTIES, DIFFICULTY_LABEL, VARIANT_DIFFICULTY, type AppraisalTier, type GearKind } from './types';
 
 export interface Room {
   area: string;
@@ -33,6 +33,39 @@ export interface TradeLink {
 /** "Agumon", or "Agumon 2" when a room has several. */
 export function traderLabel(t: Trader): string {
   return t.number ? `${t.trader} ${t.number}` : t.trader;
+}
+
+/** An unidentified item and everything the appraiser can make of it, by the player's level. */
+export interface AppraisalTable {
+  cost: number;
+  /** Level ranges; neighbouring tiers that give the same results are one column. */
+  columns: string[];
+  rows: { key: string; label: string; /** Percent chance per column, 0 where it cannot come up. */ percents: number[] }[];
+}
+
+/** Where an item can come from at the appraiser: the unidentified item to take there and the chance per tier. */
+export interface AppraisedFrom {
+  cost: number;
+  from: string;
+  /** Level ranges where it can come up, neighbours with the same chance joined. */
+  ranges: { label: string; percent: number }[];
+}
+
+/** "Lv 1–40", "Lv 401+"; several neighbouring tiers read as one range. */
+export function levelRange(first: AppraisalTier, last: AppraisalTier = first): string {
+  const low = Math.max(first.minLevel, 1);
+  return last.maxLevel === null ? `Lv ${low}+` : `Lv ${low}–${last.maxLevel}`;
+}
+
+/** Runs of neighbouring tiers (by index) that `same` says are alike. */
+function runs(tiers: AppraisalTier[], same: (a: number, b: number) => boolean): [number, number][] {
+  const out: [number, number][] = [];
+  tiers.forEach((_, i) => {
+    const last = out[out.length - 1];
+    if (last && same(last[1], i)) last[1] = i;
+    else out.push([i, i]);
+  });
+  return out;
 }
 
 export interface World {
@@ -287,6 +320,51 @@ export class Model {
       }
     }
     return out;
+  }
+
+  private unidentified(category: GearKind): Item | undefined {
+    return [...this.items.values()].find((i) => i.unidentified && i.category === category);
+  }
+
+  /** What an unidentified weapon, core or board can turn into; null for any other item. */
+  appraisalTable(key: string): AppraisalTable | null {
+    const a = this.raw.items.appraisal;
+    const item = this.items.get(key);
+    if (!a || !item?.unidentified) return null;
+    const category = item.category as GearKind;
+    const rows = new Map<string, number[]>();
+    a.tiers.forEach((t, n) => {
+      for (const r of t.results[category]) {
+        const k = itemKey(r.category, r.id);
+        if (!rows.has(k)) rows.set(k, a.tiers.map(() => 0));
+        rows.get(k)![n] += r.rate / 100;
+      }
+    });
+    const same = (x: number, y: number) => [...rows.values()].every((p) => p[x] === p[y]);
+    const groups = runs(a.tiers, same);
+    return {
+      cost: a.cost,
+      columns: groups.map(([from, to]) => levelRange(a.tiers[from], a.tiers[to])),
+      rows: [...rows]
+        .map(([k, percents]) => ({ key: k, label: this.itemLabel(k), percents: groups.map(([from]) => percents[from]) }))
+        .sort((x, y) => Math.max(...y.percents) - Math.max(...x.percents) || x.label.localeCompare(y.label)),
+    };
+  }
+
+  /** The tiers (player level ranges) in which the appraiser can turn something into this item. */
+  appraisedFrom(key: string): AppraisedFrom | null {
+    const a = this.raw.items.appraisal;
+    const item = this.items.get(key);
+    if (!a || !item || item.unidentified) return null;
+    const category = item.category;
+    if (category !== 'weapon' && category !== 'armor1' && category !== 'armor2') return null;
+    const percent = a.tiers.map((tier) =>
+      tier.results[category].filter((r) => itemKey(r.category, r.id) === key).reduce((n, r) => n + r.rate / 100, 0));
+    const ranges = runs(a.tiers, (x, y) => percent[x] === percent[y])
+      .filter(([from]) => percent[from] > 0)
+      .map(([from, to]) => ({ label: levelRange(a.tiers[from], a.tiers[to]), percent: percent[from] }));
+    const from = this.unidentified(category);
+    return ranges.length && from ? { cost: a.cost, from: this.itemLabel(itemKey(from.category, from.id)), ranges } : null;
   }
 
   /** The traders in a room that have something to swap on this difficulty. */

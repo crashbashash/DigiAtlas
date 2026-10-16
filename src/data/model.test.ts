@@ -106,6 +106,51 @@ describe('entryDifficulty', () => {
   });
 });
 
+describe('appraisal', () => {
+  const withAppraiser = (): Model => {
+    const raw = model().raw;
+    raw.items.items.push(
+      { category: 'weapon', id: 276, name: 'Unidentified Weapon', description: null, unidentified: true },
+      { category: 'weapon', id: 25, name: 'Battle Hawk β', description: null },
+    );
+    const tier = (n: number, min: number, max: number | null, results: [number, number][]) => ({
+      tier: n, minLevel: min, maxLevel: max,
+      results: { weapon: results.map(([id, rate]) => ({ category: 'weapon' as const, id, rate })), armor1: [], armor2: [] },
+    });
+    raw.items.appraisal = { cost: 300, tiers: [tier(1, 0, 40, [[0, 6000], [25, 4000]]), tier(2, 41, null, [[0, 2500], [25, 7500]])] };
+    return new Model(raw);
+  };
+
+  it('lists what an unidentified item can become, per tier, best first', () => {
+    const t = withAppraiser().appraisalTable('weapon:276')!;
+    expect(t.cost).toBe(300);
+    expect(t.columns).toEqual(['Lv 1–40', 'Lv 41+']);
+    expect(t.rows.map((r) => [r.label, r.percents])).toEqual([['Battle Hawk β', [40, 75]], ['Battle Hawk α', [60, 25]]]);
+  });
+
+  it('joins neighbouring tiers that give the same results', () => {
+    const m = withAppraiser();
+    const a = m.raw.items.appraisal!;
+    a.tiers.push({ ...a.tiers[1], tier: 3, minLevel: 101, maxLevel: null });
+    a.tiers[1] = { ...a.tiers[1], maxLevel: 100 };
+    expect(m.appraisalTable('weapon:276')!.columns).toEqual(['Lv 1–40', 'Lv 41+']);
+    expect(m.appraisedFrom('weapon:25')!.ranges).toEqual([{ label: 'Lv 1–40', percent: 40 }, { label: 'Lv 41+', percent: 75 }]);
+  });
+
+  it('says which tiers can produce an ordinary item', () => {
+    const from = withAppraiser().appraisedFrom('weapon:25')!;
+    expect(from.from).toBe('Unidentified Weapon');
+    expect(from.ranges.map((r) => [r.label, r.percent])).toEqual([['Lv 1–40', 40], ['Lv 41+', 75]]);
+  });
+
+  it('has nothing for items the appraiser cannot make or data without it', () => {
+    const m = withAppraiser();
+    expect(m.appraisedFrom('conItem:0')).toBeNull();
+    expect(m.appraisalTable('weapon:0')).toBeNull();
+    expect(model().appraisedFrom('weapon:0')).toBeNull();
+  });
+});
+
 describe('mapsFor', () => {
   it('lists each map once with its best chance and how many spawners drop the item', () => {
     const m = model();

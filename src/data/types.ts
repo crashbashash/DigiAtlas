@@ -151,10 +151,32 @@ export interface Stage {
   difficulties: Partial<Record<Difficulty, { generators: Generator[] }>>;
 }
 
+export type GearKind = 'weapon' | 'armor1' | 'armor2';
+
+/** One thing the appraiser can turn an unidentified item into, with its weight out of 10000. */
+export interface AppraisalResult {
+  category: GearKind;
+  id: number;
+  rate: number;
+}
+
+export interface AppraisalTier {
+  tier: number;
+  minLevel: number;
+  /** Highest player level the tier applies to; null for the last. */
+  maxLevel: number | null;
+  results: Record<GearKind, AppraisalResult[]>;
+}
+
+export interface Appraisal {
+  cost: number;
+  tiers: AppraisalTier[];
+}
+
 export interface RawData {
   manifest: Manifest;
   enemies: { rows: Enemy[] };
-  items: { items: Item[] };
+  items: { items: Item[]; appraisal?: Appraisal };
   drops: { pools: Record<string, DropPool> };
   stages: { stages: Stage[] };
 }

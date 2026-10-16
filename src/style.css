@@ -153,3 +153,11 @@ td { padding: 3px 6px; vertical-align: top; border-top: 1px solid rgba(255, 255,
 
 .trader.flash { animation: trader-flash 1.2s ease-out; }
 @keyframes trader-flash { from { background: rgba(185, 140, 255, 0.35); } to { background: transparent; } }
+
+table.appraisal { width: 100%; border-collapse: collapse; font-size: 11px; }
+table.appraisal th { color: var(--muted, #8a93a6); font-weight: 500; text-align: right; padding: 2px 3px; white-space: nowrap; }
+table.appraisal td { padding: 2px 3px; text-align: right; }
+table.appraisal td:first-child { text-align: left; white-space: nowrap; }
+table.appraisal tr:nth-child(even) td { background: rgba(255, 255, 255, 0.03); }
+.row.static { cursor: default; }
+.row.static:hover { background: none; }

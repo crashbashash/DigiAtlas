@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from ps2_export import banners, database, export, generators, igbpack, iso, maps, render, scene, scripts, stages, stats, textures, trades  # noqa: E402
+from ps2_export import appraisal, banners, database, export, generators, igbpack, iso, maps, render, scene, scripts, stages, stats, textures, trades  # noqa: E402
 from ps2_export.afs import Afs  # noqa: E402
 
 try:
@@ -544,6 +544,28 @@ be:DMrun()'''
         self.assertEqual(out[0]["tables"]["hard"][0], {"give": {"category": "weapon", "id": 1}, "get": {"category": "weapon", "id": 2}})
 
 
+class AppraisalTests(unittest.TestCase):
+    def test_tiers_follow_the_level_bounds(self):
+        self.assertEqual(
+            appraisal.tier_levels(),
+            [(1, 0, 40), (2, 41, 100), (3, 101, 200), (4, 201, 300), (5, 301, 400), (6, 401, None)],
+        )
+
+    def test_a_tier_row_counts_its_results(self):
+        rows = [{"ID": 0, "RATE": 0, "RANK": 0}] * 100
+        rows += [{"ID": 2, "RATE": 0, "RANK": 0}, {"ID": 7, "RATE": 6000, "RANK": 1}, {"ID": 9, "RATE": 4000, "RANK": 1}]
+        rows += [{"ID": 5, "RATE": 1, "RANK": 1}]  # past the count: not a result
+        self.assertEqual(appraisal.results(rows, 1), [{"id": 7, "rate": 6000}, {"id": 9, "rate": 4000}])
+        self.assertEqual(appraisal.results(rows, 2), [])
+
+    def test_build_lists_every_kind_per_tier(self):
+        one = [{"ID": 0, "RATE": 0, "RANK": 0}] * 100 + [{"ID": 1, "RATE": 0, "RANK": 0}, {"ID": 3, "RATE": 10000, "RANK": 1}]
+        out = appraisal.build({"coweapon": one, "coarmor1": one, "coarmor2": one})
+        self.assertEqual(out["cost"], 300)
+        self.assertEqual(out["tiers"][0]["results"]["armor1"], [{"category": "armor1", "id": 3, "rate": 10000}])
+        self.assertEqual(out["tiers"][5]["results"]["weapon"], [])
+
+
 @unittest.skipUnless(os.environ.get("DIGIATLAS_PS2_ISO"), "set DIGIATLAS_PS2_ISO to run")
 class DiscTests(unittest.TestCase):
     @classmethod
@@ -759,6 +781,21 @@ class DiscTests(unittest.TestCase):
         box = next(g for g in stage["difficulties"]["normal"]["generators"] if g["name"] == "GBOX-01")
         whens = " ".join(w for r in box["script"]["refs"] for w in r["when"])
         self.assertIn("lever", whens)
+
+    def test_appraiser_tables(self):
+        data = self.load("items.json")
+        items = {(i["category"], i["id"]): i for i in data["items"]}
+        block = data["appraisal"]
+        self.assertEqual(block["cost"], 300)
+        self.assertEqual(len(block["tiers"]), 6)
+        for tier in block["tiers"]:
+            for category, found in tier["results"].items():
+                self.assertEqual(sum(r["rate"] for r in found), 10000, (tier["tier"], category))
+                for r in found:
+                    self.assertIn((r["category"], r["id"]), items)
+                    self.assertNotIn("unidentified", items[(r["category"], r["id"])])
+        first = block["tiers"][0]["results"]["weapon"][0]
+        self.assertEqual((items[(first["category"], first["id"])]["name"], first["rate"]), ("Battle Hawk α", 5960))
 
     def test_banner_fingerprints(self):
         from ps2_export import manifest as archive_manifest

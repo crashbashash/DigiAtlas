@@ -156,6 +156,159 @@
           }
         }
       }
+    },
+    "appraisal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cost",
+        "tiers"
+      ],
+      "description": "What the appraiser turns an unidentified weapon, core or board into. Absent when the platform export does not know.",
+      "properties": {
+        "cost": {
+          "type": "integer",
+          "description": "BIT charged per appraisal."
+        },
+        "tiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tier",
+              "minLevel",
+              "maxLevel",
+              "results"
+            ],
+            "properties": {
+              "tier": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "minLevel": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "maxLevel": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Highest player level this tier applies to; null for the last tier."
+              },
+              "results": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "weapon",
+                  "armor1",
+                  "armor2"
+                ],
+                "properties": {
+                  "weapon": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "category",
+                        "id",
+                        "rate"
+                      ],
+                      "properties": {
+                        "category": {
+                          "enum": [
+                            "weapon",
+                            "armor1",
+                            "armor2"
+                          ]
+                        },
+                        "id": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Item id in the category; with `category` it is the key of an entry in `items`."
+                        },
+                        "rate": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000,
+                          "description": "Weight out of 10000."
+                        }
+                      }
+                    }
+                  },
+                  "armor1": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "category",
+                        "id",
+                        "rate"
+                      ],
+                      "properties": {
+                        "category": {
+                          "enum": [
+                            "weapon",
+                            "armor1",
+                            "armor2"
+                          ]
+                        },
+                        "id": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Item id in the category; with `category` it is the key of an entry in `items`."
+                        },
+                        "rate": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000,
+                          "description": "Weight out of 10000."
+                        }
+                      }
+                    }
+                  },
+                  "armor2": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "category",
+                        "id",
+                        "rate"
+                      ],
+                      "properties": {
+                        "category": {
+                          "enum": [
+                            "weapon",
+                            "armor1",
+                            "armor2"
+                          ]
+                        },
+                        "id": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Item id in the category; with `category` it is the key of an entry in `items`."
+                        },
+                        "rate": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000,
+                          "description": "Weight out of 10000."
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Possible results by kind of unidentified item; the weights of each list add up to 10000."
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

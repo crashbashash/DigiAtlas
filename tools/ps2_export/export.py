@@ -15,7 +15,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import banners, database, generators, iso, maps, png, scripts, stages, stats, trades
+from . import appraisal, banners, database, generators, iso, maps, png, scripts, stages, stats, trades
 from . import manifest as archive_manifest
 from .afs import Afs
 
@@ -273,6 +273,11 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
                 }
         stage_records.append(rec)
 
+    # --- appraiser (what an unidentified item turns into) -------------------------------
+    hub_packs = sorted({pk for st in all_stages if st.id.startswith("stagML") for pk in st.packs})
+    appraiser_tables = appraisal.find_tables(ndmw, hub_packs)
+    appraisal_block = appraisal.build(appraiser_tables) if appraiser_tables else None
+
     # --- items (every item in the game database) ---------------------------------------
     items = []
     for i in database.parse_items(tables):
@@ -322,7 +327,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
         "enemies.json": enemies,
         "stages.json": {"stages": stage_records},
         "drops.json": {"pools": pools},
-        "items.json": {"items": items},
+        "items.json": {"items": items, **({"appraisal": appraisal_block} if appraisal_block else {})},
     }
     for name, payload in payloads.items():
         (out_dir / name).write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n")

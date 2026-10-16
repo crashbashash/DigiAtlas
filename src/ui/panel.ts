@@ -31,6 +31,9 @@ export interface PanelActions {
 
 const SOURCE_LIMIT = 40;
 
+/** Appraiser weights are whole hundredths of a percent, so show them as they are. */
+const exactPercent = (p: number): string => `${+p.toFixed(2)}%`;
+
 export class Panel {
   readonly el = h('aside', { class: 'panel' });
   private showAllSources = false;
@@ -52,7 +55,7 @@ export class Panel {
       // The item card lives in its own window; here the map highlights the droppers.
       this.el.append(...this.overview(stage, d));
     } else if (sel.kind === 'item') {
-      this.el.append(...this.itemInfo(sel.key), ...this.mapsList(sel.key, d), ...this.tradesList(sel.key));
+      this.el.append(...this.itemInfo(sel.key), ...this.mapsList(sel.key, d), ...this.tradesList(sel.key), ...this.appraisalList(sel.key));
     } else if (sel.kind === 'species') {
       this.el.append(...this.speciesView(sel.name, d));
     } else if (stage && sel.kind === 'generator') {
@@ -314,6 +317,34 @@ export class Panel {
     el.classList.remove('flash');
     void el.offsetWidth; // restart the animation
     el.classList.add('flash');
+  }
+
+  /** What the appraiser makes of an unidentified item, or which unidentified item can turn into this one. */
+  private appraisalList(key: string): HTMLElement[] {
+    const table = this.model.appraisalTable(key);
+    if (table) {
+      return [
+        h('div', { class: 'sub' }, `Appraised into (${table.cost} BIT)`),
+        h('p', { class: 'note' }, 'Take it to the Appraiser in the central area. What you get depends on your level; each column adds up to 100%.'),
+        h('table', { class: 'appraisal' },
+          h('tr', null, h('th', null, ''), ...table.columns.map((c) => h('th', null, c))),
+          ...table.rows.map((r) =>
+            h('tr', null,
+              h('td', null, h('button', { class: 'link', onclick: () => this.act.selectItem(r.key) }, r.label)),
+              ...r.percents.map((p) => h('td', { class: p ? 'pct' : 'pct muted' }, p ? exactPercent(p) : '–'))))),
+      ];
+    }
+    const from = this.model.appraisedFrom(key);
+    if (!from) return [];
+    return [
+      h('div', { class: 'sub' }, `Appraise ${from.from} (${from.cost} BIT)`),
+      h('p', { class: 'note' }, 'Take it to the Appraiser in the central area; your level decides what it can become.'),
+      h('div', { class: 'list maps' },
+        ...from.ranges.map((r) =>
+          h('div', { class: 'row static' },
+            h('span', { class: 'grow' }, r.label),
+            h('span', { class: 'pct' }, exactPercent(r.percent))))),
+    ];
   }
 
   /** Traders who give an item, and ones who take it, listed in the item window. */

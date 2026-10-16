@@ -130,6 +130,13 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
   Mamemon in the annex only appear in `e` and `v`). The first offer of the Agumon,
   Guilmon, Dorumon and Veemon tables takes an "Offering" (important item 11) for equipment. A Digimon with no table (chatter only) is left out; same-species
   traders are numbered by instance.
+- Appraisal: `items.json` `appraisal` says what the Central appraiser turns an unidentified weapon, core or
+  board into (300 BIT; the decomp's `beNDMWShopCtrl40` notes). The player's level picks a tier (1: up to
+  40, 2: 41-100, 3: 101-200, 4: 201-300, 5: 301-400, 6: 401+); each tier lists results per kind with a
+  weight out of 10000 that adds up to 10000, so a roll cannot miss. The tables are `coweapon`, `coarmor1`
+  and `coarmor2` in the Central hub's database pack. The game draws 0-9999 and takes the first result whose
+  running total reaches it, so the first result of a tier is 0.01 points likelier and the last 0.01 less
+  than its weight says; the app shows the weights as they are.
 - Stage variants: a trailing `e`, `h` or `v` on a dungeon id is the copy the game enters on Normal, Hard and
   Very Hard. The entrance scripts branch on the game difficulty (0, 1, else) and call `funcStageChange`
   with `<id>e`, `<id>h` or `<id>v` (seen for `dngq4b1`, `dngq5b1` and `dngq2b2`; the app labels every

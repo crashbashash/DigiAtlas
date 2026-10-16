@@ -1,6 +1,6 @@
 import type { DataSource } from './source';
 import { dropTable, itemKey, type DropRow } from './logic';
-import type { DropPool, Difficulty, Enemy, Generator, Item, RawData, Stage } from './types';
+import type { DropPool, Difficulty, Enemy, EnemyKind, Generator, Item, RawData, Stage } from './types';
 import { DIFFICULTIES } from './types';
 
 export interface Room {
@@ -16,7 +16,10 @@ export interface World {
 
 export interface ItemSource {
   stage: Stage;
-  enemyRow: number;
+  enemyName: string;
+  kind: EnemyKind;
+  /** Stat rows that share this name and chance in the stage (crown ranks and the like). */
+  variants: number;
   /** Chance per kill, as a percentage. */
   percent: number;
   /** Indices of the generators (in that stage and difficulty) that use this drop table. */
@@ -35,6 +38,7 @@ function naturalKey(id: string): string {
 export class Model {
   readonly enemies = new Map<number, Enemy>();
   readonly items = new Map<string, Item>();
+  private readonly labels = new Map<string, string>();
   readonly stages: Stage[];
   readonly byId = new Map<string, Stage>();
   readonly worlds: World[];
@@ -43,10 +47,28 @@ export class Model {
   constructor(readonly raw: RawData) {
     for (const e of raw.enemies.rows) this.enemies.set(e.row, e);
     for (const i of raw.items.items) this.items.set(itemKey(i.category, i.id), i);
+    this.buildLabels();
     // Only stages that spawn something are worth browsing.
     this.stages = raw.stages.stages.filter((s) => DIFFICULTIES.some((d) => (s.difficulties[d]?.generators.length ?? 0) > 0));
     for (const s of this.stages) this.byId.set(s.id, s);
     this.worlds = this.buildWorlds();
+  }
+
+  /** The game has several items with one name (three X-Data, paired plugs); number them. */
+  private buildLabels(): void {
+    const groups = new Map<string, string[]>();
+    for (const [key, i] of this.items) {
+      const list = groups.get(i.name);
+      if (list) list.push(key);
+      else groups.set(i.name, [key]);
+    }
+    for (const [name, keys] of groups) {
+      keys.forEach((k, n) => this.labels.set(k, keys.length > 1 ? `${name} (${n + 1} of ${keys.length})` : name));
+    }
+  }
+
+  itemLabel(key: string): string {
+    return this.labels.get(key) ?? key;
   }
 
   get pools(): Record<string, DropPool> {
@@ -119,20 +141,27 @@ export class Model {
     const index = new Map<string, ItemSource[]>();
     for (const stage of this.stages) {
       const gens = this.generators(stage, d);
-      // A stage's generators often share a pool; collapse them to one row per stage + enemy + chance.
+      // A stage's spawners often share a pool, and several stat rows can be one enemy (crown ranks);
+      // collapse them to one row per stage, enemy name and chance.
       const seen = new Map<string, ItemSource>();
+      const rows = new Map<string, Set<number>>();
       gens.forEach((g, gi) => {
+        const enemy = this.enemies.get(g.row);
+        const name = enemy?.name ?? `Row ${g.row}`;
         for (const row of this.tableFor(g, d).rows as DropRow[]) {
-          const k = `${row.key}|${stage.id}|${g.row}|${row.rate}`;
+          const k = `${row.key}|${stage.id}|${name}|${row.rate}`;
           let src = seen.get(k);
           if (!src) {
-            src = { stage, enemyRow: g.row, percent: row.percent, generators: [] };
+            src = { stage, enemyName: name, kind: enemy?.kind ?? 'enemy', variants: 0, percent: row.percent, generators: [] };
             seen.set(k, src);
+            rows.set(k, new Set());
             const list = index.get(row.key);
             if (list) list.push(src);
             else index.set(row.key, [src]);
           }
           src.generators.push(gi);
+          rows.get(k)!.add(g.row);
+          src.variants = rows.get(k)!.size;
         }
       });
     }

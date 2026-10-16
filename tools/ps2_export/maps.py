@@ -52,10 +52,12 @@ def choose_scene(scenes: list[scene.Scene], points: list[tuple[float, float]]) -
     return best
 
 
-def build(ndmw: Afs, packs: list[int], points: list[tuple[float, float]]) -> StageMap | None:
+def build(ndmw: Afs, packs: list[int], spawns: list[tuple[float, float, float]]) -> StageMap | None:
     """Render the map for one stage, or None when no terrain scene covers its spawn points."""
-    if not points:
+    if not spawns:
         return None
+    points = [(x, z) for x, _y, z in spawns]
+    ys = sorted(y for _x, y, _z in spawns)
     best: tuple[tuple, int, scene.Scene] | None = None
     for pack in packs:
         data = ndmw.entry(pack)
@@ -76,6 +78,6 @@ def build(ndmw: Afs, packs: list[int], points: list[tuple[float, float]]) -> Sta
     xs, zs = [x for x, _ in points], [z for _, z in points]
     pad = max(MARGIN, 0.25 * max(max(xs) - min(xs), max(zs) - min(zs)))
     roi = (min(xs) - pad, max(xs) + pad, min(zs) - pad, max(zs) + pad)
-    raster = render.render(s.triangles, roi)
+    raster = render.render(s.triangles, roi, focus_y=ys[len(ys) // 2])
     coverage = sum(raster.covered(x, z) for x, z in points) / len(points)
     return StageMap(pack, s.name, roi, raster, coverage)

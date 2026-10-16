@@ -6,6 +6,7 @@ import { MapView } from './mapview';
 import { Panel } from './panel';
 import { sidebarBrand } from './brand';
 import { Sidebar } from './sidebar';
+import { hashFor, loadSaved, save, stateFromView, viewFromHash } from './router';
 import { Store, type State } from './state';
 
 const DEFAULT_STAGE = 'stag0102';
@@ -17,6 +18,9 @@ export class App {
   private readonly map: MapView;
   private readonly title = h('div', { class: 'title' });
   private readonly diffs = h('div', { class: 'diffs' });
+  private readonly zoom: HTMLButtonElement;
+  private matches: Set<number> | null = null;
+  private applying = false;
 
   constructor(
     root: HTMLElement,
@@ -25,7 +29,10 @@ export class App {
     private readonly onChangeData: (() => void) | null,
   ) {
     const first = model.byId.has(DEFAULT_STAGE) ? DEFAULT_STAGE : (model.stages[0]?.id ?? null);
-    this.store = new Store({ stageId: first, difficulty: 'hard', selection: { kind: 'none' }, query: '' });
+    const base: State = { stageId: first, difficulty: 'hard', selection: { kind: 'none' }, query: '' };
+    // The address wins, then the last view, then the default.
+    const view = location.hash.length > 2 ? viewFromHash(location.hash) : { ...viewFromHash(''), ...loadSaved() };
+    this.store = new Store(stateFromView(model, view, base));
 
     this.map = new MapView(model, source, {
       onSelect: (gi) => {
@@ -57,13 +64,24 @@ export class App {
       sidebarBrand(model.raw.manifest, onChangeData),
     );
 
-    const topbar = h('div', { class: 'topbar' }, this.title, this.diffs,
+    this.zoom = h('button', { class: 'fit', hidden: true, title: 'Zoom the map to the highlighted spawners', onclick: () => this.matches && this.map.zoomTo(this.matches) }, 'Zoom to matches');
+    const topbar = h('div', { class: 'topbar' }, this.title, this.zoom, this.diffs,
       h('button', { class: 'fit', title: 'Fit the map to the window (double-click the map)', onclick: () => this.map.fit() }, 'Fit'));
     clear(root);
     root.append(this.sidebar.el, h('main', null, topbar, this.map.el), this.panel.el);
 
     this.store.subscribe((s, prev) => this.update(s, prev));
     this.update(this.store.state, null);
+    history.replaceState(null, '', hashFor(model, this.store.state));
+    save(this.store.state);
+
+    window.addEventListener('popstate', () => {
+      this.applying = true;
+      this.store.set(stateFromView(model, viewFromHash(location.hash), { ...this.store.state, query: '' }));
+      this.applying = false;
+      save(this.store.state);
+    });
+    window.addEventListener('keydown', (e) => this.onKey(e));
   }
 
   private goToStage(id: string, resetSelection = false): void {
@@ -108,7 +126,35 @@ export class App {
     return sel.kind === 'group' || sel.kind === 'species' || sel.kind === 'item' ? out : null;
   }
 
+  private onKey(e: KeyboardEvent): void {
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
+    if (e.key === '/' && !typing) {
+      e.preventDefault();
+      this.sidebar.focusSearch();
+    } else if (e.key === 'Escape') {
+      const s = this.store.state;
+      if (s.query) {
+        this.sidebar.clearSearch();
+        this.store.set({ query: '' });
+      } else if (s.selection.kind !== 'none') {
+        this.store.set({ selection: { kind: 'none' } });
+      }
+    }
+  }
+
+  private syncAddress(s: State, prev: State | null): void {
+    if (this.applying || !prev) return;
+    save(s);
+    const next = hashFor(this.model, s);
+    if (next === location.hash) return;
+    // A new stage or a new kind of selection is a step you may want to go back to; refining is not.
+    const step = prev.stageId !== s.stageId || prev.selection.kind !== s.selection.kind;
+    if (step) history.pushState(null, '', next);
+    else history.replaceState(null, '', next);
+  }
+
   private update(s: State, prev: State | null): void {
+    this.syncAddress(s, prev);
     const stage = this.stage(s);
     if (!prev || prev.query !== s.query || prev.stageId !== s.stageId) this.sidebar.render(s.query, s.stageId);
     if (stage) {
@@ -116,7 +162,9 @@ export class App {
       this.title.append(h('strong', null, this.model.stageTitle(stage)), h('span', { class: 'muted' }, stage.area ?? ''));
       this.renderDifficulties(s, stage);
       const sel = s.selection;
-      this.map.show(stage, s.difficulty, this.highlight(s, stage), sel.kind === 'generator' ? sel.index : null);
+      this.matches = this.highlight(s, stage);
+      this.zoom.hidden = !this.matches || this.matches.size === 0;
+      this.map.show(stage, s.difficulty, this.matches, sel.kind === 'generator' ? sel.index : null);
     }
     this.panel.render(s, stage);
   }

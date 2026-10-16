@@ -66,10 +66,30 @@ describe('Model', () => {
   it('collapses spawners that share a table into one source row per stage and enemy', () => {
     const m = model();
     const sources = m.sourcesOf('weapon:0', 'hard');
-    const here = sources.filter((s) => s.stage.id === 'stag0102' && s.enemyRow === 1);
+    const here = sources.filter((s) => s.stage.id === 'stag0102' && s.enemyName === 'Goburimon');
     expect(here).toHaveLength(1);
     expect(here[0].generators).toEqual([0, 1]);
     expect(here[0].percent).toBe(1);
+    expect(here[0].enemyName).toBe('Goburimon');
+  });
+
+  it('merges stat rows of one enemy that share a chance', () => {
+    const raw = model().raw;
+    raw.enemies.rows.push(enemy(3, 'Goburimon'));
+    raw.stages.stages[1].difficulties.hard!.generators.push(gen('G5', 3, { hard: 'nB' }));
+    const sources = new Model(raw).sourcesOf('weapon:0', 'hard').filter((s) => s.stage.id === 'stag0102' && s.enemyName === 'Goburimon');
+    expect(sources).toHaveLength(1);
+    expect(sources[0].variants).toBe(2);
+    expect(sources[0].generators).toEqual([0, 1, 4]);
+  });
+
+  it('numbers items that share a name', () => {
+    const raw = model().raw;
+    raw.items.items.push({ category: 'insItem', id: 1, name: 'X-Data', description: null }, { category: 'insItem', id: 2, name: 'X-Data', description: null });
+    const m = new Model(raw);
+    expect(m.itemLabel('insItem:1')).toBe('X-Data (1 of 2)');
+    expect(m.itemLabel('insItem:2')).toBe('X-Data (2 of 2)');
+    expect(m.itemLabel('weapon:0')).toBe('Battle Hawk α');
   });
 
   it('orders sources by best chance and keeps difficulties apart', () => {

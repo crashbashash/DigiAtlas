@@ -271,6 +271,23 @@ class RenderTests(unittest.TestCase):
         self.assertFalse(r.covered(9.0, 9.0))  # beyond the hypotenuse
         self.assertFalse(r.covered(35.0, 35.0))
 
+    def test_backdrop_plane_larger_than_the_crop_is_dropped(self):
+        plane = ((-500.0, 0.0, -500.0), (-500.0, 0.0, 500.0), (500.0, 0.0, -500.0))
+        r = render.render([plane, self.FLOOR], (0.0, 40.0, 0.0, 40.0), max_side=80)
+        self.assertTrue(r.covered(2.0, 2.0))  # the real floor
+        self.assertFalse(r.covered(30.0, 2.0))  # only the plane would have covered this
+
+    def test_floors_near_the_focus_height_are_brightest(self):
+        low = ((0.0, 0.0, 0.0), (0.0, 0.0, 10.0), (10.0, 0.0, 0.0))
+        high = ((20.0, 100.0, 0.0), (20.0, 100.0, 10.0), (30.0, 100.0, 0.0))
+        r = render.render([low, high], (0.0, 40.0, 0.0, 40.0), max_side=80, focus_y=0.0)
+
+        def red(x, z):
+            o = (int(z * r.pixels_per_unit) * r.width + int(x * r.pixels_per_unit)) * 4
+            return r.rgba[o]
+
+        self.assertGreater(red(2.0, 2.0), red(22.0, 2.0))
+
     def test_fill_reports_the_covered_share(self):
         r = render.render([self.FLOOR], (0.0, 20.0, 0.0, 20.0), max_side=40)
         self.assertAlmostEqual(r.fill, 0.125, delta=0.02)  # half of a quarter of the crop
@@ -434,7 +451,7 @@ class DiscTests(unittest.TestCase):
         stages_out = {s["id"]: s for s in self.load("stages.json")["stages"]}
         for sid in ("stag0102", "dng101b1", "stagGF01"):
             st = stages_out[sid]
-            points = [(p[0], p[2]) for d in st["difficulties"].values() for g in d["generators"] for p in g["spawns"]]
+            points = [tuple(p) for d in st["difficulties"].values() for g in d["generators"] for p in g["spawns"]]
             built = maps.build(ndmw, st["packs"], points)
             self.assertIsNotNone(built, sid)
             self.assertGreaterEqual(built.coverage, 0.95, sid)

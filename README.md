@@ -17,6 +17,10 @@ Early development. The PS2 exporter, the data schema and a first working viewer 
   with chances (including the chance of nothing).
 - Search an item to see every enemy and object that drops it, with the chance, and jump to the stage.
 - Search an enemy to see its stat variants and every stage it appears in.
+- The address bar holds the stage, difficulty and selection (`#/stag0102?d=normal&item=weapon:175`), so
+  links and the back button work; the last view is remembered.
+- Shortcuts: `/` focuses search, `Enter` opens the first result, `Esc` clears the search, then the
+  selection. Double-click the map or press Fit to reset it; "Zoom to matches" frames highlighted spawners.
 
 Markers show what a stage can spawn. Some enemies are started by game scripts under conditions (story
 progress, your level), and scripted item pickups are not extracted yet.

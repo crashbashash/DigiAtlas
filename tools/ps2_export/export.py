@@ -160,13 +160,13 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
             "generatorPacks": st.generator_packs or None,
             "difficulties": {},
         }
-        map_points: list[tuple[float, float]] = []
+        map_points: list[tuple[float, float, float]] = []
         for difficulty in DIFFICULTIES:
             idx = st.generator_packs.get(difficulty)
             if idx is None:
                 continue
             gens = generators.Pack(ndmw.entry(idx)).generators()
-            map_points.extend((x, z) for g in gens for x, _y, z in g.spawns())
+            map_points.extend(p for g in gens for p in g.spawns())
             for g in gens:
                 for pool in g.pools + g.last_pools:
                     pools.setdefault(pool.name, _pool_record(pool))

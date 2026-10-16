@@ -16,7 +16,11 @@ interface Marker {
   z: number;
   kind: EnemyKind;
   label: string;
+  detail: string;
 }
+
+/** Maps this full are a flat floor with nothing to show; the plain grid reads better. */
+const FLAT_FILL = 0.97;
 
 interface View {
   tx: number;
@@ -81,11 +85,12 @@ export class MapView {
     this.selected = selected;
     this.markers = this.buildMarkers(stage, d);
     if (stageChanged) {
+      this.setHover(null);
       this.image = null;
       this.computeBounds(stage);
       this.pendingFit = true;
       this.fit();
-      if (stage.map) {
+      if (stage.map && stage.map.fill < FLAT_FILL) {
         const id = stage.id;
         void this.source.imageUrl(stage.map.image).then((url) => {
           const img = new Image();
@@ -107,7 +112,8 @@ export class MapView {
     this.model.generators(stage, d).forEach((g, gi) => {
       const e: Enemy | undefined = this.model.enemies.get(g.row);
       const kind: EnemyKind = e?.kind ?? 'enemy';
-      for (const [x, , z] of g.spawns) out.push({ gi, x, z, kind, label: e?.name ?? `Row ${g.row}` });
+      const detail = !e || e.kind === 'object' ? '' : `HP ${e.hp.toLocaleString('en-US')} · ${g.count ?? '?'} total`;
+      for (const [x, , z] of g.spawns) out.push({ gi, x, z, kind, label: e?.name ?? `Row ${g.row}`, detail });
     });
     return out;
   }
@@ -126,6 +132,25 @@ export class MapView {
       minZ: Math.min(...zs, 0) - pad,
       maxZ: Math.max(...zs, 0) + pad,
     };
+  }
+
+  /** Zoom so the spawners with these indices fill the view (at least a room's worth of map). */
+  zoomTo(generators: Set<number>): void {
+    const ms = this.markers.filter((m) => generators.has(m.gi));
+    const w = this.canvas.clientWidth;
+    const hgt = this.canvas.clientHeight;
+    if (!ms.length || !w || !hgt) return;
+    const xs = ms.map((m) => m.x);
+    const zs = ms.map((m) => m.z);
+    const spanX = Math.max(Math.max(...xs) - Math.min(...xs), 200);
+    const spanZ = Math.max(Math.max(...zs) - Math.min(...zs), 200);
+    const scale = Math.min(MAX_SCALE, (Math.min(w / spanX, hgt / spanZ)) * 0.75);
+    this.view = {
+      scale,
+      tx: w / 2 - ((Math.min(...xs) + Math.max(...xs)) / 2) * scale,
+      ty: hgt / 2 - ((Math.min(...zs) + Math.max(...zs)) / 2) * scale,
+    };
+    this.draw();
   }
 
   fit(): void {
@@ -306,11 +331,9 @@ export class MapView {
       this.tip.hidden = true;
       return;
     }
-    const g = this.stageId ? this.model.byId.get(this.stageId) : undefined;
-    this.tip.textContent = m.label;
+    this.tip.replaceChildren(h('strong', null, m.label), m.detail ? h('span', { class: 'muted' }, m.detail) : '');
     this.tip.hidden = false;
     this.tip.style.left = `${px + 14}px`;
     this.tip.style.top = `${py + 14}px`;
-    void g;
   }
 }

@@ -30,6 +30,7 @@ const SOURCE_LIMIT = 40;
 export class Panel {
   readonly el = h('aside', { class: 'panel' });
   private showAllSources = false;
+  private sourceFilter: 'all' | 'enemy' | 'object' = 'all';
   private lastItem = '';
 
   constructor(
@@ -43,7 +44,10 @@ export class Panel {
     const d = state.difficulty;
     const sel = state.selection;
     if (sel.kind === 'item') {
-      if (sel.key !== this.lastItem) this.showAllSources = false;
+      if (sel.key !== this.lastItem) {
+        this.showAllSources = false;
+        this.sourceFilter = 'all';
+      }
       this.lastItem = sel.key;
       this.el.append(...this.itemView(sel.key, d, stage));
     } else if (sel.kind === 'species') {
@@ -67,8 +71,7 @@ export class Panel {
   }
 
   private itemLink(key: string, text?: string): HTMLElement {
-    const item = this.model.items.get(key);
-    return h('button', { class: 'link', onclick: () => this.act.selectItem(key) }, text ?? item?.name ?? key);
+    return h('button', { class: 'link', onclick: () => this.act.selectItem(key) }, text ?? this.model.itemLabel(key));
   }
 
   private enemyCard(e: Enemy | undefined, row: number): HTMLElement {
@@ -109,23 +112,15 @@ export class Panel {
 
   private dropTableEl(t: DropTable, caption: string): HTMLElement {
     if (!t.rows.length) return h('p', { class: 'muted' }, 'Drops nothing.');
-    // The game has several items with the same name (three X-Data entries); keep them apart by id.
-    const nameCount = new Map<string, number>();
-    for (const r of t.rows) {
-      const n = this.model.items.get(r.key)?.name ?? r.key;
-      nameCount.set(n, (nameCount.get(n) ?? 0) + 1);
-    }
     return h(
       'div',
       { class: 'drops' },
       h('div', { class: 'sub' }, caption),
       h('table', null,
         ...t.rows.map((r) => {
-          const item = this.model.items.get(r.key);
           return h('tr', null,
             h('td', { class: 'pct' }, formatPercent(r.percent)),
-            h('td', null,
-              this.itemLink(r.key, (nameCount.get(item?.name ?? r.key) ?? 0) > 1 ? `${item?.name} (#${r.id})` : undefined)),
+            h('td', null, this.itemLink(r.key)),
             h('td', { class: 'cat' }, categoryLabel(r.category)),
           );
         }),
@@ -238,18 +233,18 @@ export class Panel {
   private itemView(key: string, d: Difficulty, stage: Stage | null): HTMLElement[] {
     const item: Item | undefined = this.model.items.get(key);
     if (!item) return [this.back(), h('p', { class: 'muted' }, 'Unknown item.')];
-    const out: HTMLElement[] = [
+    const out: (HTMLElement | null)[] = [
       this.back(stage ? 'Back to stage' : 'Back'),
-      h('h2', null, item.name, h('small', null, categoryLabel(item.category) + (item.skillType ? ` · ${item.skillType}` : ''))),
+      h('h2', null, this.model.itemLabel(key), h('small', null, categoryLabel(item.category) + (item.skillType ? ` · ${item.skillType}` : ''))),
+      item.description ? h('p', { class: 'desc' }, item.description) : null,
+      item.stats
+        ? h('div', { class: 'stats' },
+            ...Object.entries(item.stats).map(([k, v]) => h('div', null, h('span', { class: 'k' }, statLabel(k)), h('span', { class: 'v' }, fmt(v)))))
+        : null,
     ];
-    if (item.description) out.push(h('p', { class: 'desc' }, item.description));
-    if (item.stats) {
-      out.push(h('div', { class: 'stats' },
-        ...Object.entries(item.stats).map(([k, v]) => h('div', null, h('span', { class: 'k' }, statLabel(k)), h('span', { class: 'v' }, fmt(v))))));
-    }
-    const sources = this.model.sourcesOf(key, d);
-    out.push(h('div', { class: 'sub' }, `Dropped by (${DIFFICULTY_LABEL[d]}) · ${sources.length}`));
-    if (!sources.length) {
+    const all = this.model.sourcesOf(key, d);
+    if (!all.length) {
+      out.push(h('div', { class: 'sub' }, `Dropped by (${DIFFICULTY_LABEL[d]})`));
       const elsewhere = DIFFICULTIES.filter((x) => x !== d && this.model.sourcesOf(key, x).length > 0);
       if (elsewhere.length) {
         out.push(
@@ -262,25 +257,35 @@ export class Panel {
       } else {
         out.push(h('p', { class: 'muted' }, 'No enemy or object drops this on any difficulty. It may come from shops, quests or scripted rewards.'));
       }
-      return out;
+      return out.filter(Boolean) as HTMLElement[];
     }
+
+    const objects = all.filter((s) => s.kind === 'object').length;
+    const sources = this.sourceFilter === 'all' ? all : all.filter((s) => (s.kind === 'object') === (this.sourceFilter === 'object'));
+    const here = stage ? all.filter((s) => s.stage.id === stage.id).reduce((n, s) => n + s.generators.length, 0) : 0;
+    const chip = (id: 'all' | 'enemy' | 'object', label: string, n: number) =>
+      h('button', { class: 'chip' + (this.sourceFilter === id ? ' on' : ''), disabled: n === 0, onclick: () => { this.sourceFilter = id; this.showAllSources = false; this.act.selectItem(key); } }, `${label} ${n}`);
+    out.push(
+      h('div', { class: 'sub' }, `Dropped by (${DIFFICULTY_LABEL[d]})`),
+      h('div', { class: 'filters' }, chip('all', 'All', all.length), chip('enemy', 'Enemies', all.length - objects), chip('object', 'Boxes & crates', objects)),
+      stage ? h('p', { class: 'note' }, here ? `${here} spawner${here === 1 ? '' : 's'} on this map ${here === 1 ? 'is' : 'are'} highlighted.` : 'Nothing on this map drops it.') : null,
+    );
     const shown = this.showAllSources ? sources : sources.slice(0, SOURCE_LIMIT);
     out.push(
       h('table', { class: 'sources' },
-        ...shown.map((s) => {
-          const e = this.model.enemies.get(s.enemyRow);
-          return h('tr', { class: s.stage.id === stage?.id ? 'here' : '' },
+        h('tr', { class: 'head' }, h('th', { class: 'pct' }, 'Chance'), h('th', null, 'Dropped by'), h('th', null, 'Where')),
+        ...shown.map((s) =>
+          h('tr', { class: s.stage.id === stage?.id ? 'here' : '' },
             h('td', { class: 'pct' }, formatPercent(s.percent)),
-            h('td', null, e?.name ?? `Row ${s.enemyRow}`, s.generators.length > 1 ? h('span', { class: 'muted' }, ` ×${s.generators.length}`) : null),
-            h('td', null, h('button', { class: 'link', onclick: () => this.act.goToStage(s.stage.id) }, this.model.stageTitle(s.stage))),
-          );
-        }),
+            h('td', null, s.enemyName, s.generators.length > 1 ? h('span', { class: 'muted' }, ` ×${s.generators.length}`) : null),
+            h('td', null, h('button', { class: 'link', title: s.stage.area ?? '', onclick: () => this.act.goToStage(s.stage.id) }, this.model.stageTitle(s.stage))),
+          )),
       ),
     );
     if (sources.length > shown.length) {
       out.push(h('button', { class: 'more', onclick: () => { this.showAllSources = true; this.act.selectItem(key); } }, `Show all ${sources.length}`));
     }
-    return out;
+    return out.filter(Boolean) as HTMLElement[];
   }
 
   private speciesView(name: string, d: Difficulty): HTMLElement[] {

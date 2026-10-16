@@ -1,7 +1,7 @@
 """Top-down rasteriser for stage geometry (pure Python, standard library only).
 
-Floors (triangles facing up) are filled with a colour ramp by height, drawn lowest first so higher
-surfaces cover lower ones. Steep triangles (walls) are drawn as thin edge lines on top. The
+Floors (triangles facing up) are filled with a colour ramp, drawn lowest first so higher surfaces
+cover lower ones. The ramp peaks at the height where things spawn so walkable floors stand out. Steep triangles (walls) are drawn as thin edge lines on top. The
 background stays transparent so the app can place the map on its own theme. Image x is world x and
 image y is world z (z grows downward).
 """
@@ -14,6 +14,7 @@ from .scene import Triangle
 WALL_NORMAL_Y = 0.35  # |normal.y| below this counts as a wall
 LOW, HIGH = (46, 82, 118), (196, 218, 232)
 WALL = (16, 28, 50, 255)
+BACKDROP_AREA = 0.6  # a floor triangle covering this share of the crop is a backdrop plane
 
 
 @dataclass
@@ -43,11 +44,17 @@ def _normal_y(t: Triangle) -> float:
     return ny / length if length > 1e-9 else 0.0
 
 
+def _area_xz(t: Triangle) -> float:
+    (ax, _ay, az), (bx, _by, bz), (cx, _cy, cz) = t
+    return abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2
+
+
 def render(
     triangles: list[Triangle],
     roi: tuple[float, float, float, float],
     max_side: int = 2000,
     max_ppu: float = 4.0,
+    focus_y: float | None = None,
 ) -> Raster:
     min_x, max_x, min_z, max_z = roi
     span = max(max_x - min_x, max_z - min_z)
@@ -55,6 +62,7 @@ def render(
     width, height = int((max_x - min_x) * ppu) + 1, int((max_z - min_z) * ppu) + 1
     rgba = bytearray(width * height * 4)
 
+    roi_area = (max_x - min_x) * (max_z - min_z)
     floors: list[tuple[float, Triangle]] = []
     walls: list[Triangle] = []
     for t in triangles:
@@ -64,8 +72,9 @@ def render(
             continue
         if abs(_normal_y(t)) < WALL_NORMAL_Y:
             walls.append(t)
-        else:
+        elif _area_xz(t) < BACKDROP_AREA * roi_area:
             floors.append(((t[0][1] + t[1][1] + t[2][1]) / 3, t))
+        # else: a ground or sky plane that extends well past the crop; it only hides the structure
     floors.sort(key=lambda e: e[0])
     if floors:
         heights = sorted(h for h, _ in floors)
@@ -73,8 +82,14 @@ def render(
     else:
         lo = hi = 0.0
 
+    # Brightest where things stand (focus_y), fading with height difference; without a focus,
+    # fall back to shading by absolute height.
+    spread = max(80.0, (hi - lo) * 0.5)
     for h, t in floors:
-        f = min(1.0, max(0.0, (h - lo) / (hi - lo))) if hi > lo else 0.5
+        if focus_y is not None:
+            f = max(0.0, 1.0 - abs(h - focus_y) / spread) ** 1.6
+        else:
+            f = min(1.0, max(0.0, (h - lo) / (hi - lo))) if hi > lo else 0.5
         color = bytes(int(LOW[i] + (HIGH[i] - LOW[i]) * f) for i in range(3)) + b"\xff"
         _fill(rgba, width, height, [((p[0] - min_x) * ppu, (p[2] - min_z) * ppu) for p in t], color)
     for t in walls:

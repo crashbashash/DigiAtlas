@@ -71,7 +71,10 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
 - Dbl Axe, Rage Hammer, Hekatoncheir, Fang Smasher and Meteor Force (ids 100-124) are described as
   "Bash Skill" in game but stored with the Blunt skill index. `skillType` follows the stored value.
 - The unique weapons (ids 266-275) display "Skill 1" but store a requirement of 0.
-- Placeholder entries (`???????`) are real items in the game's data (unknown weapon, core and board).
+- Three "??????" items (weapon 276, core 31, board 44) are unidentified drops. Per the game, they are
+  taken to a Digimon in the central area, which rolls a random weapon, core or board. They are flagged
+  `unidentified`, named "Unidentified Weapon/Core/Board", and appear in 66 drop pools. What the roll
+  can produce is not extracted.
 
 ## Verification
 

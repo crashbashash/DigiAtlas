@@ -41,6 +41,11 @@ STAT_KEYS = {
 }
 
 
+# Placeholder items (name is all question marks) are unidentified drops: they are taken to a
+# Digimon in the central area, which rolls the real weapon / core / board.
+UNIDENTIFIED = {"weapon": "Weapon", "armor1": "Core", "armor2": "Board"}
+
+
 @dataclass
 class Item:
     category: str
@@ -49,6 +54,7 @@ class Item:
     description: str | None
     stats: dict[str, int] = field(default_factory=dict)
     skill_type: str | None = None
+    unidentified: bool = False
 
 
 def _decode(raw: str | None) -> str | None:
@@ -115,5 +121,12 @@ def parse_items(tables: dict[str, list[dict]]) -> list[Item]:
             skill = None
             if category == "weapon" and 0 <= row.get("SKILL", -1) < len(SKILL_TYPES):
                 skill = SKILL_TYPES[row["SKILL"]]
-            items.append(Item(category, i, name.strip(), row.get("TXT") or None, stats, skill))
+            name, text = name.strip(), row.get("TXT") or None
+            unidentified = bool(name) and set(name) == {"?"} and category in UNIDENTIFIED
+            if unidentified:
+                kind = UNIDENTIFIED[category]
+                name = f"Unidentified {kind}"
+                text = f"Take this to a Digimon in the central area to identify it as a random {kind.lower()}."
+                stats.pop("equipLevel", None)  # the game stores 999 as a placeholder
+            items.append(Item(category, i, name, text, stats, skill, unidentified))
     return items

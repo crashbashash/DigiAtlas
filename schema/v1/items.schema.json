@@ -149,6 +149,10 @@
                 "type": "integer"
               }
             }
+          },
+          "unidentified": {
+            "const": true,
+            "description": "Placeholder drop that a Digimon in the central area identifies as a random weapon, core or board."
           }
         }
       }

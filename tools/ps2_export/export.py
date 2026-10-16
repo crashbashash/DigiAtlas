@@ -158,6 +158,8 @@ def export(iso_path: str, out_dir: Path) -> dict:
     items = []
     for i in database.parse_items(tables):
         rec = {"category": i.category, "id": i.id, "name": i.name, "description": i.description}
+        if i.unidentified:
+            rec["unidentified"] = True
         if i.skill_type:
             rec["skillType"] = i.skill_type
         if i.stats:

@@ -150,6 +150,13 @@ class DatabaseTests(unittest.TestCase):
         )
         self.assertEqual(items[("weapon", 1)].skill_type, "Slash")
 
+    def test_unidentified_placeholder(self):
+        armor2 = [{"NAME": "???????", "TXT": "Equip. Level ???", "LVPOINT": 999, "KAITORI": 100}]
+        item = database.parse_items(self.tables(armor2=armor2))[0]
+        self.assertTrue(item.unidentified)
+        self.assertEqual(item.name, "Unidentified Board")
+        self.assertEqual(item.stats, {"sellPrice": 100})
+
     def test_parse_items_requires_every_database(self):
         t = self.tables()
         del t["conItem"]
@@ -266,7 +273,7 @@ class DiscTests(unittest.TestCase):
             if i["category"] != "weapon":
                 continue
             m = re.search(r"Equip\. Skill (\w+) Skill\s+(\d+)", i["description"])
-            if not m:  # the "??????" placeholder weapon has no skill text or type
+            if i.get("unidentified"):  # placeholder weapon has no skill text or type
                 self.assertEqual((i["id"], i.get("skillType")), (276, None))
                 continue
             checked += 1
@@ -276,6 +283,13 @@ class DiscTests(unittest.TestCase):
         self.assertEqual(checked, 276)
         # Dbl Axe .. Meteor Force (ids 100-124) read "Bash Skill" but are stored as Blunt.
         self.assertEqual(quirks, list(range(100, 125)))
+
+    def test_unidentified_placeholders(self):
+        items = self.load("items.json")["items"]
+        flagged = {(i["category"], i["id"]) for i in items if i.get("unidentified")}
+        self.assertEqual(flagged, {("weapon", 276), ("armor1", 31), ("armor2", 44)})
+        self.assertFalse([i for i in items if "?" in i["name"]])
+        self.assertTrue(all("equipLevel" not in i.get("stats", {}) for i in items if i.get("unidentified")))
 
     def test_every_dropped_item_has_a_name(self):
         items = {(i["category"], i["id"]) for i in self.load("items.json")["items"]}

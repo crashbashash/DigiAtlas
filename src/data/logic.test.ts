@@ -66,7 +66,7 @@ describe('groupByEnemy', () => {
 describe('startModeText', () => {
   it('explains the three start modes', () => {
     expect(startModeText('radar')).toMatch(/close/);
-    expect(startModeText('direct')).toMatch(/start/);
+    expect(startModeText('direct')).toMatch(/script/);
     expect(startModeText('weird')).toBe('weird');
   });
 });

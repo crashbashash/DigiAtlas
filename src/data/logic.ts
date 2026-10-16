@@ -92,7 +92,7 @@ export const formatPercent = (p: number): string =>
 export function startModeText(mode: string): string {
   switch (mode) {
     case 'direct':
-      return 'Appears as soon as the stage starts';
+      return 'Appears when a game script starts it (a trigger, a cutscene or the stage setup)';
     case 'radar':
       return 'Appears when you get close';
     case 'timer':

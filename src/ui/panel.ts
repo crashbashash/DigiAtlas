@@ -171,7 +171,7 @@ export class Panel {
     }
     out.push(
       h('p', { class: 'note' },
-        'Markers show everything this stage can spawn. Some enemies only appear under conditions set by the game scripts, such as story progress or your level.'),
+        'Markers show everything this stage can spawn, not what is there when you arrive. Enemies that come when you get close appear on their own; the rest are started by game scripts (traps, cutscenes, story progress, your Digimon or level, co-op), which are not shown yet. Spawners stacked on one spot are usually alternatives.'),
     );
     if (!stage.map) out.push(h('p', { class: 'note' }, 'No map is available for this stage; markers are plotted on a plain grid.'));
     return out;

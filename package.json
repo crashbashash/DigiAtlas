@@ -1,0 +1,26 @@
+{
+  "name": "digiatlas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5175 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "tauri": "tauri",
+    "desktop": "tauri dev",
+    "test": "vitest run",
+    "format": "prettier --write src",
+    "check:format": "prettier --check src"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.4"
+  },
+  "license": "GPL-3.0-or-later"
+}

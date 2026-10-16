@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DigiAtlas</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar">
+        <h1>DigiAtlas</h1>
+        <p class="muted">Digimon World 4 map and data explorer</p>
+        <label>Search <input id="search" type="search" placeholder="Enemies, items, areas" disabled /></label>
+        <p class="muted" id="status"></p>
+      </aside>
+      <main><canvas id="map"></canvas></main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DigiAtlas",
+  "version": "0.1.0",
+  "identifier": "io.github.crashbashash.digiatlas",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:5175",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      { "title": "DigiAtlas", "width": 1440, "height": 900, "minWidth": 960, "minHeight": 600 }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost http://127.0.0.1:5175 ws://127.0.0.1:5175;"
+    }
+  },
+  "bundle": { "active": false, "icon": ["icons/icon.png"] }
+}

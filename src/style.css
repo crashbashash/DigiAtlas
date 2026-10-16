@@ -1,0 +1,70 @@
+:root {
+  color-scheme: dark;
+  --bg: #14161a;
+  --panel: #1d2026;
+  --line: #2c313a;
+  --text: #e6e8eb;
+  --muted: #8b93a0;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font:
+    14px system-ui,
+    sans-serif;
+}
+#app {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+}
+#sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+#sidebar h1 {
+  margin: 0;
+  font-size: 20px;
+}
+#sidebar label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+}
+#sidebar input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+.muted {
+  color: var(--muted);
+  margin: 0;
+}
+main {
+  position: relative;
+  overflow: hidden;
+}
+canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+canvas:active {
+  cursor: grabbing;
+}

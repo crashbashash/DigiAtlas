@@ -103,6 +103,13 @@
         "type": "string"
       },
       "description": "Fields this exporter cannot fill yet."
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Directories of extracted images, relative to the export directory."
     }
   }
 }

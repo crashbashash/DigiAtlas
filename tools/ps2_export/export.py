@@ -15,7 +15,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import database, generators, iso, stages, stats
+from . import banners, database, generators, iso, png, stages, stats
+from . import manifest as archive_manifest
 from .afs import Afs
 
 SCHEMA_VERSION = 1
@@ -25,10 +26,12 @@ POOL_NAME = re.compile(r"^(?P<d>[nhv])(?P<zone>Z\d+)(?P<family>[A-Za-z]+?)(?P<va
 KNOWN_GAPS = [
     "enemies[].name: Machinedramon, Devimon/Lucemon form and object names are not in the game text",
     "items[].stats: attack delay, upgrade costs and item flags are not exported (meaning unconfirmed)",
-    "stages[].name and maps: stage ids only; floor maps are not extracted yet",
+    "stages[]: stage names for 3 system scenes (stagIS07, stagIS08, stagIS20) are unknown",
+    "maps: floor maps and coordinate-to-map placement are not extracted yet",
     "trigger-placed item spawns (scripted pickups) are not extracted yet",
 ]
 ENEMY_NAMES = json.loads((Path(__file__).parent / "names" / "enemies.json").read_text())
+STAGE_NAMES = json.loads((Path(__file__).parent / "names" / "stages.json").read_text())
 KINDS = {"e": "enemy", "f": "boss", "g": "object"}
 
 
@@ -87,7 +90,7 @@ def _generator_record(g: generators.Generator) -> dict:
 
 def export(iso_path: str, out_dir: Path) -> dict:
     files = iso.list_files(iso_path)
-    for needed in ("/SYSTEM.CNF", "/AREA.AFS", "/NDMW.AFS", "/SLUS_208.36"):
+    for needed in ("/SYSTEM.CNF", "/AREA.AFS", "/NDMW.AFS", "/NDMW.IGB", "/SLUS_208.36"):
         if needed not in files:
             raise SystemExit(f"{iso_path} does not look like the USA PS2 disc: missing {needed}")
 
@@ -135,9 +138,24 @@ def export(iso_path: str, out_dir: Path) -> dict:
 
     # --- stages, generators, drop pools -----------------------------------------------
     stage_records, pools = [], {}
-    for st in stages.list_stages(ndmw):
+    names = archive_manifest.read_names(src("NDMW.IGB").read(0, files["/NDMW.IGB"].size))
+    banner_dir = out_dir / "banners"
+    banner_dir.mkdir(parents=True, exist_ok=True)
+    all_stages = stages.list_stages(ndmw)
+    unnamed = sorted(st.id for st in all_stages if st.id not in STAGE_NAMES)
+    if unnamed:
+        raise SystemExit(f"no name entry for stages {unnamed}; add them to names/stages.json")
+    for st in all_stages:
+        label = STAGE_NAMES[st.id]
+        tex = banners.load(area, names, st.id)
+        if tex is not None:
+            (banner_dir / f"{st.id}.png").write_bytes(png.encode_rgba(tex.width, tex.height, tex.rgba))
         rec: dict = {
             "id": st.id,
+            "area": label["area"],
+            "room": label["room"],
+            **stages.describe(st.id),
+            "banner": f"banners/{st.id}.png" if tex is not None else None,
             "manifestEntry": st.manifest_entry,
             "packs": st.packs,
             "generatorPacks": st.generator_packs or None,
@@ -192,6 +210,7 @@ def export(iso_path: str, out_dir: Path) -> dict:
             "items": len(items),
         },
         "files": ["enemies.json", "stages.json", "drops.json", "items.json"],
+        "assets": ["banners/"],
         "knownGaps": KNOWN_GAPS,
     }
 

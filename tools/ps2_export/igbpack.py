@@ -315,6 +315,13 @@ class Graph:
             return None
         return self.obj_of_id[value]
 
+    def block(self, memory_id: int, size: int) -> bytes:
+        """``size`` bytes of the memory block with global id ``memory_id``."""
+        start = self._block[memory_id]
+        if start + size > len(self.b):
+            raise ValueError(f"block {memory_id} ({size} bytes) runs past the pack")
+        return self.b[start : start + size]
+
     def block_offset(self, k: int) -> int:
         """File offset of list record ``k``'s elements."""
         return self._block[self.vals(k)[2]]

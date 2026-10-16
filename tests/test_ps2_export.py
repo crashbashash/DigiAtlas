@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from ps2_export import database, export, generators, igbpack, iso, stats  # noqa: E402
+from ps2_export import banners, database, export, generators, igbpack, iso, stages, stats, textures  # noqa: E402
 from ps2_export.afs import Afs  # noqa: E402
 
 try:
@@ -176,6 +176,52 @@ class DatabaseTests(unittest.TestCase):
             self.assertIn(entry["source"], ("disc", "decomp"), model)
 
 
+class StageTests(unittest.TestCase):
+    def test_describe_floors_and_kinds(self):
+        self.assertEqual(stages.describe("dng101b2"), {"kind": "dungeon", "floor": "B2", "variant": None})
+        self.assertEqual(stages.describe("dng103f1")["floor"], "F1")
+        self.assertEqual(stages.describe("dngq4b2v"), {"kind": "dungeon", "floor": "B2", "variant": "v"})
+        self.assertEqual(stages.describe("dngq6b01")["floor"], "B1")
+        self.assertEqual(stages.describe("stag0102")["kind"], "field")
+        self.assertEqual(stages.describe("stagBS04")["kind"], "boss")
+        self.assertEqual(stages.describe("stagML12")["kind"], "hub")
+        self.assertEqual(stages.describe("stagIS12")["kind"], "hub")
+        self.assertEqual(stages.describe("stagIS10")["kind"], "system")
+
+    def test_banner_pack_names(self):
+        self.assertEqual(banners.pack_name("stag0102"), "ldag0102.igb")
+        self.assertEqual(banners.pack_name("stagGF01"), "ldaggf01.igb")
+        self.assertEqual(banners.pack_name("dng101b1"), "ldg101b1.igb")
+        with self.assertRaises(ValueError):
+            banners.pack_name("loading")
+
+    def test_stage_name_table_is_well_formed(self):
+        for stage, entry in export.STAGE_NAMES.items():
+            if stage.startswith("_"):
+                continue
+            self.assertIn(entry["source"], ("banner", "decomp", None), stage)
+            if entry["source"] == "banner":
+                self.assertRegex(entry["band"], r"^[0-9a-f]{40}$", stage)
+                self.assertTrue(entry["area"] and entry["room"], stage)
+
+    def test_texture_decode_and_flip(self):
+        # 2x2 image, palette index 1 = red in CSM1 slot 1, rows stored bottom first.
+        import struct
+
+        from ps2_export import png
+
+        pal = bytearray(1024)
+        pal[4:8] = bytes((255, 0, 0, 128))
+        tex = textures.Texture("t", 2, 2, bytes(16))
+        self.assertEqual(textures.region_sha1(tex, 0, 0, 2, 2), textures.region_sha1(tex, 0, 0, 2, 2))
+        self.assertEqual(textures._csm1(0x08), 0x10)
+        self.assertEqual(textures._csm1(0x10), 0x08)
+        self.assertEqual(textures._csm1(0x20), 0x20)
+        data = png.encode_rgba(1, 1, bytes((1, 2, 3, 4)))
+        self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(struct.unpack(">II", data[16:24]), (1, 1))
+
+
 class PoolTests(unittest.TestCase):
     def test_pool_record_parses_name_and_totals(self):
         pool = generators.DropPool(
@@ -283,6 +329,34 @@ class DiscTests(unittest.TestCase):
         self.assertEqual(checked, 276)
         # Dbl Axe .. Meteor Force (ids 100-124) read "Bash Skill" but are stored as Blunt.
         self.assertEqual(quirks, list(range(100, 125)))
+
+    def test_stage_names_match_their_banners(self):
+        # Each transcribed name is pinned to a fingerprint of the banner it was read from.
+        stages_out = {s["id"]: s for s in self.load("stages.json")["stages"]}
+        self.assertEqual(len(stages_out), 98)
+        with_banner = 0
+        for sid, s in stages_out.items():
+            entry = export.STAGE_NAMES[sid]
+            self.assertEqual((s["area"], s["room"]), (entry["area"], entry["room"]), sid)
+            if entry["source"] == "banner":
+                self.assertTrue((self.out / s["banner"]).is_file(), sid)
+                with_banner += 1
+        self.assertEqual(with_banner, 92)
+        self.assertEqual(len(list((self.out / "banners").glob("*.png"))), 92)
+
+    def test_banner_fingerprints(self):
+        from ps2_export import manifest as archive_manifest
+        from ps2_export.afs import Afs
+
+        path = os.environ["DIGIATLAS_PS2_ISO"]
+        names_src = iso.open_disc_file(path, "NDMW.IGB")
+        names = archive_manifest.read_names(names_src.read(0, names_src.size))
+        area = Afs(iso.open_disc_file(path, "AREA.AFS"))
+        for sid, entry in export.STAGE_NAMES.items():
+            if sid.startswith("_") or entry["source"] != "banner":
+                continue
+            tex = banners.load(area, names, sid)
+            self.assertEqual(banners.fingerprint(tex), entry["band"], sid)
 
     def test_unidentified_placeholders(self):
         items = self.load("items.json")["items"]

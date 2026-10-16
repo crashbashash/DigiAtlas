@@ -14,6 +14,27 @@ STAGE_ID = re.compile(rb"^(stag[0-9A-Za-z]+|dng[0-9a-z]+)$")
 GENERATOR_DIFFICULTIES = ("hard", "normal", "veryhard")
 
 
+_FLOOR = re.compile(r"^dng(?:\d{3}|q\d)(?P<kind>[bf])(?P<n>\d+)(?P<variant>[ehv])?$")
+
+
+def describe(stage_id: str) -> dict:
+    """Floor, variant and kind derived from the engine id (``dng101b2`` -> floor B2)."""
+    info: dict = {"kind": "field", "floor": None, "variant": None}
+    if stage_id.startswith("dng"):
+        info["kind"] = "dungeon"
+        m = _FLOOR.match(stage_id)
+        if m:
+            info["floor"] = f"{m['kind'].upper()}{int(m['n'])}"
+            info["variant"] = m["variant"]
+    elif stage_id.startswith("stagBS"):
+        info["kind"] = "boss"
+    elif stage_id.startswith("stagML") or stage_id in ("stagIS11", "stagIS12", "stagIS13"):
+        info["kind"] = "hub"  # Home Server lobby areas
+    elif stage_id.startswith("stagIS"):
+        info["kind"] = "system"  # logo, opening, title and other non-area scenes
+    return info
+
+
 @dataclass
 class Stage:
     id: str

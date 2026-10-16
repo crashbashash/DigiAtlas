@@ -1,0 +1,591 @@
+{
+ "_note": "Stage names as shown on the game's own loading banners (source 'banner'; 'band' fingerprints the banner's text region so tests can confirm the transcription matches its image), or from the DW4_Decomp loading-screen tour (source 'decomp'). Stages with no name are system scenes without a banner.",
+ "dng101b1": {
+  "area": "Death Valley",
+  "room": "Humid Cave",
+  "source": "banner",
+  "band": "3609ed1dd538819a8468edb0ea6256c4796acd3c"
+ },
+ "dng101b2": {
+  "area": "Death Valley",
+  "room": "Humid Cave",
+  "source": "banner",
+  "band": "3609ed1dd538819a8468edb0ea6256c4796acd3c"
+ },
+ "dng102b1": {
+  "area": "Death Valley",
+  "room": "Cliff Dungeon",
+  "source": "banner",
+  "band": "7ac0d719c5717aed5ff9c6ddcc1acf9ab5cd04ab"
+ },
+ "dng102b2": {
+  "area": "Death Valley",
+  "room": "Cliff Dungeon",
+  "source": "banner",
+  "band": "7ac0d719c5717aed5ff9c6ddcc1acf9ab5cd04ab"
+ },
+ "dng102b3": {
+  "area": "Death Valley",
+  "room": "Cliff Dungeon",
+  "source": "banner",
+  "band": "7ac0d719c5717aed5ff9c6ddcc1acf9ab5cd04ab"
+ },
+ "dng103f1": {
+  "area": "Death Valley",
+  "room": "Dome Base",
+  "source": "banner",
+  "band": "4dd921cc18257ce2dcd5d9336d0356d231f67e0b"
+ },
+ "dng103f2": {
+  "area": "Death Valley",
+  "room": "Dome Base",
+  "source": "banner",
+  "band": "4dd921cc18257ce2dcd5d9336d0356d231f67e0b"
+ },
+ "dng204b1": {
+  "area": "Dry Land",
+  "room": "Sand Labyrinth",
+  "source": "banner",
+  "band": "b0a0d4b100f934e844a72dbac89274bcd7253b3c"
+ },
+ "dng204b2": {
+  "area": "Dry Land",
+  "room": "Sand Labyrinth",
+  "source": "banner",
+  "band": "b0a0d4b100f934e844a72dbac89274bcd7253b3c"
+ },
+ "dng205b1": {
+  "area": "Dry Land",
+  "room": "Ancient Ruins",
+  "source": "banner",
+  "band": "9db69912e3fc7c0973a2c6733d9b3bcb6c24369a"
+ },
+ "dng205b2": {
+  "area": "Dry Land",
+  "room": "Ancient Ruins",
+  "source": "banner",
+  "band": "9db69912e3fc7c0973a2c6733d9b3bcb6c24369a"
+ },
+ "dng205b3": {
+  "area": "Dry Land",
+  "room": "Ancient Ruins",
+  "source": "banner",
+  "band": "9db69912e3fc7c0973a2c6733d9b3bcb6c24369a"
+ },
+ "dng206f1": {
+  "area": "Dry Land",
+  "room": "Virus Lab",
+  "source": "banner",
+  "band": "7e58f98c7ff2b4cc0219c86d5e9422d1b139b2a1"
+ },
+ "dng206f2": {
+  "area": "Dry Land",
+  "room": "Virus Lab",
+  "source": "banner",
+  "band": "7e58f98c7ff2b4cc0219c86d5e9422d1b139b2a1"
+ },
+ "dng307b1": {
+  "area": "Venom Jungle",
+  "room": "Geko Path",
+  "source": "banner",
+  "band": "7c290cc5fa85acfb84422306359a6cd6c3a7a45f"
+ },
+ "dng307b2": {
+  "area": "Venom Jungle",
+  "room": "Geko Path",
+  "source": "banner",
+  "band": "7c290cc5fa85acfb84422306359a6cd6c3a7a45f"
+ },
+ "dng308b1": {
+  "area": "Venom Jungle",
+  "room": "Vine Tunnel",
+  "source": "banner",
+  "band": "dfacd7fcf9dba708e2eb32b60cf595053d1f19e4"
+ },
+ "dng308b2": {
+  "area": "Venom Jungle",
+  "room": "Vine Tunnel",
+  "source": "banner",
+  "band": "dfacd7fcf9dba708e2eb32b60cf595053d1f19e4"
+ },
+ "dng308b3": {
+  "area": "Venom Jungle",
+  "room": "Vine Tunnel",
+  "source": "banner",
+  "band": "dfacd7fcf9dba708e2eb32b60cf595053d1f19e4"
+ },
+ "dng309b1": {
+  "area": "Venom Jungle",
+  "room": "Vein",
+  "source": "banner",
+  "band": "de4e160e910b5139515cd658b76c3933c4789d13"
+ },
+ "dng309b2": {
+  "area": "Venom Jungle",
+  "room": "Vein",
+  "source": "banner",
+  "band": "de4e160e910b5139515cd658b76c3933c4789d13"
+ },
+ "dng309b3": {
+  "area": "Venom Jungle",
+  "room": "Vein",
+  "source": "banner",
+  "band": "de4e160e910b5139515cd658b76c3933c4789d13"
+ },
+ "dng309b4": {
+  "area": "Venom Jungle",
+  "room": "Vein",
+  "source": "banner",
+  "band": "de4e160e910b5139515cd658b76c3933c4789d13"
+ },
+ "dng310f1": {
+  "area": "Venom Jungle",
+  "room": "Dread Bridge",
+  "source": "banner",
+  "band": "1d8392d2348d344109bd70713acabf2baa2060cc"
+ },
+ "dng310f2": {
+  "area": "Venom Jungle",
+  "room": "Dread Bridge",
+  "source": "banner",
+  "band": "8eb931e5ee73b6c00d0e3cb855e277a94b2ad66c"
+ },
+ "dng310f3": {
+  "area": "Venom Jungle",
+  "room": "Dread Bridge",
+  "source": "banner",
+  "band": "7a07fded9b5ba68acd87207c6fa5d1764d5c5208"
+ },
+ "dng411b1": {
+  "area": "Machine Pit",
+  "room": "Mecha Nest",
+  "source": "banner",
+  "band": "27875471b2e50ed9549599b0028f60302ba4cfa9"
+ },
+ "dng411b2": {
+  "area": "Machine Pit",
+  "room": "Mecha Nest",
+  "source": "banner",
+  "band": "27875471b2e50ed9549599b0028f60302ba4cfa9"
+ },
+ "dng411b3": {
+  "area": "Machine Pit",
+  "room": "Mecha Nest",
+  "source": "banner",
+  "band": "27875471b2e50ed9549599b0028f60302ba4cfa9"
+ },
+ "dng412b1": {
+  "area": "Machine Pit",
+  "room": "Electro Mine",
+  "source": "banner",
+  "band": "163d0f0d80b897da5c6d46181b37dd8257fba67a"
+ },
+ "dng412b2": {
+  "area": "Machine Pit",
+  "room": "Electro Mine",
+  "source": "banner",
+  "band": "163d0f0d80b897da5c6d46181b37dd8257fba67a"
+ },
+ "dng412b3": {
+  "area": "Machine Pit",
+  "room": "Electro Mine",
+  "source": "banner",
+  "band": "163d0f0d80b897da5c6d46181b37dd8257fba67a"
+ },
+ "dng412b4": {
+  "area": "Machine Pit",
+  "room": "Electro Mine",
+  "source": "banner",
+  "band": "163d0f0d80b897da5c6d46181b37dd8257fba67a"
+ },
+ "dngq1b1e": {
+  "area": "Machine Pit",
+  "room": "Barbarian Cave",
+  "source": "banner",
+  "band": "bf6b615c01165c4eea7b338b4222945fea62616d"
+ },
+ "dngq1b2e": {
+  "area": "Machine Pit",
+  "room": "Barbarian Cave",
+  "source": "banner",
+  "band": "bf6b615c01165c4eea7b338b4222945fea62616d"
+ },
+ "dngq2b1e": {
+  "area": "Machine Pit",
+  "room": "Undead Yard",
+  "source": "banner",
+  "band": "c51bfadf25ea300f52836446b39944fc47a7047b"
+ },
+ "dngq2b2e": {
+  "area": "Machine Pit",
+  "room": "Undead Yard",
+  "source": "banner",
+  "band": "c51bfadf25ea300f52836446b39944fc47a7047b"
+ },
+ "dngq2b2h": {
+  "area": "Machine Pit",
+  "room": "Undead Yard",
+  "source": "banner",
+  "band": "c51bfadf25ea300f52836446b39944fc47a7047b"
+ },
+ "dngq3b1e": {
+  "area": "Machine Pit",
+  "room": "Forbidden Shrine",
+  "source": "banner",
+  "band": "165bb1e4f4dec36f3f907f6973bdfe529dc89b43"
+ },
+ "dngq3b2e": {
+  "area": "Machine Pit",
+  "room": "Forbidden Shrine",
+  "source": "banner",
+  "band": "165bb1e4f4dec36f3f907f6973bdfe529dc89b43"
+ },
+ "dngq4b1e": {
+  "area": "Machine Pit",
+  "room": "Captive Dungeon",
+  "source": "banner",
+  "band": "644f4a98a60d492f51d9a52036140cca01d3bb2d"
+ },
+ "dngq4b1h": {
+  "area": "Machine Pit",
+  "room": "Captive Dungeon",
+  "source": "banner",
+  "band": "644f4a98a60d492f51d9a52036140cca01d3bb2d"
+ },
+ "dngq4b1v": {
+  "area": "Machine Pit",
+  "room": "Captive Dungeon",
+  "source": "banner",
+  "band": "644f4a98a60d492f51d9a52036140cca01d3bb2d"
+ },
+ "dngq4b2e": {
+  "area": "Machine Pit",
+  "room": "Captive Dungeon",
+  "source": "banner",
+  "band": "644f4a98a60d492f51d9a52036140cca01d3bb2d"
+ },
+ "dngq4b2h": {
+  "area": "Machine Pit",
+  "room": "Captive Dungeon",
+  "source": "banner",
+  "band": "644f4a98a60d492f51d9a52036140cca01d3bb2d"
+ },
+ "dngq4b2v": {
+  "area": "Machine Pit",
+  "room": "Captive Dungeon",
+  "source": "banner",
+  "band": "644f4a98a60d492f51d9a52036140cca01d3bb2d"
+ },
+ "dngq5b1e": {
+  "area": "Machine Pit",
+  "room": "Trader Hall",
+  "source": "banner",
+  "band": "bbe8b8ac63714f66249da497da56a59db2252d47"
+ },
+ "dngq5b1h": {
+  "area": "Machine Pit",
+  "room": "Trader Hall",
+  "source": "banner",
+  "band": "bbe8b8ac63714f66249da497da56a59db2252d47"
+ },
+ "dngq5b1v": {
+  "area": "Machine Pit",
+  "room": "Trader Hall",
+  "source": "banner",
+  "band": "bbe8b8ac63714f66249da497da56a59db2252d47"
+ },
+ "dngq6b01": {
+  "area": "Machine Pit",
+  "room": "Dungeon of Doom",
+  "source": "banner",
+  "band": "e325c1802023fbbff8ae197bfc0e6b51346b60cb"
+ },
+ "dngq7b1e": {
+  "area": "Machine Pit",
+  "room": "Item Road",
+  "source": "banner",
+  "band": "afb2678fc8fa5910a01d50325c4428d46c0e781b"
+ },
+ "dngq7b2e": {
+  "area": "Machine Pit",
+  "room": "Item Road",
+  "source": "banner",
+  "band": "afb2678fc8fa5910a01d50325c4428d46c0e781b"
+ },
+ "dngq8b1e": {
+  "area": "Machine Pit",
+  "room": "Cursed Dungeon",
+  "source": "banner",
+  "band": "825ce15ed8ca957d49a2ec4f3c9448ef0094cfa9"
+ },
+ "dngq8b2e": {
+  "area": "Machine Pit",
+  "room": "Cursed Dungeon",
+  "source": "banner",
+  "band": "825ce15ed8ca957d49a2ec4f3c9448ef0094cfa9"
+ },
+ "dngq8b3e": {
+  "area": "Machine Pit",
+  "room": "Cursed Dungeon",
+  "source": "banner",
+  "band": "825ce15ed8ca957d49a2ec4f3c9448ef0094cfa9"
+ },
+ "dngq8b3h": {
+  "area": "Machine Pit",
+  "room": "Cursed Dungeon",
+  "source": "banner",
+  "band": "825ce15ed8ca957d49a2ec4f3c9448ef0094cfa9"
+ },
+ "dngq8b3v": {
+  "area": "Machine Pit",
+  "room": "Cursed Dungeon",
+  "source": "banner",
+  "band": "825ce15ed8ca957d49a2ec4f3c9448ef0094cfa9"
+ },
+ "stag0000": {
+  "area": "Death Valley",
+  "room": "Debug Stage",
+  "source": "banner",
+  "band": "8d07677d04f170f8d37b8507e5ebed3813e5b7e1"
+ },
+ "stag0001": {
+  "area": "Death Valley",
+  "room": "Practice Stage",
+  "source": "banner",
+  "band": "d30b74e72a315549d6ff1d5fed837011fdb9c99c"
+ },
+ "stag0101": {
+  "area": "Death Valley",
+  "room": "Goblin Pass",
+  "source": "banner",
+  "band": "ebe77a42ee39faad82575a98e32850c347c94df5"
+ },
+ "stag0102": {
+  "area": "Death Valley",
+  "room": "Abyss of Grief",
+  "source": "banner",
+  "band": "d444566ed81a6404646a8664d9f94d14b93c7b0f"
+ },
+ "stag0103": {
+  "area": "Death Valley",
+  "room": "Numenume River",
+  "source": "banner",
+  "band": "884174dc0046011e89e546e105409e7d3c87bc37"
+ },
+ "stag0104": {
+  "area": "Death Valley",
+  "room": "Doom Dome",
+  "source": "banner",
+  "band": "40a24a2550592bb57161b1415b8d2168deba3744"
+ },
+ "stag0201": {
+  "area": "Dry Land",
+  "room": "Mummy Desert",
+  "source": "banner",
+  "band": "ea437c70f135e4b74bf526d708ee7bbb07708146"
+ },
+ "stag0202": {
+  "area": "Dry Land",
+  "room": "Grief Wasteland",
+  "source": "banner",
+  "band": "c0ad63493190cd791150cf117052df2adf82c214"
+ },
+ "stag0203": {
+  "area": "Dry Land",
+  "room": "Train Line",
+  "source": "banner",
+  "band": "583421d620b54cb053763c5964c8c698be575b24"
+ },
+ "stag0204": {
+  "area": "Dry Land",
+  "room": "Station X",
+  "source": "banner",
+  "band": "10ad7f0b26496a11b7c9c39e51ef14cb96581c2b"
+ },
+ "stag0205": {
+  "area": "Dry Land",
+  "room": "Power Plant",
+  "source": "banner",
+  "band": "de5724242a66ae06cba29517acb82cc0d10a1701"
+ },
+ "stag0301": {
+  "area": "Venom Jungle",
+  "room": "GekoGeko Land",
+  "source": "banner",
+  "band": "b06e298b0f89794c28eaa22d4f6dff973f099da6"
+ },
+ "stag0302": {
+  "area": "Venom Jungle",
+  "room": "Mangrove Forest",
+  "source": "banner",
+  "band": "052e7ca45f4bfc6fc1d107427799cce6f477a4d4"
+ },
+ "stag0303": {
+  "area": "Venom Jungle",
+  "room": "Venom Swamp",
+  "source": "banner",
+  "band": "bb96ea2297d077726806d798de09e720d1bc5d4f"
+ },
+ "stag0304": {
+  "area": "Venom Jungle",
+  "room": "Dread Note",
+  "source": "banner",
+  "band": "0e6e4db60da5abcccfd1e86db7348734ec083370"
+ },
+ "stag0401": {
+  "area": "Machine Pit",
+  "room": "Battle Arena",
+  "source": "banner",
+  "band": "15e4935352aff4618a746ef2aa025b34e0dbd863"
+ },
+ "stag0403": {
+  "area": "Machine Pit",
+  "room": "Mechanical Core",
+  "source": "banner",
+  "band": "799698c458845f1a0dab99e6b18c572d667220ce"
+ },
+ "stag0404": {
+  "area": "Machine Pit",
+  "room": "Core Area",
+  "source": "banner",
+  "band": "68046e661b225d70258f5cd8c6c3a146810b8682"
+ },
+ "stagBS01": {
+  "area": "Death Valley",
+  "room": "Apokarimon Space",
+  "source": "banner",
+  "band": "3c9414ef9e6f9eee2b6174f70ada6df8b9a5c1f2"
+ },
+ "stagBS02": {
+  "area": "Dry Land",
+  "room": "Demon Shift",
+  "source": "banner",
+  "band": "1879c3d60bd4aa73fe7e77593c2ec59eb0a321a5"
+ },
+ "stagBS03": {
+  "area": "Venom Jungle",
+  "room": "Hades Obelisk",
+  "source": "banner",
+  "band": "245b72a35240407b11420546b89ef36aa5e9a164"
+ },
+ "stagBS04": {
+  "area": "Machine Pit",
+  "room": "Zone X",
+  "source": "banner",
+  "band": "72798fbf9ba7005b64fc1f6e630b345a665ad79f"
+ },
+ "stagBS05": {
+  "area": "Machine Pit",
+  "room": "Zone X",
+  "source": "banner",
+  "band": "d0e81ffae6ed778f01b6ca98ee29290b86fb6450"
+ },
+ "stagBS06": {
+  "area": "Machine Pit",
+  "room": "Zone X",
+  "source": "banner",
+  "band": "78c0beda2f1595d7c501aaf47f5c239d218365d0"
+ },
+ "stagGF01": {
+  "area": "Fortress",
+  "room": "Guard Room",
+  "source": "banner",
+  "band": "ff2c046d9b8967e8ab5e672dfb76309a69d352d1"
+ },
+ "stagGF02": {
+  "area": "Fortress",
+  "room": "Rotating Hall",
+  "source": "banner",
+  "band": "119e647c2902bcfcd020ff35794c97110b7af8f7"
+ },
+ "stagGF03": {
+  "area": "Fortress",
+  "room": "X Digimon Lab",
+  "source": "banner",
+  "band": "d5d2c69423cbd4d136542ef769007612ed8e1d15"
+ },
+ "stagGF04": {
+  "area": "Fortress",
+  "room": "GobGob Room",
+  "source": "banner",
+  "band": "ea17eca34daa9fbbd0360aef9c3488ce690ae854"
+ },
+ "stagIS07": {
+  "area": null,
+  "room": null,
+  "source": null,
+  "band": null
+ },
+ "stagIS08": {
+  "area": null,
+  "room": null,
+  "source": null,
+  "band": null
+ },
+ "stagIS09": {
+  "area": null,
+  "room": "Bandai Logo",
+  "source": "decomp",
+  "band": null
+ },
+ "stagIS10": {
+  "area": null,
+  "room": "Opening and Title",
+  "source": "decomp",
+  "band": null
+ },
+ "stagIS11": {
+  "area": "Home Server",
+  "room": "Main Lobby: Central Area",
+  "source": "banner",
+  "band": "ae8d1bc92c6cc490d207b530b305ea2c2e620f1f"
+ },
+ "stagIS12": {
+  "area": "Home Server",
+  "room": "Main Lobby: Central Area",
+  "source": "banner",
+  "band": "b299a806b4f45516b5d891fdbacefaa41d50d57a"
+ },
+ "stagIS13": {
+  "area": "Home Server",
+  "room": "Main Lobby: Terminal Area",
+  "source": "banner",
+  "band": "f92267cb205c19594f441c481a2d705eb87ae07d"
+ },
+ "stagIS20": {
+  "area": null,
+  "room": null,
+  "source": null,
+  "band": null
+ },
+ "stagML02": {
+  "area": "Home Server",
+  "room": "Commander Room",
+  "source": "banner",
+  "band": "919399e949d2caaf2e7165c105f96c7eaccb571b"
+ },
+ "stagML11": {
+  "area": "Home Server",
+  "room": "Main Lobby: Terminal Area",
+  "source": "banner",
+  "band": "92887dfa4435453186693f4b4cb3dd5418a9eab4"
+ },
+ "stagML12": {
+  "area": "Home Server",
+  "room": "Main Lobby: Central Area",
+  "source": "banner",
+  "band": "722a41c8f0d2a1bad1a039ad7031ca77eb722c3a"
+ },
+ "stagML13": {
+  "area": "Home Server",
+  "room": "Main Lobby: Shop Area",
+  "source": "banner",
+  "band": "de7a07636b31a05bea83c20d220618d7fb9fd3db"
+ },
+ "stagML14": {
+  "area": "Home Server",
+  "room": "Main Lobby: Central Area",
+  "source": "decomp",
+  "band": null
+ }
+}

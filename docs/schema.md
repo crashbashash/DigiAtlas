@@ -57,11 +57,26 @@ Players see `name`, never the internal ids.
   weapon skill type and requirement). Columns whose meaning is unconfirmed (attack delay, upgrade
   costs, item flags) are not exported.
 
+- **Stages** (`stages.json`): `area` and `room` are the names printed on the game's own loading
+  banner (for example Death Valley / Abyss of Grief). The banner is a 256x256 picture in the disc's
+  loading packs, so the names were read from the images and each transcription is pinned to a
+  fingerprint of its banner text, which the disc test re-checks. The banner pictures are exported
+  to `banners/<id>.png` and linked from `stages[].banner` (92 of the 98 stages have one).
+  `floor` comes from the id (`dng101b2` is floor B2; `b` and `f` are the game's letters) and `kind` is
+  `field`, `dungeon`, `boss`, `hub` or `system`. Floors of one dungeon share a banner. The side
+  dungeons (`dngq*`) carry a trailing `variant` letter (e, h or v) whose meaning is not confirmed;
+  the three variants share the same spawn rows and drop pools, so it is not a difficulty setting.
+  Notes: the area on the Goblin Fortress banners reads "Fortress", and `stag0000` is the Japanese-text
+  debug stage.
+
 ## Not extracted yet
 
 Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, never invented:
 
-- Stages carry only their engine id (`stagGF01`, `dng101b1`); no display names or floor maps yet.
+- Stage names for `stagIS07`, `stagIS08` and `stagIS20`: system scenes with no banner (`stagIS09` and
+  `stagIS10` are the Bandai logo and the opening, from the decomp's loading-screen tour, as is
+  `stagML14`, which has no banner image of its own).
+- Floor maps and the placement of spawn coordinates on them.
 - Scripted pickups placed by triggers are not extracted; destructibles are (as generators).
 
 ## Data quirks

@@ -18,7 +18,13 @@
           "manifestEntry",
           "packs",
           "generatorPacks",
-          "difficulties"
+          "difficulties",
+          "area",
+          "room",
+          "kind",
+          "floor",
+          "variant",
+          "banner"
         ],
         "properties": {
           "id": {
@@ -349,6 +355,52 @@
                 }
               }
             }
+          },
+          "area": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "World as printed on the loading banner, e.g. Death Valley."
+          },
+          "room": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Room or dungeon name as printed on the loading banner. Null for unnamed system scenes."
+          },
+          "kind": {
+            "enum": [
+              "field",
+              "dungeon",
+              "boss",
+              "hub",
+              "system"
+            ]
+          },
+          "floor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Dungeon floor from the id: B1, B2 or F1 (b and f are the game's own letters)."
+          },
+          "variant": {
+            "enum": [
+              "e",
+              "h",
+              "v",
+              null
+            ],
+            "description": "Trailing letter on the side dungeons (dngq*); its meaning is not confirmed."
+          },
+          "banner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Loading-screen picture, relative to the export directory."
           }
         }
       }

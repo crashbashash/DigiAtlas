@@ -3,7 +3,7 @@ import type { Model } from '../data/model';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty, type Stage } from '../data/types';
 import { clear, h } from './dom';
 import { MapView } from './mapview';
-import { onGoto, openItemWindow } from './ipc';
+import { openItemWindow } from './ipc';
 import { Panel } from './panel';
 import { sidebarBrand } from './brand';
 import { Sidebar } from './sidebar';
@@ -88,11 +88,6 @@ export class App {
       save(this.store.state);
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
-    void onGoto((m) => {
-      this.store.set({ difficulty: m.difficulty, players: m.players });
-      this.goToStage(m.stageId);
-      if (m.itemKey) this.store.set({ selection: { kind: 'item', key: m.itemKey } });
-    });
   }
 
   private goToStage(id: string, resetSelection = false): void {
@@ -112,8 +107,7 @@ export class App {
   }
 
   private openItem(key: string): void {
-    const s = this.store.state;
-    void openItemWindow(key, this.model.itemLabel(key), { difficulty: s.difficulty, players: s.players, showUnused: s.showUnused });
+    void openItemWindow(key, this.model.itemLabel(key));
   }
 
   private setDifficulty(d: Difficulty): void {

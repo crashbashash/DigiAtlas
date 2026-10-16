@@ -111,8 +111,8 @@ async fn open_popout(app: tauri::AppHandle, label: String, hash: String, title: 
     }
     let mut builder = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(format!("index.html{hash}").into()))
         .title(title)
-        .inner_size(520.0, 780.0)
-        .min_inner_size(380.0, 400.0);
+        .inner_size(440.0, 520.0)
+        .min_inner_size(340.0, 300.0);
     if let Some(main) = app.get_webview_window("main") {
         builder = builder.parent(&main).map_err(|e| e.to_string())?;
     }

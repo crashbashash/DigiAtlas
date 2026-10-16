@@ -34,6 +34,7 @@ export class Panel {
   readonly el = h('aside', { class: 'panel' });
   private showAllSources = false;
   private sourceFilter: 'all' | 'enemy' | 'object' = 'all';
+  private sourcesOpen = false;
   private lastItem = '';
 
   constructor(
@@ -47,15 +48,16 @@ export class Panel {
     const d = state.difficulty;
     const sel = state.selection;
     if (sel.kind === 'item' && stage) {
-      // In the main window the details live in their own window; here the item is highlighted on the map.
-      this.el.append(this.itemBanner(sel.key), ...this.overview(stage, d));
-    } else if (sel.kind === 'item') {
+      // In the main window the item card lives in its own window; here the item is highlighted on the map.
       if (sel.key !== this.lastItem) {
         this.showAllSources = false;
         this.sourceFilter = 'all';
+        this.sourcesOpen = false;
       }
       this.lastItem = sel.key;
-      this.el.append(...this.itemView(sel.key, d, stage));
+      this.el.append(this.itemBanner(sel.key), this.sourcesSection(sel.key, d, stage), ...this.overview(stage, d));
+    } else if (sel.kind === 'item') {
+      this.el.append(...this.itemInfo(sel.key));
     } else if (sel.kind === 'species') {
       this.el.append(...this.speciesView(sel.name, d));
     } else if (stage && sel.kind === 'generator') {
@@ -68,6 +70,16 @@ export class Panel {
       this.el.append(h('p', { class: 'muted' }, 'Pick a stage from the list to begin.'));
     }
     this.el.scrollTop = 0;
+  }
+
+  /** Where an item drops, folded away until asked for. */
+  private sourcesSection(key: string, d: Difficulty, stage: Stage): HTMLElement {
+    const count = this.model.sourcesOf(key, d).length;
+    const section = h('details', { class: 'sources-section', open: this.sourcesOpen },
+      h('summary', null, `Where it drops (${DIFFICULTY_LABEL[d]}) · ${count}`),
+      ...this.sourcesBlock(key, d, stage));
+    section.addEventListener('toggle', () => { this.sourcesOpen = section.open; });
+    return section;
   }
 
   private itemBanner(key: string): HTMLElement {
@@ -279,11 +291,11 @@ export class Panel {
     return out;
   }
 
-  private itemView(key: string, d: Difficulty, stage: Stage | null): HTMLElement[] {
+  /** The item card: name, description and stats. This is all the popout window shows. */
+  private itemInfo(key: string): HTMLElement[] {
     const item: Item | undefined = this.model.items.get(key);
-    if (!item) return [this.back(), h('p', { class: 'muted' }, 'Unknown item.')];
+    if (!item) return [h('p', { class: 'muted' }, 'Unknown item.')];
     const out: (HTMLElement | null)[] = [
-      this.back(stage ? 'Back to stage' : 'Back'),
       h('h2', null, this.model.itemLabel(key), h('small', null, categoryLabel(item.category) + (item.skillType ? ` · ${item.skillType}` : ''))),
       item.description ? h('p', { class: 'desc' }, item.description) : null,
       item.stats
@@ -291,9 +303,14 @@ export class Panel {
             ...Object.entries(item.stats).map(([k, v]) => h('div', null, h('span', { class: 'k' }, statLabel(k)), h('span', { class: 'v' }, fmt(v)))))
         : null,
     ];
+    return out.filter(Boolean) as HTMLElement[];
+  }
+
+  /** Every enemy and object that drops an item, for the chosen difficulty and player count. */
+  private sourcesBlock(key: string, d: Difficulty, stage: Stage | null): HTMLElement[] {
+    const out: (HTMLElement | null)[] = [];
     const all = this.model.sourcesOf(key, d);
     if (!all.length) {
-      out.push(h('div', { class: 'sub' }, `Dropped by (${DIFFICULTY_LABEL[d]})`));
       const elsewhere = DIFFICULTIES.filter((x) => x !== d && this.model.sourcesOf(key, x).length > 0);
       if (elsewhere.length) {
         out.push(
@@ -315,7 +332,6 @@ export class Panel {
     const chip = (id: 'all' | 'enemy' | 'object', label: string, n: number) =>
       h('button', { class: 'chip' + (this.sourceFilter === id ? ' on' : ''), disabled: n === 0, onclick: () => { this.sourceFilter = id; this.showAllSources = false; this.act.selectItem(key); } }, `${label} ${n}`);
     out.push(
-      h('div', { class: 'sub' }, `Dropped by (${DIFFICULTY_LABEL[d]})`),
       h('div', { class: 'filters' }, chip('all', 'All', all.length), chip('enemy', 'Enemies', all.length - objects), chip('object', 'Boxes & crates', objects)),
       stage ? h('p', { class: 'note' }, here ? `${here} spawner${here === 1 ? '' : 's'} on this map ${here === 1 ? 'is' : 'are'} highlighted.` : 'Nothing on this map drops it.') : null,
     );

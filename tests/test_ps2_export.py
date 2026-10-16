@@ -222,10 +222,10 @@ class StageTests(unittest.TestCase):
         self.assertEqual(struct.unpack(">II", data[16:24]), (1, 1))
 
 
-def generator(position, positions, is_global):
+def generator(position, positions, is_global, start_mode="", start_data=0.0):
     return generators.Generator(
         name="GENE-00", row=1, position=position, positions=positions, rotations=[], is_global=is_global,
-        start_mode="", fill_mode="", lua="", gene_count=1, gene_max_count=1, pools=[], last_pools=[],
+        start_mode=start_mode, start_data=start_data, fill_mode="", lua="", gene_count=1, gene_max_count=1, pools=[], last_pools=[],
     )
 
 
@@ -243,6 +243,21 @@ class SpawnTests(unittest.TestCase):
 
     def test_room_generator_without_offsets_spawns_at_the_anchor(self):
         self.assertEqual(generator((7.0, 0.0, 9.0), [], False).spawns(), [(7.0, 0.0, 9.0)])
+
+
+class TriggerTests(unittest.TestCase):
+    def test_radar_spawner_triggers_at_its_anchor_within_the_square_root(self):
+        g = generator((455.0, 50.0, 15.0), [(455.0, 50.0, 15.0)], True, "radar", 4225.0)
+        self.assertEqual(g.trigger(), ((455.0, 50.0, 15.0), 65.0))
+
+    def test_script_started_spawners_have_no_trigger(self):
+        self.assertIsNone(generator((0.0, 0.0, 0.0), [], True, "direct", 150.0).trigger())
+        self.assertIsNone(generator((0.0, 0.0, 0.0), [], True, "radar", 0.0).trigger())
+
+    def test_record_carries_the_trigger(self):
+        rec = export._generator_record(generator((1.0, 2.0, 3.0), [(1.0, 2.0, 3.0)], True, "radar", 625.0))
+        self.assertEqual(rec["trigger"], {"center": [1.0, 2.0, 3.0], "radius": 25.0})
+        self.assertNotIn("trigger", export._generator_record(generator((1.0, 2.0, 3.0), [], True, "direct")))
 
 
 class SceneTests(unittest.TestCase):
@@ -451,6 +466,21 @@ class DiscTests(unittest.TestCase):
                 with_banner += 1
         self.assertEqual(with_banner, 92)
         self.assertEqual(len(list((self.out / "banners").glob("*.png"))), 92)
+
+    def test_radar_triggers_match_the_documented_radii(self):
+        # Every radar spawner carries a trigger; Goblin Pass GENE-00 is (455, 50, 15) with radius 65.
+        radii = set()
+        for stage in self.load("stages.json")["stages"]:
+            for d in stage["difficulties"].values():
+                for g in d["generators"]:
+                    if g["startMode"] == "radar":
+                        self.assertIn("trigger", g, f"{stage['id']} {g['name']}")
+                        radii.add(g["trigger"]["radius"])
+        # The game stores squared radii as whole numbers; they range from tight (20) to wide arenas.
+        self.assertTrue(radii and all(0 < r <= 500 and round(r * r) == r * r for r in radii), sorted(radii))
+        goblin = next(s for s in self.load("stages.json")["stages"] if s["id"] == "stag0101")
+        gene00 = next(g for g in goblin["difficulties"]["normal"]["generators"] if g["name"] == "GENE-00")
+        self.assertEqual(gene00["trigger"], {"center": [455.0, 50.0, 15.0], "radius": 65.0})
 
     def test_stage_maps_cover_their_spawn_points(self):
         # Three stage types: field, dungeon floor and fortress room, each cropped to its spawn area.

@@ -66,7 +66,7 @@ export class MapView {
       ...(Object.keys(KIND_COLOR) as EnemyKind[]).map((k) =>
         h('span', null, h('i', { style: `background:${KIND_COLOR[k]}` }), KIND_LABEL[k]),
       ),
-      h('span', { class: 'muted' }, 'Number = how many spawn there · shaded = where'),
+      h('span', { class: 'muted' }, 'Number = how many spawn · dashed circle = how close you must get'),
     );
   }
 
@@ -183,6 +183,13 @@ export class MapView {
     ctx.restore();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const order = [...this.markers].sort((a, c) => this.rank(a) - this.rank(c));
+    const triggered = new Set<number>();
+    for (const m of order) {
+      if (m.trigger && !triggered.has(m.gi)) {
+        triggered.add(m.gi);
+        this.drawTrigger(ctx, m);
+      }
+    }
     for (const m of order) if (m.zone) this.drawZone(ctx, m);
     for (const m of order) this.drawMarker(ctx, m);
   }
@@ -210,22 +217,49 @@ export class MapView {
     }
   }
 
-  /** The area a numbered spawner can use; its individual spots show on hover or selection. */
-  private drawZone(ctx: CanvasRenderingContext2D, m: Marker): void {
-    if (!m.zone) return;
+  /** How close you must get for a radar spawner to start; stronger on hover or selection. */
+  private drawTrigger(ctx: CanvasRenderingContext2D, m: Marker): void {
+    if (!m.trigger) return;
     const dim = this.highlight !== null && !this.highlight.has(m.gi);
-    const [sx, sy] = this.toScreen(m);
-    const showSpots = m.gi === this.selected || m.gi === this.hover?.gi;
-    ctx.globalAlpha = dim ? 0.12 : 1;
-    ctx.fillStyle = `${KIND_COLOR[m.kind]}${showSpots ? '33' : '1c'}`;
-    ctx.strokeStyle = `${KIND_COLOR[m.kind]}${showSpots ? 'cc' : '66'}`;
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([4, 4]);
+    const strong = m.gi === this.selected || m.gi === this.hover?.gi;
+    ctx.globalAlpha = dim ? 0.1 : 1;
+    ctx.fillStyle = `${KIND_COLOR[m.kind]}${strong ? '26' : '0d'}`;
+    ctx.strokeStyle = `${KIND_COLOR[m.kind]}${strong ? 'dd' : '4d'}`;
+    ctx.lineWidth = strong ? 1.8 : 1;
+    ctx.setLineDash([5, 4]);
     ctx.beginPath();
-    ctx.arc(sx, sy, m.zone.radius * this.view.scale + 6, 0, Math.PI * 2);
+    ctx.arc(
+      this.view.tx + m.trigger.x * this.view.scale,
+      this.view.ty + m.trigger.z * this.view.scale,
+      m.trigger.radius * this.view.scale,
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+
+  /** The spots of a numbered spawner, shown on hover or selection (and its extent when nothing triggers it). */
+  private drawZone(ctx: CanvasRenderingContext2D, m: Marker): void {
+    if (!m.zone) return;
+    const showSpots = m.gi === this.selected || m.gi === this.hover?.gi;
+    if (m.trigger && !showSpots) return;
+    const dim = this.highlight !== null && !this.highlight.has(m.gi);
+    const [sx, sy] = this.toScreen(m);
+    ctx.globalAlpha = dim ? 0.12 : 1;
+    if (!m.trigger) {
+      ctx.fillStyle = `${KIND_COLOR[m.kind]}${showSpots ? '33' : '14'}`;
+      ctx.strokeStyle = `${KIND_COLOR[m.kind]}${showSpots ? 'cc' : '55'}`;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.arc(sx, sy, m.zone.radius * this.view.scale + 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     if (showSpots) {
       ctx.fillStyle = '#ffffff';
       for (const [x, z] of m.zone.spots) {

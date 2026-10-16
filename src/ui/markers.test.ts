@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Enemy, Generator } from '../data/types';
-import { makeMarkers } from './markers';
+import { makeMarkers, startText } from './markers';
 
 const enemy = (row: number, kind: Enemy['kind'] = 'enemy'): Enemy => ({
   row, name: `E${row}`, kind, model: 'm', hp: 100,
@@ -13,6 +13,26 @@ const gen = (row: number, count: number | null, spots: [number, number][]): Gene
   rotations: [], startMode: 'direct', fillMode: 'wipeout',
 });
 const enemies = new Map([[1, enemy(1)], [9, enemy(9, 'object')]]);
+
+describe('start text and triggers', () => {
+  const radar: Generator = { ...gen(1, 2, [[0, 0], [20, 0], [0, 20]]), startMode: 'radar', trigger: { center: [5, 50, 5], radius: 65 } };
+
+  it('says how close you must get for a radar spawner', () => {
+    expect(startText(radar)).toBe('Appears when you get within 65 units');
+    expect(startText(gen(1, 1, [[0, 0]]))).toBe('Started by a game script');
+  });
+
+  it('puts the trigger on the markers and the start text in the tooltip', () => {
+    const [m] = makeMarkers([radar], enemies);
+    expect(m.trigger).toEqual({ x: 5, z: 5, radius: 65 });
+    expect(m.detail).toMatch(/within 65 units/);
+    expect(makeMarkers([gen(9, 1, [[0, 0]])], enemies)[0].trigger).toBeNull();
+  });
+
+  it('does not describe how an object starts', () => {
+    expect(makeMarkers([gen(9, 1, [[0, 0]])], enemies)[0].detail).not.toMatch(/script/);
+  });
+});
 
 describe('makeMarkers', () => {
   it('draws one marker per spot when each spot holds one enemy', () => {

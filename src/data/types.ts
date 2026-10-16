@@ -73,6 +73,8 @@ export interface Generator {
   startMode: string;
   fillMode: string;
   lua?: string;
+  /** Radar spawners start once a player is within `radius` units of `center`. */
+  trigger?: { center: Vec3; radius: number };
   drops?: Record<string, string>;
   lastDrops?: Record<string, string>;
 }

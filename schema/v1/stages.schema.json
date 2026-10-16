@@ -138,6 +138,29 @@
                           },
                           "minItems": 1,
                           "description": "World positions [x, y, z] where this generator places enemies or objects. For dungeon rooms the game stores offsets from a room anchor; they are already added here."
+                        },
+                        "trigger": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "center",
+                            "radius"
+                          ],
+                          "description": "Radar spawners only: the spawner starts once a player is within `radius` units of `center`.",
+                          "properties": {
+                            "center": {
+                              "type": "array",
+                              "items": {
+                                "type": "number"
+                              },
+                              "minItems": 3,
+                              "maxItems": 3
+                            },
+                            "radius": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            }
+                          }
                         }
                       }
                     }
@@ -227,6 +250,29 @@
                           },
                           "minItems": 1,
                           "description": "World positions [x, y, z] where this generator places enemies or objects. For dungeon rooms the game stores offsets from a room anchor; they are already added here."
+                        },
+                        "trigger": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "center",
+                            "radius"
+                          ],
+                          "description": "Radar spawners only: the spawner starts once a player is within `radius` units of `center`.",
+                          "properties": {
+                            "center": {
+                              "type": "array",
+                              "items": {
+                                "type": "number"
+                              },
+                              "minItems": 3,
+                              "maxItems": 3
+                            },
+                            "radius": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            }
+                          }
                         }
                       }
                     }
@@ -316,6 +362,29 @@
                           },
                           "minItems": 1,
                           "description": "World positions [x, y, z] where this generator places enemies or objects. For dungeon rooms the game stores offsets from a room anchor; they are already added here."
+                        },
+                        "trigger": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "center",
+                            "radius"
+                          ],
+                          "description": "Radar spawners only: the spawner starts once a player is within `radius` units of `center`.",
+                          "properties": {
+                            "center": {
+                              "type": "array",
+                              "items": {
+                                "type": "number"
+                              },
+                              "minItems": 3,
+                              "maxItems": 3
+                            },
+                            "radius": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            }
+                          }
                         }
                       }
                     }

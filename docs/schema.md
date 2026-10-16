@@ -73,6 +73,9 @@ Players see `name`, never the internal ids.
   coordinates (global generators) or offsets from a room anchor (dungeon rooms); the exporter resolves
   both, so `spawns` is always world space. Every spawn lands on the stage's terrain (checked on map
   coverage below).
+- **Triggers** (`generators[].trigger`): a radar spawner starts when a player is within `radius` units of
+  `center` (the game stores the squared radius; 20 to 150 units, one arena at 450). Only radar spawners have
+  one. Script-started (`direct`) spawners start when a game script says so, which is not extracted yet.
 - **Maps** (`stages[].map`, export option `--maps`): a top-down footprint of each stage's terrain mesh,
   written to `maps/<id>.png` (transparent where there is no geometry) with its world `bounds` and
   `pixelsPerUnit`, so `pixel = (world - min) * pixelsPerUnit`. Image x is world x and image y is world

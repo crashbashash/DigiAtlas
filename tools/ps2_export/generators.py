@@ -55,12 +55,23 @@ class Generator:
     rotations: list[float]
     is_global: bool
     start_mode: str
+    start_data: float  # radar: squared trigger radius; direct/timer: unused or a frame count
     fill_mode: str
     lua: str
     gene_count: int | None
     gene_max_count: int | None
     pools: list[DropPool]
     last_pools: list[DropPool]
+
+    def trigger(self) -> tuple[tuple[float, float, float], float] | None:
+        """Where and how close you must get for a ``radar`` spawner to start: (anchor, radius).
+
+        The game stores the squared radius (625, 1225, 2025, 3025 or 4225, i.e. 25 to 65 units) and
+        measures from ``position``, which for these spawners is only an anchor.
+        """
+        if self.start_mode != "radar" or self.start_data <= 0:
+            return None
+        return self.position, round(self.start_data**0.5, 2)
 
     def spawns(self) -> list[tuple[float, float, float]]:
         """World positions where this generator places things.
@@ -158,6 +169,7 @@ class Pack:
                     rotations=self._floats(v[GENE_ROT_LIST]),
                     is_global=bool(v[GENE_GLOBAL]),
                     start_mode=v[GENE_START_MODE],
+                    start_data=v[GENE_START_DATA],
                     fill_mode=v[GENE_FILL_MODE],
                     lua=v[GENE_LUA],
                     gene_count=count,

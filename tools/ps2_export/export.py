@@ -77,6 +77,10 @@ def _generator_record(g: generators.Generator) -> dict:
         "startMode": g.start_mode,
         "fillMode": g.fill_mode,
     }
+    trigger = g.trigger()
+    if trigger:
+        center, radius = trigger
+        rec["trigger"] = {"center": [round(v, 3) for v in center], "radius": radius}
     if g.lua:
         rec["lua"] = g.lua
     if g.pools:

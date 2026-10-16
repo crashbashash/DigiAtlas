@@ -2,6 +2,7 @@ import type { DataSource } from '../data/source';
 import type { Model } from '../data/model';
 import type { Difficulty, Enemy, EnemyKind, Stage } from '../data/types';
 import { h } from './dom';
+import { makeMarkers, type Marker } from './markers';
 
 export const KIND_COLOR: Record<EnemyKind, string> = {
   enemy: '#ff6b6b',
@@ -9,20 +10,6 @@ export const KIND_COLOR: Record<EnemyKind, string> = {
   object: '#6bc7ff',
 };
 export const KIND_LABEL: Record<EnemyKind, string> = { enemy: 'Enemy', boss: 'Boss', object: 'Box / crate / barrel' };
-
-interface Marker {
-  gi: number;
-  x: number;
-  z: number;
-  kind: EnemyKind;
-  label: string;
-  detail: string;
-  /** One of several spots for a spawner that places fewer enemies than it has spots. */
-  shared: boolean;
-}
-
-/** Maps this full are a flat floor with nothing to show; the plain grid reads better. */
-const FLAT_FILL = 0.97;
 
 interface View {
   tx: number;
@@ -34,6 +21,8 @@ export interface MapEvents {
   onSelect(generator: number | null): void;
 }
 
+/** Maps this full are a flat floor with nothing to show; the plain grid reads better. */
+const FLAT_FILL = 0.97;
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 40;
 const HIT_RADIUS = 12;
@@ -77,7 +66,7 @@ export class MapView {
       ...(Object.keys(KIND_COLOR) as EnemyKind[]).map((k) =>
         h('span', null, h('i', { style: `background:${KIND_COLOR[k]}` }), KIND_LABEL[k]),
       ),
-      h('span', null, h('i', { class: 'small' }), 'Small: one of several spots'),
+      h('span', { class: 'muted' }, 'Number = how many spawn there · shaded = where'),
     );
   }
 
@@ -111,21 +100,7 @@ export class MapView {
   }
 
   private buildMarkers(stage: Stage, d: Difficulty): Marker[] {
-    const out: Marker[] = [];
-    this.model.generators(stage, d).forEach((g, gi) => {
-      const e: Enemy | undefined = this.model.enemies.get(g.row);
-      const kind: EnemyKind = e?.kind ?? 'enemy';
-      const spots = g.spawns.length;
-      const shared = e?.kind !== 'object' && g.count !== null && spots > g.count;
-      const lines = [
-        e && e.kind !== 'object' ? `HP ${e.hp.toLocaleString('en-US')} · ${g.count ?? '?'} total` : '',
-        shared ? `One of ${spots} spots; places ${g.count}` : '',
-      ].filter(Boolean);
-      for (const [x, , z] of g.spawns) {
-        out.push({ gi, x, z, kind, label: e?.name ?? `Row ${g.row}`, detail: lines.join('\n'), shared });
-      }
-    });
-    return out;
+    return makeMarkers(this.model.generators(stage, d), this.model.enemies);
   }
 
   private computeBounds(stage: Stage): void {
@@ -208,6 +183,7 @@ export class MapView {
     ctx.restore();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const order = [...this.markers].sort((a, c) => this.rank(a) - this.rank(c));
+    for (const m of order) if (m.zone) this.drawZone(ctx, m);
     for (const m of order) this.drawMarker(ctx, m);
   }
 
@@ -234,6 +210,33 @@ export class MapView {
     }
   }
 
+  /** The area a numbered spawner can use; its individual spots show on hover or selection. */
+  private drawZone(ctx: CanvasRenderingContext2D, m: Marker): void {
+    if (!m.zone) return;
+    const dim = this.highlight !== null && !this.highlight.has(m.gi);
+    const [sx, sy] = this.toScreen(m);
+    const showSpots = m.gi === this.selected || m.gi === this.hover?.gi;
+    ctx.globalAlpha = dim ? 0.12 : 1;
+    ctx.fillStyle = `${KIND_COLOR[m.kind]}${showSpots ? '33' : '1c'}`;
+    ctx.strokeStyle = `${KIND_COLOR[m.kind]}${showSpots ? 'cc' : '66'}`;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(sx, sy, m.zone.radius * this.view.scale + 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (showSpots) {
+      ctx.fillStyle = '#ffffff';
+      for (const [x, z] of m.zone.spots) {
+        ctx.beginPath();
+        ctx.arc(this.view.tx + x * this.view.scale, this.view.ty + z * this.view.scale, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   private toScreen(m: Marker): [number, number] {
     return [this.view.tx + m.x * this.view.scale, this.view.ty + m.z * this.view.scale];
   }
@@ -243,7 +246,7 @@ export class MapView {
     const dim = this.highlight !== null && !this.highlight.has(m.gi);
     const selected = m.gi === this.selected;
     const lit = this.highlight !== null && this.highlight.has(m.gi);
-    const r = (selected ? 8 : lit ? 7.5 : 6) * (m.shared ? 0.72 : 1);
+    const r = (selected ? 8 : lit ? 7.5 : 6) * (m.badge > 1 ? 1.5 : 1);
     ctx.globalAlpha = dim ? 0.22 : 1;
     ctx.fillStyle = KIND_COLOR[m.kind];
     ctx.strokeStyle = selected ? '#ffffff' : 'rgba(10,14,24,0.9)';
@@ -259,6 +262,13 @@ export class MapView {
     } else ctx.arc(sx, sy, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    if (m.badge > 1) {
+      ctx.fillStyle = '#0b0f18';
+      ctx.font = `700 ${m.badge >= 10 ? 10 : 12}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(m.badge), sx, sy + 0.5);
+    }
     if (lit && !selected) {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
@@ -335,7 +345,9 @@ export class MapView {
 
   private setHover(m: Marker | null, px = 0, py = 0): void {
     if (m === this.hover && m === null) return;
+    const before = this.hover;
     this.hover = m;
+    if ((before?.zone || m?.zone) && before?.gi !== m?.gi) this.draw();
     this.canvas.style.cursor = m ? 'pointer' : 'grab';
     if (!m) {
       this.tip.hidden = true;

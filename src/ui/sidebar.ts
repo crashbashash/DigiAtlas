@@ -57,7 +57,7 @@ export class Sidebar {
     this.results.hidden = q.length < 2;
     if (q.length < 2) return;
     const items = [...this.model.items.entries()]
-      .filter(([, i]) => !i.unidentified && itemMatchesQuery(i, q))
+      .filter(([, i]) => itemMatchesQuery(i, q))
       .slice(0, RESULT_LIMIT);
     const species = new Map<string, number>();
     for (const e of this.model.enemies.values()) if (e.name.toLowerCase().includes(q) && e.kind !== 'object') species.set(e.name, e.row);

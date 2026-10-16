@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dropTable, formatPercent, groupByEnemy, isUnused, scriptRefText, startModeText } from './logic';
+import { dropTable, formatPercent, groupByEnemy, isUnused, itemMatchesQuery, scriptRefText, startModeText } from './logic';
 import type { Enemy, Generator } from './types';
 
 describe('dropTable', () => {
@@ -88,5 +88,14 @@ describe('script helpers', () => {
   it('turns a script call into a sentence', () => {
     expect(scriptRefText({ verb: 'RESTART', when: ['event 339 not done yet'] })).toBe('Restarted when event 339 not done yet');
     expect(scriptRefText({ verb: 'START', when: [] })).toBe('Started with no condition');
+  });
+});
+
+describe('itemMatchesQuery', () => {
+  it('finds the unidentified items by that word', () => {
+    const item = { category: 'weapon', id: 276, name: 'Unidentified Weapon', description: null, unidentified: true as const };
+    expect(itemMatchesQuery(item, 'unidentified')).toBe(true);
+    expect(itemMatchesQuery(item, 'unid')).toBe(true);
+    expect(itemMatchesQuery(item, 'core')).toBe(false);
   });
 });

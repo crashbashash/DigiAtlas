@@ -226,9 +226,8 @@ export class MapView {
   /** How close you must get for a radar spawner to start; stronger on hover or selection. */
   private drawTrigger(ctx: CanvasRenderingContext2D, m: Marker): void {
     if (!m.trigger) return;
-    const dim = this.highlight !== null && !this.highlight.has(m.gi);
     const strong = m.gi === this.selected || m.gi === this.hover?.gi;
-    ctx.globalAlpha = dim ? 0.1 : 1;
+    ctx.globalAlpha = 1;
     ctx.fillStyle = `${KIND_COLOR[m.kind]}${strong ? '26' : '0d'}`;
     ctx.strokeStyle = `${KIND_COLOR[m.kind]}${strong ? 'dd' : '4d'}`;
     ctx.lineWidth = strong ? 1.8 : 1;
@@ -267,12 +266,11 @@ export class MapView {
 
   private drawMarker(ctx: CanvasRenderingContext2D, m: Marker): void {
     const [sx, sy] = this.toScreen(m);
-    const dim = this.highlight !== null && !this.highlight.has(m.gi);
     const lit = this.highlight !== null && this.highlight.has(m.gi);
-    // Everything the current search or item matches is drawn as selected; the rest is only dimmed.
+    // Everything the current search or item matches is drawn as selected; the rest is left as it was.
     const selected = m.gi === this.selected || lit;
     const r = (selected ? 8 : 6) * (m.badge > 1 ? 1.5 : 1);
-    ctx.globalAlpha = dim ? 0.3 : m.unused ? 0.4 : 1;
+    ctx.globalAlpha = m.unused ? 0.4 : 1;
     ctx.fillStyle = KIND_COLOR[m.kind];
     ctx.strokeStyle = selected ? '#ffffff' : 'rgba(10,14,24,0.9)';
     ctx.lineWidth = selected ? 2.5 : 1.5;

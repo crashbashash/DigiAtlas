@@ -87,7 +87,36 @@ def _generator_record(g: generators.Generator) -> dict:
         rec["drops"] = _drop_map(g.pools)
     if g.last_pools:
         rec["lastDrops"] = _drop_map(g.last_pools)
+    players = _player_slots(g)
+    if players:
+        rec["players"] = players
     return rec
+
+
+def _player_slots(g: generators.Generator) -> list[dict] | None:
+    """Per-player-count numbers, only when they differ from the one-player case.
+
+    The game keeps four entries per spawner (one to four players); most are identical, in which case
+    the single set of fields on the generator applies to every player count.
+    """
+    if not g.slots:
+        return None
+    first = g.slots[0]
+    if all(
+        (sl.count, sl.max_count, _drop_map(sl.pools), _drop_map(sl.last_pools))
+        == (first.count, first.max_count, _drop_map(first.pools), _drop_map(first.last_pools))
+        for sl in g.slots
+    ):
+        return None
+    out = []
+    for sl in g.slots:
+        entry: dict = {"count": sl.count, "maxCount": sl.max_count}
+        if sl.pools:
+            entry["drops"] = _drop_map(sl.pools)
+        if sl.last_pools:
+            entry["lastDrops"] = _drop_map(sl.last_pools)
+        out.append(entry)
+    return out
 
 
 def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
@@ -172,8 +201,9 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
             gens = generators.Pack(ndmw.entry(idx)).generators()
             map_points.extend(p for g in gens for p in g.spawns())
             for g in gens:
-                for pool in g.pools + g.last_pools:
-                    pools.setdefault(pool.name, _pool_record(pool))
+                for slot in g.slots or [generators.PlayerSlot(0, 0, g.pools, g.last_pools)]:
+                    for pool in slot.pools + slot.last_pools:
+                        pools.setdefault(pool.name, _pool_record(pool))
             rec["difficulties"][difficulty] = {"generators": [_generator_record(g) for g in gens]}
         rec["map"] = None
         if with_maps:

@@ -29,10 +29,12 @@ export class App {
     private readonly onChangeData: (() => void) | null,
   ) {
     const first = model.byId.has(DEFAULT_STAGE) ? DEFAULT_STAGE : (model.stages[0]?.id ?? null);
-    const base: State = { stageId: first, difficulty: 'hard', selection: { kind: 'none' }, query: '' };
+    const base: State = { stageId: first, difficulty: 'hard', players: 1, selection: { kind: 'none' }, query: '' };
     // The address wins, then the last view, then the default.
     const view = location.hash.length > 2 ? viewFromHash(location.hash) : { ...viewFromHash(''), ...loadSaved() };
-    this.store = new Store(stateFromView(model, view, base));
+    const initial = stateFromView(model, view, base);
+    model.players = initial.players;
+    this.store = new Store(initial);
 
     this.map = new MapView(model, source, {
       onSelect: (gi) => {
@@ -154,6 +156,7 @@ export class App {
   }
 
   private update(s: State, prev: State | null): void {
+    this.model.players = s.players;
     this.syncAddress(s, prev);
     const stage = this.stage(s);
     if (!prev || prev.query !== s.query || prev.stageId !== s.stageId) this.sidebar.render(s.query, s.stageId);
@@ -178,6 +181,10 @@ export class App {
           DIFFICULTY_LABEL[d] + (avail.includes(d) ? '' : ' (no data)'))),
     );
     select.value = s.difficulty;
-    this.diffs.append(h('label', null, h('span', { class: 'muted' }, 'Difficulty'), select));
+    const players = h('select', { 'aria-label': 'Players', title: 'Spawn counts and drops depend on how many players are in the game', onchange: () => this.store.set({ players: Number(players.value) }) },
+      ...[1, 2, 3, 4].map((n) => h('option', { value: String(n), selected: n === s.players }, `${n} player${n === 1 ? '' : 's'}`)),
+    );
+    players.value = String(s.players);
+    this.diffs.append(h('label', null, h('span', { class: 'muted' }, 'Players'), players), h('label', null, h('span', { class: 'muted' }, 'Difficulty'), select));
   }
 }

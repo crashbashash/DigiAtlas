@@ -42,7 +42,8 @@ export class Model {
   readonly stages: Stage[];
   readonly byId = new Map<string, Stage>();
   readonly worlds: World[];
-  private readonly sourceCache = new Map<Difficulty, Map<string, ItemSource[]>>();
+  private readonly sourceCache = new Map<string, Map<string, ItemSource[]>>();
+  private playerCount = 1;
 
   constructor(readonly raw: RawData) {
     for (const e of raw.enemies.rows) this.enemies.set(e.row, e);
@@ -109,8 +110,32 @@ export class Model {
     return [...worlds.values()].sort((a, b) => rank(a.area) - rank(b.area));
   }
 
+  /** How many players the numbers are for (1 to 4). Spawn counts and drops depend on it. */
+  get players(): number {
+    return this.playerCount;
+  }
+
+  set players(n: number) {
+    this.playerCount = Math.min(4, Math.max(1, Math.round(n)));
+  }
+
+  /** A spawner as it behaves for the chosen number of players. */
+  forPlayers(g: Generator): Generator {
+    const slot = g.players?.[this.playerCount - 1];
+    if (!slot || this.playerCount === 1 && !g.players) return g;
+    return {
+      ...g,
+      count: slot.count,
+      maxCount: slot.maxCount,
+      drops: slot.drops ?? g.drops,
+      lastDrops: slot.lastDrops ?? g.lastDrops,
+    };
+  }
+
   generators(stage: Stage, d: Difficulty): Generator[] {
-    return stage.difficulties[d]?.generators ?? [];
+    const raw = stage.difficulties[d]?.generators ?? [];
+    if (this.playerCount === 1 && !raw.some((g) => g.players)) return raw;
+    return raw.map((g) => this.forPlayers(g));
   }
 
   /** Difficulties a stage actually has data for. */
@@ -129,10 +154,11 @@ export class Model {
 
   /** Where an item drops (per kill) for one difficulty, best chance first. */
   sourcesOf(key: string, d: Difficulty): ItemSource[] {
-    let index = this.sourceCache.get(d);
+    const cacheKey = `${d}:${this.playerCount}`;
+    let index = this.sourceCache.get(cacheKey);
     if (!index) {
       index = this.buildSources(d);
-      this.sourceCache.set(d, index);
+      this.sourceCache.set(cacheKey, index);
     }
     return index.get(key) ?? [];
   }

@@ -63,6 +63,13 @@ export interface DropPool {
   difficulty?: Difficulty;
 }
 
+export interface PlayerSlot {
+  count: number | null;
+  maxCount: number | null;
+  drops?: Record<string, string>;
+  lastDrops?: Record<string, string>;
+}
+
 export interface Generator {
   name: string;
   row: number;
@@ -77,6 +84,8 @@ export interface Generator {
   trigger?: { center: Vec3; radius: number };
   drops?: Record<string, string>;
   lastDrops?: Record<string, string>;
+  /** One entry per player count (index 0 = one player); absent when it makes no difference. */
+  players?: PlayerSlot[];
 }
 
 export interface StageMap {

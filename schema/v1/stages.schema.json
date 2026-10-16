@@ -161,6 +161,48 @@
                               "exclusiveMinimum": 0
                             }
                           }
+                        },
+                        "players": {
+                          "type": "array",
+                          "minItems": 4,
+                          "maxItems": 4,
+                          "description": "Present only when the numbers change with the number of players: entry 0 is one player, entry 3 is four. Without it the fields above apply to every player count.",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "count",
+                              "maxCount"
+                            ],
+                            "properties": {
+                              "count": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "maxCount": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "drops": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "difficulty (or slotN) -> pool name in drops.json"
+                              },
+                              "lastDrops": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "difficulty (or slotN) -> pool name in drops.json"
+                              }
+                            }
+                          }
                         }
                       }
                     }
@@ -273,6 +315,48 @@
                               "exclusiveMinimum": 0
                             }
                           }
+                        },
+                        "players": {
+                          "type": "array",
+                          "minItems": 4,
+                          "maxItems": 4,
+                          "description": "Present only when the numbers change with the number of players: entry 0 is one player, entry 3 is four. Without it the fields above apply to every player count.",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "count",
+                              "maxCount"
+                            ],
+                            "properties": {
+                              "count": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "maxCount": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "drops": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "difficulty (or slotN) -> pool name in drops.json"
+                              },
+                              "lastDrops": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "difficulty (or slotN) -> pool name in drops.json"
+                              }
+                            }
+                          }
                         }
                       }
                     }
@@ -383,6 +467,48 @@
                             "radius": {
                               "type": "number",
                               "exclusiveMinimum": 0
+                            }
+                          }
+                        },
+                        "players": {
+                          "type": "array",
+                          "minItems": 4,
+                          "maxItems": 4,
+                          "description": "Present only when the numbers change with the number of players: entry 0 is one player, entry 3 is four. Without it the fields above apply to every player count.",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "count",
+                              "maxCount"
+                            ],
+                            "properties": {
+                              "count": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "maxCount": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "drops": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "difficulty (or slotN) -> pool name in drops.json"
+                              },
+                              "lastDrops": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "difficulty (or slotN) -> pool name in drops.json"
+                              }
                             }
                           }
                         }

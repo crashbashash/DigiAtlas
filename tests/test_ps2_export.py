@@ -260,6 +260,26 @@ class TriggerTests(unittest.TestCase):
         self.assertNotIn("trigger", export._generator_record(generator((1.0, 2.0, 3.0), [], True, "direct")))
 
 
+class PlayerSlotTests(unittest.TestCase):
+    def slots(self, *rows):
+        return [generators.PlayerSlot(c, m, [generators.DropPool(p)] if p else [], []) for c, m, p in rows]
+
+    def test_identical_entries_collapse_to_the_plain_fields(self):
+        g = generator((0.0, 0.0, 0.0), [], True)
+        g.slots = self.slots(*[(1, 1, "nA")] * 4)
+        self.assertIsNone(export._player_slots(g))
+
+    def test_differing_entries_are_exported_in_order(self):
+        g = generator((0.0, 0.0, 0.0), [], True)
+        g.slots = self.slots((2, 2, "nA"), (3, 3, "nA"), (4, 4, "nB"), (4, 4, "nB"))
+        out = export._player_slots(g)
+        self.assertEqual([e["count"] for e in out], [2, 3, 4, 4])
+        self.assertEqual(out[2]["drops"], {"normal": "nB"})
+
+    def test_a_spawner_without_entries_has_none(self):
+        self.assertIsNone(export._player_slots(generator((0.0, 0.0, 0.0), [], True)))
+
+
 class SceneTests(unittest.TestCase):
     def test_transform_uses_row_vectors_with_translation_in_last_row(self):
         move = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 30, 1)
@@ -466,6 +486,23 @@ class DiscTests(unittest.TestCase):
                 with_banner += 1
         self.assertEqual(with_banner, 92)
         self.assertEqual(len(list((self.out / "banners").glob("*.png"))), 92)
+
+    def test_player_counts_scale_spawners(self):
+        stage = next(s for s in self.load("stages.json")["stages"] if s["id"] == "stag0101")
+        gens = {g["name"]: g for g in stage["difficulties"]["normal"]["generators"]}
+        # The bridge spawner places 2, 3, 4 or 5 enemies for 1 to 4 players.
+        self.assertEqual([e["count"] for e in gens["GENE-00"]["players"]], [2, 3, 4, 5])
+        # A lone Numemon grows by one per player but is capped at one alive at a time.
+        self.assertEqual([(e["count"], e["maxCount"]) for e in gens["GENE-14"]["players"]], [(1, 1), (2, 1), (3, 1), (4, 1)])
+        # The fourth entry of GENE-01 repeats the third; a set would have lost it.
+        self.assertEqual(len(gens["GENE-01"]["players"]), 4)
+        pools = self.load("drops.json")["pools"]
+        for st in self.load("stages.json")["stages"]:
+            for d in st["difficulties"].values():
+                for g in d["generators"]:
+                    for entry in [g] + g.get("players", []):
+                        for name in list(entry.get("drops", {}).values()) + list(entry.get("lastDrops", {}).values()):
+                            self.assertIn(name, pools)
 
     def test_radar_triggers_match_the_documented_radii(self):
         # Every radar spawner carries a trigger; Goblin Pass GENE-00 is (455, 50, 15) with radius 65.

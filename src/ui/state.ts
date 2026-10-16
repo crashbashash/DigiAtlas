@@ -10,6 +10,8 @@ export type Selection =
 export interface State {
   stageId: string | null;
   difficulty: Difficulty;
+  /** Number of players (1 to 4) the spawn counts and drops are shown for. */
+  players: number;
   selection: Selection;
   query: string;
 }

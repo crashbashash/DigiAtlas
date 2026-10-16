@@ -43,6 +43,53 @@ function model(): Model {
   return new Model(raw);
 }
 
+describe('player counts', () => {
+  const scaled = (): Model => {
+    const raw = model().raw;
+    const g = raw.stages.stages[1].difficulties.hard!.generators[0];
+    g.players = [
+      { count: 2, maxCount: 2, drops: { hard: 'nB' } },
+      { count: 3, maxCount: 3, drops: { hard: 'nA' } },
+      { count: 4, maxCount: 4, drops: { hard: 'nA' } },
+      { count: 5, maxCount: 5, drops: { hard: 'nA' } },
+    ];
+    return new Model(raw);
+  };
+
+  it('uses the one-player numbers by default and the chosen entry otherwise', () => {
+    const m = scaled();
+    const stage = m.byId.get('stag0102')!;
+    expect(m.generators(stage, 'hard')[0].count).toBe(2);
+    m.players = 3;
+    const g = m.generators(stage, 'hard')[0];
+    expect([g.count, g.maxCount, g.drops?.hard]).toEqual([4, 4, 'nA']);
+    expect(m.poolFor(g, 'hard')?.totalRate).toBe(1300);
+  });
+
+  it('leaves spawners without per-player data unchanged', () => {
+    const m = scaled();
+    m.players = 4;
+    expect(m.generators(m.byId.get('dng101b1')!, 'hard')[0].count).toBe(2);
+  });
+
+  it('keeps item sources separate per player count', () => {
+    const m = scaled();
+    const before = m.sourcesOf('conItem:0', 'hard').length;
+    m.players = 2;
+    expect(m.sourcesOf('conItem:0', 'hard').length).toBeGreaterThan(before);
+    m.players = 1;
+    expect(m.sourcesOf('conItem:0', 'hard').length).toBe(before);
+  });
+
+  it('clamps the number of players', () => {
+    const m = model();
+    m.players = 9;
+    expect(m.players).toBe(4);
+    m.players = 0;
+    expect(m.players).toBe(1);
+  });
+});
+
 describe('Model', () => {
   it('lists only stages that spawn something, fields before dungeons', () => {
     const m = model();

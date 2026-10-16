@@ -157,7 +157,7 @@ export class Panel {
     const fights = groups.filter((g) => g.enemy?.kind !== 'object').sort(byName);
     const objects = groups.filter((g) => g.enemy?.kind === 'object').sort(byName);
     const out: HTMLElement[] = [
-      h('h2', null, this.model.stageTitle(stage), h('small', null, `${stage.area ?? ''} · ${DIFFICULTY_LABEL[d]}`)),
+      h('h2', null, this.model.stageTitle(stage), h('small', null, `${stage.area ?? ''} · ${DIFFICULTY_LABEL[d]}${this.model.players > 1 ? ` · ${this.model.players} players` : ''}`)),
     ];
     out.push(
       h('div', { class: 'sub' }, `Enemies (${fights.length})`),

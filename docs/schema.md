@@ -73,6 +73,12 @@ Players see `name`, never the internal ids.
   coordinates (global generators) or offsets from a room anchor (dungeon rooms); the exporter resolves
   both, so `spawns` is always world space. Every spawn lands on the stage's terrain (checked on map
   coverage below).
+- **Player count** (`generators[].players`): every spawner has four entries in the game, one per number of
+  players, and in 13% of them the count, the alive-at-once cap or the drop pools differ (counts never fall
+  as players are added, in 99.5% of cases they rise). The fields on the generator are the one-player case;
+  `players` is present only when an entry differs, entry 0 meaning one player and entry 3 four. That the
+  entry index is the number of players (and not a player's own slot) is read from the data, where counts
+  rise by about one per entry, and is not confirmed in the code.
 - **Which spots are used.** A spawner's `spawns` list is the list the game steps through: each enemy goes to
   the next spot and the cursor wraps around the list, with no randomness (read from the spawn function's
   code). So a spawner that places `count` enemies among more spots uses the first `count` of them, and a

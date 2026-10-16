@@ -47,6 +47,16 @@ class DropPool:
 
 
 @dataclass
+class PlayerSlot:
+    """What a spawner does for a given number of players (entry 0 is one player, entry 3 is four)."""
+
+    count: int
+    max_count: int
+    pools: list[DropPool]
+    last_pools: list[DropPool]
+
+
+@dataclass
 class Generator:
     name: str
     row: int
@@ -62,6 +72,8 @@ class Generator:
     gene_max_count: int | None
     pools: list[DropPool]
     last_pools: list[DropPool]
+    # One entry per player count, in the game's order. ``gene_count`` etc. above are entry 0 (one player).
+    slots: list[PlayerSlot] = field(default_factory=list)
 
     def trigger(self) -> tuple[tuple[float, float, float], float] | None:
         """Where and how close you must get for a ``radar`` spawner to start: (anchor, radius).
@@ -146,20 +158,28 @@ class Pack:
             if rec["class"] != "beGeneraterData":
                 continue
             v = self._vals(k)
-            count = maximum = None
-            pools: list[DropPool] = []
-            last_pools: list[DropPool] = []
+            slots: list[PlayerSlot] = []
             pk = self._ref(v[GENE_PLAYER_LIST])
             if pk is not None and self.s2[pk]["class"] == "beGeneraterPlayerDataList":
-                for pid in sorted(set(self._list_ids(pk))):
+                # The list order is the player count (1..4) and entries may repeat; keep both.
+                for pid in self._list_ids(pk):
                     dk = self._ref(pid)
                     if dk is None or self.s2[dk]["class"] != "beGeneraterPlayerData":
                         continue
                     pv = self._vals(dk)
-                    if count is None:
-                        count, maximum = pv[PLAYER_COUNT], pv[PLAYER_MAX]
-                    pools = pools or self._pools(pv[PLAYER_ITEMS])
-                    last_pools = last_pools or self._pools(pv[PLAYER_LAST_ITEMS])
+                    slots.append(
+                        PlayerSlot(
+                            pv[PLAYER_COUNT],
+                            pv[PLAYER_MAX],
+                            self._pools(pv[PLAYER_ITEMS]),
+                            self._pools(pv[PLAYER_LAST_ITEMS]),
+                        )
+                    )
+            first = slots[0] if slots else None
+            count = first.count if first else None
+            maximum = first.max_count if first else None
+            pools = next((sl.pools for sl in slots if sl.pools), [])
+            last_pools = next((sl.last_pools for sl in slots if sl.last_pools), [])
             out.append(
                 Generator(
                     name=v[GENE_NAME],
@@ -176,6 +196,7 @@ class Pack:
                     gene_max_count=maximum,
                     pools=pools,
                     last_pools=last_pools,
+                    slots=slots,
                 )
             )
         return out

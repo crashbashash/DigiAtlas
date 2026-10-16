@@ -6,6 +6,7 @@ import type { Selection, State } from './state';
 export interface View {
   stageId: string | null;
   difficulty: Difficulty | null;
+  players: number | null;
   item: string | null;
   enemy: string | null;
   spawner: string | null;
@@ -18,6 +19,7 @@ export function viewFromHash(hash: string): View {
   return {
     stageId: path || null,
     difficulty: DIFFICULTIES.includes(d as Difficulty) ? (d as Difficulty) : null,
+    players: [1, 2, 3, 4].includes(Number(q.get('p'))) ? Number(q.get('p')) : null,
     item: q.get('item'),
     enemy: q.get('enemy'),
     spawner: q.get('spawner'),
@@ -26,6 +28,7 @@ export function viewFromHash(hash: string): View {
 
 export function hashFor(model: Model, s: State): string {
   const q = new URLSearchParams({ d: s.difficulty });
+  if (s.players !== 1) q.set('p', String(s.players));
   const sel = s.selection;
   if (sel.kind === 'item') q.set('item', sel.key);
   else if (sel.kind === 'species') q.set('enemy', sel.name);
@@ -52,15 +55,15 @@ export function stateFromView(model: Model, v: View, fallback: State): State {
     const index = model.generators(target, difficulty).findIndex((g) => g.name === v.spawner);
     if (index >= 0) selection = { kind: 'generator', index };
   }
-  return { ...fallback, stageId, difficulty, selection };
+  return { ...fallback, stageId, difficulty, players: v.players ?? fallback.players, selection };
 }
 
 const KEY = 'digiatlas.view';
 
-export function loadSaved(): Pick<View, 'stageId' | 'difficulty'> | null {
+export function loadSaved(): Pick<View, 'stageId' | 'difficulty' | 'players'> | null {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Pick<View, 'stageId' | 'difficulty'>) : null;
+    return raw ? (JSON.parse(raw) as Pick<View, 'stageId' | 'difficulty' | 'players'>) : null;
   } catch {
     return null;
   }
@@ -68,7 +71,7 @@ export function loadSaved(): Pick<View, 'stageId' | 'difficulty'> | null {
 
 export function save(s: State): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ stageId: s.stageId, difficulty: s.difficulty }));
+    localStorage.setItem(KEY, JSON.stringify({ stageId: s.stageId, difficulty: s.difficulty, players: s.players }));
   } catch {
     /* storage can be unavailable; the view just is not remembered */
   }

@@ -121,8 +121,10 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
 - Stage names for `stagIS07`, `stagIS08` and `stagIS20`: system scenes with no banner (`stagIS09` and
   `stagIS10` are the Bandai logo and the opening, from the decomp's loading-screen tour, as is
   `stagML14`, which has no banner image of its own).
-- Trader Hall (`dngq5b1e/h/v`) has no map: its rooms are assembled by script at load, so the static
-  terrain does not cover its spawn points. Hubs and system scenes have no spawns and no map.
+- Trader Hall (`dngq5b1e/h/v`) and the Home Server lobbies have no spawners. Their maps are the largest
+  terrain scene cropped to the rooms (no markers). System scenes (logo, opening) have no map.
+  Stage packs are followed on disc by their own generator packs only; Trader Hall's neighbours' packs
+  are not borrowed.
 - Room names, doors and icons on the maps; the maps are geometry only.
 - Scripted pickups placed by triggers are not extracted; destructibles are (as generators).
 

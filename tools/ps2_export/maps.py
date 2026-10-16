@@ -65,9 +65,12 @@ def choose_scene(scenes: list[scene.Scene], points: list[tuple[float, float]]) -
 
 
 def build(ndmw: Afs, packs: list[int], spawns: list[tuple[float, float, float]]) -> StageMap | None:
-    """Render the map for one stage, or None when no terrain scene covers its spawn points."""
+    """Render the map for one stage, or None when no terrain scene covers its spawn points.
+
+    A stage without spawn points (a shop or lobby) gets its largest terrain scene, cropped to the terrain.
+    """
     if not spawns:
-        return None
+        return _build_empty(ndmw, packs)
     points = [(x, z) for x, _y, z in spawns]
     ys = sorted(y for _x, y, _z in spawns)
     best: tuple[tuple, int, scene.Scene] | None = None
@@ -93,3 +96,34 @@ def build(ndmw: Afs, packs: list[int], spawns: list[tuple[float, float, float]])
     raster = render.render(terrain_triangles(s), roi, focus_y=ys[len(ys) // 2])
     coverage = sum(raster.covered(x, z) for x, z in points) / len(points)
     return StageMap(pack, s.name, roi, raster, coverage)
+
+
+def _build_empty(ndmw: Afs, packs: list[int]) -> StageMap | None:
+    """Map of the biggest terrain scene in a stage that has nothing spawning in it."""
+    best: tuple[int, int, scene.Scene] | None = None
+    for pack in packs:
+        try:
+            scenes = scene.scenes(igbpack.Graph(ndmw.entry(pack)))
+        except ValueError:
+            continue
+        for s in scenes:
+            if len(s.triangles) < MIN_TRIANGLES or s.name.startswith(SKIP_PREFIXES):
+                continue
+            if best is None or len(s.triangles) > best[0]:
+                best = (len(s.triangles), pack, s)
+    if best is None:
+        return None
+    _n, pack, s = best
+    tris = terrain_triangles(s)
+    if not tris:
+        return None
+    # A backdrop plane spanning the whole scene would make the crop far bigger than the rooms in it.
+    parts = [pt for pt in s.parts if _span(pt) >= MIN_PART_SPAN]
+    overall = max(_span(pt) for pt in parts)
+    inner = [pt for pt in parts if _span(pt) < 0.85 * overall]
+    tris = [t for pt in (inner or parts) for t in pt]
+    x0, x1, z0, z1 = _bbox(tris)
+    ys = sorted(p[1] for t in tris for p in t)
+    roi = (x0 - MARGIN / 3, x1 + MARGIN / 3, z0 - MARGIN / 3, z1 + MARGIN / 3)
+    raster = render.render(tris, roi, focus_y=ys[len(ys) // 2])
+    return StageMap(pack, s.name, roi, raster, 1.0) if raster.fill >= 0.02 else None

@@ -160,8 +160,12 @@ export class Panel {
     const fights = groups.filter((g) => g.enemy?.kind !== 'object').sort(byName);
     const objects = groups.filter((g) => g.enemy?.kind === 'object').sort(byName);
     const out: HTMLElement[] = [
-      h('h2', null, this.model.stageTitle(stage), h('small', null, `${stage.area ?? ''} · ${DIFFICULTY_LABEL[d]}${this.model.players > 1 ? ` · ${this.model.players} players` : ''}`)),
+      h('h2', null, this.model.stageTitle(stage), h('small', null, `${stage.area ?? ''}${gens.length ? ` · ${DIFFICULTY_LABEL[d]}` : ''}${gens.length && this.model.players > 1 ? ` · ${this.model.players} players` : ''}`)),
     ];
+    if (!gens.length) {
+      out.push(h('p', { class: 'note' }, 'No enemies or breakable objects spawn here.'));
+      return out;
+    }
     out.push(
       h('div', { class: 'sub' }, `Enemies (${fights.length})`),
       h('div', { class: 'list' }, ...fights.map((g) => this.groupSummary(g, d))),

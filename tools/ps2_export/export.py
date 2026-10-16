@@ -230,7 +230,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
                         pools.setdefault(pool.name, _pool_record(pool))
             rec["difficulties"][difficulty] = {"generators": [_generator_record(g, stage_scripts) for g in gens]}
         rec["map"] = None
-        if with_maps:
+        if with_maps and not (rec["kind"] == "system" and not map_points):
             built = maps.build(ndmw, st.packs, map_points)
             if built is not None:
                 map_dir.mkdir(parents=True, exist_ok=True)

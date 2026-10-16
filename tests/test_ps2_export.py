@@ -494,7 +494,7 @@ class DiscTests(unittest.TestCase):
         self.assertTrue(self.manifest["source"]["statTableVerified"])
         self.assertEqual(self.manifest["counts"]["enemyRows"], 580)
         self.assertEqual(self.manifest["counts"]["stages"], 98)
-        self.assertEqual(self.manifest["counts"]["stagesWithGenerators"], 85)
+        self.assertEqual(self.manifest["counts"]["stagesWithGenerators"], 81)
 
     def test_documented_pool_totals(self):
         # DW4_Decomp docs/systems/drop-tables.md section 2: crate pools and the guaranteed boss drop.
@@ -641,6 +641,24 @@ class DiscTests(unittest.TestCase):
             self.assertGreaterEqual(built.coverage, 0.95, sid)
             self.assertGreater(built.raster.fill, 0.0, sid)
             self.assertTrue(built.png().startswith(b"\x89PNG"))
+
+    def test_stages_without_spawners_do_not_borrow_the_next_stages(self):
+        # Trader Hall (a shop) has no generator packs of its own; the Dungeon of Doom's follow it on the disc.
+        stages_out = {s["id"]: s for s in self.load("stages.json")["stages"]}
+        for sid in ("dngq5b1e", "dngq5b1h", "dngq5b1v"):
+            self.assertFalse(stages_out[sid].get("generatorPacks"), sid)
+            self.assertFalse(stages_out[sid]["difficulties"].get("normal", {}).get("generators"), sid)
+        self.assertEqual(len(stages_out["dngq6b01"]["difficulties"]["normal"]["generators"]), 39)
+
+    def test_shop_and_lobby_rooms_get_a_map_without_spawn_points(self):
+        from ps2_export.afs import Afs
+
+        ndmw = Afs(iso.open_disc_file(os.environ["DIGIATLAS_PS2_ISO"], "NDMW.AFS"))
+        stages_out = {s["id"]: s for s in self.load("stages.json")["stages"]}
+        for sid in ("dngq5b1e", "dngq5b1h", "dngq5b1v", "stagML11"):
+            built = maps.build(ndmw, stages_out[sid]["packs"], [])
+            self.assertIsNotNone(built, sid)
+            self.assertLess(built.raster.fill, 0.9, sid)  # an outline, not a flat arena
 
     def test_banner_fingerprints(self):
         from ps2_export import manifest as archive_manifest

@@ -62,7 +62,7 @@ export class Model {
     for (const i of raw.items.items) this.items.set(itemKey(i.category, i.id), i);
     this.buildLabels();
     // Only stages that spawn something are worth browsing.
-    this.stages = raw.stages.stages.filter((s) => DIFFICULTIES.some((d) => (s.difficulties[d]?.generators.length ?? 0) > 0));
+    this.stages = raw.stages.stages.filter((s) => s.map !== null || DIFFICULTIES.some((d) => (s.difficulties[d]?.generators.length ?? 0) > 0));
     for (const s of this.stages) this.byId.set(s.id, s);
     this.worlds = this.buildWorlds();
   }

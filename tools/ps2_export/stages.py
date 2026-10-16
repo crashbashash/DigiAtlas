@@ -57,11 +57,15 @@ def list_stages(ndmw: Afs) -> list[Stage]:
         stage_id, packs = parse_manifest(ndmw.entry(entry))
         if not stage_id or not packs:
             continue
-        stage = Stage(stage_id, entry, sorted(set(packs)))
-        first = max(packs) + 1
-        window = range(first, min(first + 12, ndmw.count))
-        found = [idx for idx in window if generators.has_generators(ndmw.entry(idx)[:0x4000])]
+        stages.append(Stage(stage_id, entry, sorted(set(packs))))
+    starts = sorted({p for st in stages for p in st.packs})
+    for stage in stages:
+        first = max(stage.packs) + 1
+        # The generator packs sit between this stage's own packs and the next stage's first pack. Looking
+        # further would borrow the next stage's (a shop room has none of its own).
+        later = [p for p in starts if p > max(stage.packs)]
+        stop = min([first + 12, ndmw.count] + later[:1])
+        found = [idx for idx in range(first, stop) if generators.has_generators(ndmw.entry(idx)[:0x4000])]
         if len(found) >= 3 and found[1] == found[0] + 1 and found[2] == found[0] + 2:
             stage.generator_packs = dict(zip(GENERATOR_DIFFICULTIES, found[:3]))
-        stages.append(stage)
     return stages

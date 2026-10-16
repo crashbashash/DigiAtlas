@@ -208,6 +208,7 @@ export class App {
   private renderDifficulties(s: State, stage: Stage): void {
     clear(this.diffs);
     const avail = this.model.available(stage);
+    if (!avail.length) return; // a shop or lobby: nothing spawns, so players and difficulty mean nothing
     const select = h('select', { 'aria-label': 'Difficulty', onchange: () => this.setDifficulty(select.value as Difficulty) },
       ...(DIFFICULTIES as Difficulty[]).map((d) =>
         h('option', { value: d, selected: d === s.difficulty, disabled: !avail.includes(d) },

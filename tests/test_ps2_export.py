@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from ps2_export import export, generators, iso, stats  # noqa: E402
+from ps2_export import database, export, generators, igbpack, iso, stats  # noqa: E402
 from ps2_export.afs import Afs  # noqa: E402
 
 try:
@@ -121,6 +121,45 @@ class StatsTests(unittest.TestCase):
         self.assertFalse(stats.anchors_match(stats.read_table(self.entry({}))))
 
 
+class DatabaseTests(unittest.TestCase):
+    def test_decode_cp932_and_normalise(self):
+        raw = "\u0083\u0041".encode("latin1")  # not valid cp932 pair is tolerated
+        self.assertIsNotNone(database._decode(raw.decode("latin1")))
+        shift_jis = "バトルホーク\r\nα".encode("cp932").decode("latin1")
+        self.assertEqual(database._decode(shift_jis), "バトルホーク\nα")
+        self.assertEqual(database._decode(None), None)
+
+    def test_xdata_glyph_is_renamed(self):
+        raw = "\u00b6 Data".encode("cp932").decode("latin1")
+        self.assertEqual(database._decode(raw), "X-Data")
+
+    def test_parse_items_strides_and_slot_glyph(self):
+        cols = {c: [] for c in database.ITEM_LAYOUT}
+        cols["weapon"] = ["∈Battle Hawk α", "w_axe01", "TSUYOSA", "Axe", "∈Long Sword α", "w", "T", "Sword"]
+        cols["conItem"] = ["HP Disk α", "Recovers 450 HP", "g_000item"]
+        items = {(i.category, i.id): i for i in database.parse_items(cols)}
+        self.assertEqual(items[("weapon", 0)].name, "Battle Hawk α")
+        self.assertEqual(items[("weapon", 1)].description, "Sword")
+        self.assertEqual(items[("conItem", 0)].description, "Recovers 450 HP")
+
+    def test_parse_items_rejects_bad_stride(self):
+        cols = {c: [] for c in database.ITEM_LAYOUT}
+        cols["weapon"] = ["a", "b", "c"]
+        with self.assertRaises(ValueError):
+            database.parse_items(cols)
+
+    def test_enemy_models_skip_empty_rows(self):
+        self.assertEqual(database.enemy_models({"enemy": [None, "e_goburi", None, "e_ogre"]}), {1: "e_goburi", 3: "e_ogre"})
+
+    def test_every_enemy_name_entry_is_well_formed(self):
+        for model, entry in export.ENEMY_NAMES.items():
+            if model.startswith("_"):
+                continue
+            self.assertIn(model[0], export.KINDS, model)
+            self.assertTrue(entry["name"], model)
+            self.assertIn(entry["source"], ("disc", "decomp"), model)
+
+
 class PoolTests(unittest.TestCase):
     def test_pool_record_parses_name_and_totals(self):
         pool = generators.DropPool(
@@ -179,6 +218,42 @@ class DiscTests(unittest.TestCase):
         stage = {s["id"]: s for s in self.load("stages.json")["stages"]}["stagGF01"]
         rows = {d: stage["difficulties"][d]["generators"][0]["row"] for d in stage["difficulties"]}
         self.assertEqual(rows, {"hard": 6, "normal": 2, "veryhard": 10})
+
+    def test_known_names(self):
+        enemies = {r["row"]: r for r in self.load("enemies.json")["rows"]}
+        self.assertEqual(enemies[1]["name"], "Goburimon")
+        self.assertEqual(enemies[1]["hp"], 58)
+        self.assertEqual(enemies[36]["name"], "Ogremon")
+        self.assertEqual(enemies[370]["kind"], "object")
+        items = {(i["category"], i["id"]): i for i in self.load("items.json")["items"]}
+        # DW4_Decomp docs/systems/drop-tables.md section 5: guard-room boss drops.
+        self.assertTrue(items[("weapon", 175)]["name"].startswith("Mighty Talon"))
+        self.assertTrue(items[("weapon", 200)]["name"].startswith("Beam Magnum"))
+
+    def test_every_dropped_item_has_a_name(self):
+        items = {(i["category"], i["id"]) for i in self.load("items.json")["items"]}
+        for pool in self.load("drops.json")["pools"].values():
+            for e in pool["entries"]:
+                self.assertIn((e["category"], e["id"]), items)
+
+    def test_generator_rows_resolve_except_known_empty_slot(self):
+        # Three Kokatorimon spawners in stag0104 point at row 90, an empty slot between the
+        # Blossomon and Kokatorimon rows (data quirk in the game, not an export error).
+        rows = {r["row"] for r in self.load("enemies.json")["rows"]}
+        missing = set()
+        for stage in self.load("stages.json")["stages"]:
+            for d in stage["difficulties"].values():
+                missing |= {g["row"] for g in d["generators"]} - rows
+        self.assertLessEqual(missing, {90}, f"unresolved spawn rows: {sorted(missing)}")
+
+    def test_disc_sourced_enemy_names_appear_in_game_text(self):
+        from ps2_export.afs import Afs
+
+        archive = Afs(iso.open_disc_file(os.environ["DIGIATLAS_PS2_ISO"], "AREA.AFS"))
+        album = {r["name"] for r in igbpack.Graph(archive.entry(621)).s2 if r["class"] == "igNamedObject"}
+        for model, entry in export.ENEMY_NAMES.items():
+            if not model.startswith("_") and entry["source"] == "disc":
+                self.assertIn(entry["name"], album, f"{model} is not in the card album")
 
     @unittest.skipUnless(jsonschema, "jsonschema not installed")
     def test_output_matches_schema(self):

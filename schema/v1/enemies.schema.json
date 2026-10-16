@@ -19,6 +19,8 @@
         "additionalProperties": false,
         "required": [
           "row",
+          "name",
+          "kind",
           "model",
           "hp",
           "stats",
@@ -33,11 +35,8 @@
             "description": "Row in the platform's stat table. Spawn generators reference this."
           },
           "model": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Model name such as e_goburi, when resolved."
+            "type": "string",
+            "description": "Internal model name; for debugging and icon lookup, not for display."
           },
           "hp": {
             "type": "integer"
@@ -100,6 +99,18 @@
             "type": "integer",
             "minimum": 0,
             "description": "Crown rank; 0 for most rows."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name shown to players."
+          },
+          "kind": {
+            "enum": [
+              "enemy",
+              "boss",
+              "object"
+            ],
+            "description": "object = destructible (box, barrel, case)."
           }
         }
       }

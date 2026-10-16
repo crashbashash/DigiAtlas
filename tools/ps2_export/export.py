@@ -15,7 +15,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import generators, iso, stages, stats
+from . import database, generators, iso, stages, stats
 from .afs import Afs
 
 SCHEMA_VERSION = 1
@@ -23,11 +23,14 @@ EXPORTER = {"name": "digiatlas-ps2-export", "version": "0.1.0"}
 DIFFICULTIES = ("normal", "hard", "veryhard")
 POOL_NAME = re.compile(r"^(?P<d>[nhv])(?P<zone>Z\d+)(?P<family>[A-Za-z]+?)(?P<variant>\d*)$")
 KNOWN_GAPS = [
-    "enemies[].model: the row-to-model-name column is not decoded from the disc yet",
     "enemies[].unmapped: stat columns 5-10 are exported raw",
-    "items[].name: display names need an overlay (--item-names); not yet read from the disc",
+    "enemies[].name: Machinedramon, Devimon/Lucemon form and object names are not in the game text",
+    "items[]: numeric item stats (attack, level, resistances) are not decoded yet",
     "stages[].name and maps: stage ids only; floor maps are not extracted yet",
+    "trigger-placed item spawns (scripted pickups) are not extracted yet",
 ]
+ENEMY_NAMES = json.loads((Path(__file__).parent / "names" / "enemies.json").read_text())
+KINDS = {"e": "enemy", "f": "boss", "g": "object"}
 
 
 def _serial(system_cnf: bytes) -> str | None:
@@ -83,7 +86,7 @@ def _generator_record(g: generators.Generator) -> dict:
     return rec
 
 
-def export(iso_path: str, out_dir: Path, item_names: dict | None = None) -> dict:
+def export(iso_path: str, out_dir: Path) -> dict:
     files = iso.list_files(iso_path)
     for needed in ("/SYSTEM.CNF", "/AREA.AFS", "/NDMW.AFS", "/SLUS_208.36"):
         if needed not in files:
@@ -95,15 +98,24 @@ def export(iso_path: str, out_dir: Path, item_names: dict | None = None) -> dict
 
     area, ndmw = Afs(src("AREA.AFS")), Afs(src("NDMW.AFS"))
 
+    # --- text databases (English copy) -----------------------------------------------
+    columns = database.read_string_columns(area.entry(database.DATABASE_ENTRY))
+    models = database.enemy_models(columns)
+
     # --- enemies -----------------------------------------------------------------------
     table = stats.read_table(area.entry(stats.STAT_ENTRY))
     anchors_ok = stats.anchors_match(table)
+    unnamed = sorted({m for m in models.values() if m not in ENEMY_NAMES})
+    if unnamed:
+        raise SystemExit(f"no display name for models {unnamed}; add them to names/enemies.json")
     enemies = {
         "rowCount": stats.ROWS,
         "rows": [
             {
                 "row": r.row,
-                "model": None,
+                "name": ENEMY_NAMES[models[r.row]]["name"],
+                "kind": KINDS[models[r.row][0]],
+                "model": models[r.row],
                 "hp": r.hp,
                 "stats": {
                     "strength": r.strength,
@@ -118,7 +130,7 @@ def export(iso_path: str, out_dir: Path, item_names: dict | None = None) -> dict
                 "rarity": r.rarity,
             }
             for r in table
-            if not r.is_empty
+            if not r.is_empty and r.row in models
         ],
     }
 
@@ -143,16 +155,10 @@ def export(iso_path: str, out_dir: Path, item_names: dict | None = None) -> dict
             rec["difficulties"][difficulty] = {"generators": [_generator_record(g) for g in gens]}
         stage_records.append(rec)
 
-    # --- items (every id that appears in a pool) ------------------------------------
-    names = item_names or {}
-    seen = sorted({(e["category"], e["id"]) for p in pools.values() for e in p["entries"]})
+    # --- items (every item in the game database) ---------------------------------------
     items = [
-        {
-            "category": c,
-            "id": i,
-            "name": names.get(c, {}).get(str(i)),
-        }
-        for c, i in seen
+        {"category": i.category, "id": i.id, "name": i.name, "description": i.description}
+        for i in database.parse_items(columns)
     ]
 
     manifest = {
@@ -201,13 +207,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("iso", help="Digimon World 4 (USA) PS2 disc image")
     ap.add_argument("--out", default="data/generated/ps2", help="output directory")
-    ap.add_argument(
-        "--item-names",
-        help='optional JSON overlay: {"weapon": {"0": "Battle Hawk α"}, "conItem": {...}}',
-    )
     args = ap.parse_args(argv)
-    names = json.loads(Path(args.item_names).read_text()) if args.item_names else None
-    manifest = export(args.iso, Path(args.out), names)
+    manifest = export(args.iso, Path(args.out))
     print(json.dumps(manifest["counts"], indent=1))
     if not manifest["source"]["statTableVerified"]:
         print("warning: stat table anchors did not match; disc may be modified or not vanilla USA",

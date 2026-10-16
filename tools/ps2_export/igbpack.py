@@ -24,7 +24,9 @@ TID2REF = {0: "igObjectRef", 1: "igInt", 2: "igBool", 3: "igChar", 4: "igString"
 ITEM_SIZE = {"igVec3fList": 12, "igFloatList": 4, "beGeneraterPlayerDataList": 4,
              "beGeneraterItemDataList": 4, "beGeneraterItemDataOneList": 4,
              "beGeneraterDataList": 4, "beBaseInfoRamList": 4, "igInfoList": 4,
-             "igDataList": 4, "igObjectList": 4, "igNamedObjectList": 4}
+             "igDataList": 4, "igObjectList": 4, "igNamedObjectList": 4,
+             "igIntList": 4, "igShortList": 2, "igCharList": 1, "igBoolList": 1,
+             "igUnsignedIntList": 4, "beUnicodeObjList": 4, "beBaseInfoDataList": 4}
 
 
 def align4(x):
@@ -277,3 +279,63 @@ def sections(b):
     if len(chains) < 2:
         raise ValueError(f"expected two object chains, found {len(chains)}")
     return dirs, chains[0], chains[1]
+
+
+class Graph:
+    """Resolved view of a pack: records, the id remap table and memory-block contents.
+
+    The remap table lists every global id. Ids that land on an ``igMemoryDirEntry`` are memory
+    blocks (``_memSize`` bytes). The blocks are stored after the object records in ascending id
+    order, each padded to 4 bytes, and tile the rest of the pack exactly. A list record's ``_data``
+    field is the global id of the block holding its elements.
+    """
+
+    def __init__(self, data: bytes):
+        self.b = data
+        _dirs, self.s1, self.s2 = sections(data)
+        off, self.id_count, self.obj_of_id = find_table(data, self.s1, self.s2)
+        self.pool_start = self.s2[-1]["end"]
+        self._block: dict[int, int] = {}
+        cursor = self.pool_start
+        for gid in range(self.id_count):
+            entry = self.s1[struct.unpack_from("<H", data, off + 8 + 2 * gid)[0]]
+            if entry["class"] != "igMemoryDirEntry":
+                continue
+            self._block[gid] = cursor
+            cursor += (field_map(entry)["slot7"] + 3) & ~3
+        self.pool_end = cursor
+        if cursor != len(data):
+            raise ValueError(f"memory blocks end at {cursor}, pack is {len(data)} bytes")
+
+    def vals(self, k: int) -> list:
+        return [f[1] for f in self.s2[k]["fields"]]
+
+    def ref(self, value) -> int | None:
+        if not isinstance(value, int) or value < 0 or value >= self.id_count:
+            return None
+        return self.obj_of_id[value]
+
+    def block_offset(self, k: int) -> int:
+        """File offset of list record ``k``'s elements."""
+        return self._block[self.vals(k)[2]]
+
+    def list_values(self, k: int) -> list:
+        """Contents of list record ``k``: ints/floats by list class, raw element ids otherwise."""
+        cls = self.s2[k]["class"]
+        count = self.vals(k)[0]
+        if count == 0:
+            return []
+        fmt = {"igFloatList": "<f", "igVec3fList": "<3f", "igShortList": "<h", "igCharList": "<b",
+               "igBoolList": "<B", "igIntList": "<i"}.get(cls, "<I")
+        size = struct.calcsize(fmt)
+        base = self.block_offset(k)
+        out = [struct.unpack_from(fmt, self.b, base + size * j) for j in range(count)]
+        return out if cls == "igVec3fList" else [v[0] for v in out]
+
+    def names(self, k: int) -> list[str | None]:
+        """Strings of an ``igNamedObjectList`` (None where the element does not resolve)."""
+        out = []
+        for gid in self.list_values(k):
+            r = self.ref(gid)
+            out.append(self.s2[r]["name"] if r is not None and self.s2[r]["class"] == "igNamedObject" else None)
+        return out

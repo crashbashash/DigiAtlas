@@ -10,8 +10,7 @@ cd tools
 python3 -m ps2_export.export "/path/to/Digimon World 4 (USA).iso" --out ../data/generated/ps2
 ```
 
-It takes a few seconds. Output stays out of git (`data/generated/` is ignored). An optional
-`--item-names names.json` overlay (`{"weapon": {"0": "Battle Hawk α"}}`) fills `items[].name`.
+It takes a few seconds. Output stays out of git (`data/generated/` is ignored).
 
 | Module | Reads |
 |---|---|
@@ -20,6 +19,8 @@ It takes a few seconds. Output stays out of git (`data/generated/` is ignored). 
 | `generators.py` | Spawn generators and drop pools from a generator pack |
 | `stages.py` | Stage manifests (`NDMW.AFS` entries 80-177) and their generator packs |
 | `stats.py` | The 649-row enemy stat table (`AREA.AFS` entry 3) |
+| `database.py` | Item names/descriptions and the stat-row to model column (`AREA.AFS` entry 9, English) |
+| `names/enemies.json` | Curated enemy display names, by internal model |
 
 `igbpack.py` and `generators.py` are adapted from the DW4 decompilation tooling (`igb_inst.py`,
 `igb_ids.py`, `igb_generators.py`).
@@ -32,4 +33,5 @@ DIGIATLAS_PS2_ISO="/path/to/Digimon World 4 (USA).iso" python3 -m unittest disco
 ```
 
 The second form also exports the disc and checks documented pool totals, per-difficulty spawn
-rows, and the output against the JSON schemas (needs `jsonschema` for that last check).
+rows, that every dropped item has a name, that disc-sourced enemy names appear in the game text, and
+the output against the JSON schemas (needs `jsonschema` for that last check).

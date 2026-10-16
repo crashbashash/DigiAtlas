@@ -12,7 +12,6 @@ Adapted from DW4_Decomp scripts/igb_generators.py. Walks, entirely from the file
 """
 from __future__ import annotations
 
-import struct
 from dataclasses import dataclass, field
 
 from . import igbpack
@@ -71,48 +70,29 @@ def has_generators(data: bytes) -> bool:
 
 class Pack:
     def __init__(self, data: bytes):
-        self.b = data
-        _dirs, self.s1, self.s2 = igbpack.sections(data)
-        _off, self.id_count, self.obj_of_id = igbpack.find_table(data, self.s1, self.s2)
-        pool = self.s2[-1]["end"]
-        self._list_offset: dict[int, int] = {}
-        cursor = pool
-        for _dk, count, cls, idx, _rec in igbpack.list_records(self.s2):
-            self._list_offset[idx] = cursor
-            cursor += count * igbpack.ITEM_SIZE.get(cls, 4)
+        self.g = igbpack.Graph(data)
+        self.s2 = self.g.s2
 
     def _vals(self, k: int) -> list:
-        return [f[1] for f in self.s2[k]["fields"]]
+        return self.g.vals(k)
 
     def _ref(self, value) -> int | None:
-        if not isinstance(value, int) or value < 0 or value >= self.id_count:
-            return None
-        return self.obj_of_id[value]
+        return self.g.ref(value)
 
     def _list_ids(self, k: int) -> list[int]:
-        count = self._vals(k)[LIST_COUNT]
-        base = self._list_offset[k]
-        return [struct.unpack_from("<I", self.b, base + 4 * j)[0] for j in range(count)]
+        return self.g.list_values(k)
 
     def _vec3s(self, ref) -> list[tuple[float, float, float]]:
         k = self._ref(ref)
         if k is None or self.s2[k]["class"] != "igVec3fList":
             return []
-        base = self._list_offset[k]
-        return [
-            tuple(round(x, 4) for x in struct.unpack_from("<3f", self.b, base + 12 * j))
-            for j in range(self._vals(k)[LIST_COUNT])
-        ]
+        return [tuple(round(x, 4) for x in v) for v in self.g.list_values(k)]
 
     def _floats(self, ref) -> list[float]:
         k = self._ref(ref)
         if k is None or self.s2[k]["class"] != "igFloatList":
             return []
-        base = self._list_offset[k]
-        return [
-            round(struct.unpack_from("<f", self.b, base + 4 * j)[0], 5)
-            for j in range(self._vals(k)[LIST_COUNT])
-        ]
+        return [round(x, 5) for x in self.g.list_values(k)]
 
     def _pools(self, list_ref) -> list[DropPool]:
         lk = self._ref(list_ref)

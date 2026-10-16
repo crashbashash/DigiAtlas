@@ -16,21 +16,28 @@
         "required": [
           "category",
           "id",
-          "name"
+          "name",
+          "description"
         ],
         "properties": {
           "category": {
             "type": "string"
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index within the category; matches drop-pool entries."
           },
           "name": {
+            "type": "string",
+            "description": "Display name as shown in game."
+          },
+          "description": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Display name; null until resolved."
+            "description": "In-game description text; lines separated by \\n."
           }
         }
       }

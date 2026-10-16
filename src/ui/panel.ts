@@ -48,14 +48,8 @@ export class Panel {
     const d = state.difficulty;
     const sel = state.selection;
     if (sel.kind === 'item' && stage) {
-      // In the main window the item card lives in its own window; here the item is highlighted on the map.
-      if (sel.key !== this.lastItem) {
-        this.showAllSources = false;
-        this.sourceFilter = 'all';
-        this.sourcesOpen = false;
-      }
-      this.lastItem = sel.key;
-      this.el.append(this.itemBanner(sel.key), this.sourcesSection(sel.key, d, stage), ...this.overview(stage, d));
+      // The item card lives in its own window; here the map highlights the droppers.
+      this.el.append(...this.overview(stage, d));
     } else if (sel.kind === 'item') {
       this.el.append(...this.itemInfo(sel.key), ...this.mapsList(sel.key, d));
     } else if (sel.kind === 'species') {
@@ -70,27 +64,6 @@ export class Panel {
       this.el.append(h('p', { class: 'muted' }, 'Pick a stage from the list to begin.'));
     }
     this.el.scrollTop = 0;
-  }
-
-  /** Where an item drops, folded away until asked for. */
-  private sourcesSection(key: string, d: Difficulty, stage: Stage): HTMLElement {
-    const count = this.model.sourcesOf(key, d).length;
-    const section = h('details', { class: 'sources-section', open: this.sourcesOpen },
-      h('summary', null, `Where it drops (${DIFFICULTY_LABEL[d]}) · ${count}`),
-      ...this.sourcesBlock(key, d, stage));
-    section.addEventListener('toggle', () => { this.sourcesOpen = section.open; });
-    return section;
-  }
-
-  private itemBanner(key: string): HTMLElement {
-    const item = this.model.items.get(key);
-    return h('div', { class: 'item-banner' },
-      h('div', null, 'Highlighting where ', h('strong', null, this.model.itemLabel(key)), ' drops',
-        item ? h('span', { class: 'muted' }, ` · ${categoryLabel(item.category)}`) : null),
-      h('div', { class: 'item-banner-actions' },
-        h('button', { class: 'link', onclick: () => this.act.openItem(key) }, 'Open details ↗'),
-        h('button', { class: 'link', onclick: () => this.act.clearSelection() }, 'Clear')),
-    );
   }
 
   // --- shared pieces -------------------------------------------------------------------------
@@ -328,53 +301,6 @@ export class Panel {
           )),
       ),
     ];
-  }
-
-  /** Every enemy and object that drops an item, for the chosen difficulty and player count. */
-  private sourcesBlock(key: string, d: Difficulty, stage: Stage | null): HTMLElement[] {
-    const out: (HTMLElement | null)[] = [];
-    const all = this.model.sourcesOf(key, d);
-    if (!all.length) {
-      const elsewhere = DIFFICULTIES.filter((x) => x !== d && this.model.sourcesOf(key, x).length > 0);
-      if (elsewhere.length) {
-        out.push(
-          h('p', { class: 'muted' }, `Nothing drops this on ${DIFFICULTY_LABEL[d]}. It does drop on:`),
-          h('div', { class: 'list' }, ...elsewhere.map((x) =>
-            h('button', { class: 'row', onclick: () => this.act.setDifficulty(x) },
-              h('span', { class: 'grow' }, DIFFICULTY_LABEL[x]),
-              h('span', { class: 'muted' }, `${this.model.sourcesOf(key, x).length} sources`)))),
-        );
-      } else {
-        out.push(h('p', { class: 'muted' }, 'No enemy or object drops this on any difficulty. It may come from shops, quests or scripted rewards.'));
-      }
-      return out.filter(Boolean) as HTMLElement[];
-    }
-
-    const objects = all.filter((s) => s.kind === 'object').length;
-    const sources = this.sourceFilter === 'all' ? all : all.filter((s) => (s.kind === 'object') === (this.sourceFilter === 'object'));
-    const here = stage ? all.filter((s) => s.stage.id === stage.id).reduce((n, s) => n + s.generators.length, 0) : 0;
-    const chip = (id: 'all' | 'enemy' | 'object', label: string, n: number) =>
-      h('button', { class: 'chip' + (this.sourceFilter === id ? ' on' : ''), disabled: n === 0, onclick: () => { this.sourceFilter = id; this.showAllSources = false; this.act.selectItem(key); } }, `${label} ${n}`);
-    out.push(
-      h('div', { class: 'filters' }, chip('all', 'All', all.length), chip('enemy', 'Enemies', all.length - objects), chip('object', 'Boxes & crates', objects)),
-      stage ? h('p', { class: 'note' }, here ? `${here} spawner${here === 1 ? '' : 's'} on this map ${here === 1 ? 'is' : 'are'} highlighted.` : 'Nothing on this map drops it.') : null,
-    );
-    const shown = this.showAllSources ? sources : sources.slice(0, SOURCE_LIMIT);
-    out.push(
-      h('table', { class: 'sources' },
-        h('tr', { class: 'head' }, h('th', { class: 'pct' }, 'Chance'), h('th', null, 'Dropped by'), h('th', null, 'Where')),
-        ...shown.map((s) =>
-          h('tr', { class: s.stage.id === stage?.id ? 'here' : '' },
-            h('td', { class: 'pct' }, formatPercent(s.percent)),
-            h('td', null, s.enemyName, s.generators.length > 1 ? h('span', { class: 'muted' }, ` ×${s.generators.length}`) : null),
-            h('td', null, h('button', { class: 'link', title: s.stage.area ?? '', onclick: () => this.act.goToStage(s.stage.id) }, this.model.stageTitle(s.stage))),
-          )),
-      ),
-    );
-    if (sources.length > shown.length) {
-      out.push(h('button', { class: 'more', onclick: () => { this.showAllSources = true; this.act.selectItem(key); } }, `Show all ${sources.length}`));
-    }
-    return out.filter(Boolean) as HTMLElement[];
   }
 
   private speciesView(name: string, d: Difficulty): HTMLElement[] {

@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://digiatlas.invalid/schema/v1/stages.schema.json",
+  "title": "Stages and spawn generators",
+  "type": "object",
+  "required": [
+    "stages"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "manifestEntry",
+          "packs",
+          "generatorPacks",
+          "difficulties"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Engine stage id, e.g. stagGF01, dng101b1."
+          },
+          "manifestEntry": {
+            "type": "integer"
+          },
+          "packs": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "generatorPacks": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "difficulty -> source archive entry (platform specific).",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "difficulties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "normal": {
+                "type": "object",
+                "required": [
+                  "generators"
+                ],
+                "properties": {
+                  "generators": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "row",
+                        "count",
+                        "maxCount",
+                        "position",
+                        "positions",
+                        "rotations",
+                        "positionIsGlobal",
+                        "startMode",
+                        "fillMode"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "GENE-* enemies, GBOX-* boxes, GBRL-* barrels, GWCS-* crates."
+                        },
+                        "row": {
+                          "type": "integer",
+                          "description": "Enemy stat row (enemies.json) spawned by this generator."
+                        },
+                        "count": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "maxCount": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "position": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "minItems": 3,
+                          "maxItems": 3
+                        },
+                        "positions": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 3,
+                            "maxItems": 3
+                          }
+                        },
+                        "rotations": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          }
+                        },
+                        "positionIsGlobal": {
+                          "type": "boolean"
+                        },
+                        "startMode": {
+                          "type": "string"
+                        },
+                        "fillMode": {
+                          "type": "string"
+                        },
+                        "lua": {
+                          "type": "string"
+                        },
+                        "drops": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "difficulty (or slotN) -> pool name in drops.json"
+                        },
+                        "lastDrops": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "difficulty (or slotN) -> pool name in drops.json"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "hard": {
+                "type": "object",
+                "required": [
+                  "generators"
+                ],
+                "properties": {
+                  "generators": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "row",
+                        "count",
+                        "maxCount",
+                        "position",
+                        "positions",
+                        "rotations",
+                        "positionIsGlobal",
+                        "startMode",
+                        "fillMode"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "GENE-* enemies, GBOX-* boxes, GBRL-* barrels, GWCS-* crates."
+                        },
+                        "row": {
+                          "type": "integer",
+                          "description": "Enemy stat row (enemies.json) spawned by this generator."
+                        },
+                        "count": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "maxCount": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "position": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "minItems": 3,
+                          "maxItems": 3
+                        },
+                        "positions": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 3,
+                            "maxItems": 3
+                          }
+                        },
+                        "rotations": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          }
+                        },
+                        "positionIsGlobal": {
+                          "type": "boolean"
+                        },
+                        "startMode": {
+                          "type": "string"
+                        },
+                        "fillMode": {
+                          "type": "string"
+                        },
+                        "lua": {
+                          "type": "string"
+                        },
+                        "drops": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "difficulty (or slotN) -> pool name in drops.json"
+                        },
+                        "lastDrops": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "difficulty (or slotN) -> pool name in drops.json"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "veryhard": {
+                "type": "object",
+                "required": [
+                  "generators"
+                ],
+                "properties": {
+                  "generators": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "row",
+                        "count",
+                        "maxCount",
+                        "position",
+                        "positions",
+                        "rotations",
+                        "positionIsGlobal",
+                        "startMode",
+                        "fillMode"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "GENE-* enemies, GBOX-* boxes, GBRL-* barrels, GWCS-* crates."
+                        },
+                        "row": {
+                          "type": "integer",
+                          "description": "Enemy stat row (enemies.json) spawned by this generator."
+                        },
+                        "count": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "maxCount": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "position": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "minItems": 3,
+                          "maxItems": 3
+                        },
+                        "positions": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 3,
+                            "maxItems": 3
+                          }
+                        },
+                        "rotations": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          }
+                        },
+                        "positionIsGlobal": {
+                          "type": "boolean"
+                        },
+                        "startMode": {
+                          "type": "string"
+                        },
+                        "fillMode": {
+                          "type": "string"
+                        },
+                        "lua": {
+                          "type": "string"
+                        },
+                        "drops": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "difficulty (or slotN) -> pool name in drops.json"
+                        },
+                        "lastDrops": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "difficulty (or slotN) -> pool name in drops.json"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

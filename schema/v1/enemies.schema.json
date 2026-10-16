@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://digiatlas.invalid/schema/v1/enemies.schema.json",
+  "title": "Enemy stat rows",
+  "type": "object",
+  "required": [
+    "rowCount",
+    "rows"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "rowCount": {
+      "type": "integer"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "row",
+          "model",
+          "hp",
+          "stats",
+          "unmapped",
+          "rates",
+          "rarity"
+        ],
+        "properties": {
+          "row": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Row in the platform's stat table. Spawn generators reference this."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Model name such as e_goburi, when resolved."
+          },
+          "hp": {
+            "type": "integer"
+          },
+          "stats": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "strength",
+              "defense",
+              "wisdom",
+              "spirit",
+              "speed",
+              "exp"
+            ],
+            "properties": {
+              "strength": {
+                "type": "integer"
+              },
+              "defense": {
+                "type": "integer"
+              },
+              "wisdom": {
+                "type": "integer"
+              },
+              "spirit": {
+                "type": "integer"
+              },
+              "speed": {
+                "type": "integer"
+              },
+              "exp": {
+                "type": "integer"
+              }
+            }
+          },
+          "unmapped": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Stat columns not yet named, in column order."
+          },
+          "rates": {
+            "type": "object",
+            "required": [
+              "crit",
+              "paralysis"
+            ],
+            "properties": {
+              "crit": {
+                "type": "integer"
+              },
+              "paralysis": {
+                "type": "integer"
+              }
+            }
+          },
+          "rarity": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Crown rank; 0 for most rows."
+          }
+        }
+      }
+    }
+  }
+}

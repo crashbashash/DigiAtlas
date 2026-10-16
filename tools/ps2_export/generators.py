@@ -1,0 +1,178 @@
+"""Decode a stage generator pack into spawn generators and their drop pools.
+
+Adapted from DW4_Decomp scripts/igb_generators.py. Walks, entirely from the file:
+
+    beGeneraterData              spawn row: name, stat row, position/rotation lists, modes
+      -> beGeneraterPlayerDataList -> beGeneraterPlayerData (_geneCount, _geneMaxCount,
+           _itemDataList, _itemLastDataList)
+           -> beGeneraterItemDataList -> beGeneraterItemData (pool name, n/h/v + zone + family)
+                -> beGeneraterItemDataOneList -> beGeneraterItemDataOne (category, id, rank, rate)
+
+``rate`` is out of 10000 (the engine rolls ``RNG() % 10000``), so P(nothing) = 1 - sum(rate)/10000.
+"""
+from __future__ import annotations
+
+import struct
+from dataclasses import dataclass, field
+
+from . import igbpack
+
+# Field positions (index into a record's decoded fields) for the classes we read.
+GENE_NAME, GENE_POS, GENE_GLOBAL, GENE_POS_LIST, GENE_ROT_LIST = 0, 1, 2, 3, 4
+GENE_ROW, GENE_SEQ, GENE_START_MODE, GENE_START_DATA = 5, 6, 7, 8
+GENE_FILL_MODE, GENE_FILL_DATA, GENE_LUA, GENE_PLAYER_LIST = 9, 10, 11, 12
+PLAYER_COUNT, PLAYER_MAX, PLAYER_ITEMS, PLAYER_LAST_ITEMS = 0, 1, 2, 3
+ITEM_NAME, ITEM_ONES = 0, 1
+ONE_CATEGORY, ONE_ID, ONE_RANK, ONE_RATE = 0, 1, 2, 3
+LIST_COUNT, LIST_DATA = 0, 2
+
+DIFFICULTY_PREFIX = {"n": "normal", "h": "hard", "v": "veryhard"}
+
+
+@dataclass
+class DropEntry:
+    category: str
+    id: int
+    rank: int
+    rate: int
+
+
+@dataclass
+class DropPool:
+    name: str
+    entries: list[DropEntry] = field(default_factory=list)
+
+    @property
+    def difficulty(self) -> str | None:
+        return DIFFICULTY_PREFIX.get(self.name[:1]) if self.name[1:2].isupper() else None
+
+
+@dataclass
+class Generator:
+    name: str
+    row: int
+    position: tuple[float, float, float]
+    positions: list[tuple[float, float, float]]
+    rotations: list[float]
+    is_global: bool
+    start_mode: str
+    fill_mode: str
+    lua: str
+    gene_count: int | None
+    gene_max_count: int | None
+    pools: list[DropPool]
+    last_pools: list[DropPool]
+
+
+def has_generators(data: bytes) -> bool:
+    """Cheap test: does this AFS entry carry a ``beGeneraterData`` class?"""
+    return b"beGeneraterData\x00" in data[:0x4000]
+
+
+class Pack:
+    def __init__(self, data: bytes):
+        self.b = data
+        _dirs, self.s1, self.s2 = igbpack.sections(data)
+        _off, self.id_count, self.obj_of_id = igbpack.find_table(data, self.s1, self.s2)
+        pool = self.s2[-1]["end"]
+        self._list_offset: dict[int, int] = {}
+        cursor = pool
+        for _dk, count, cls, idx, _rec in igbpack.list_records(self.s2):
+            self._list_offset[idx] = cursor
+            cursor += count * igbpack.ITEM_SIZE.get(cls, 4)
+
+    def _vals(self, k: int) -> list:
+        return [f[1] for f in self.s2[k]["fields"]]
+
+    def _ref(self, value) -> int | None:
+        if not isinstance(value, int) or value < 0 or value >= self.id_count:
+            return None
+        return self.obj_of_id[value]
+
+    def _list_ids(self, k: int) -> list[int]:
+        count = self._vals(k)[LIST_COUNT]
+        base = self._list_offset[k]
+        return [struct.unpack_from("<I", self.b, base + 4 * j)[0] for j in range(count)]
+
+    def _vec3s(self, ref) -> list[tuple[float, float, float]]:
+        k = self._ref(ref)
+        if k is None or self.s2[k]["class"] != "igVec3fList":
+            return []
+        base = self._list_offset[k]
+        return [
+            tuple(round(x, 4) for x in struct.unpack_from("<3f", self.b, base + 12 * j))
+            for j in range(self._vals(k)[LIST_COUNT])
+        ]
+
+    def _floats(self, ref) -> list[float]:
+        k = self._ref(ref)
+        if k is None or self.s2[k]["class"] != "igFloatList":
+            return []
+        base = self._list_offset[k]
+        return [
+            round(struct.unpack_from("<f", self.b, base + 4 * j)[0], 5)
+            for j in range(self._vals(k)[LIST_COUNT])
+        ]
+
+    def _pools(self, list_ref) -> list[DropPool]:
+        lk = self._ref(list_ref)
+        if lk is None:
+            return []
+        out: list[DropPool] = []
+        for item_id in self._list_ids(lk):
+            ik = self._ref(item_id)
+            if ik is None or self.s2[ik]["class"] != "beGeneraterItemData":
+                continue
+            iv = self._vals(ik)
+            pool = DropPool(iv[ITEM_NAME])
+            ok = self._ref(iv[ITEM_ONES])
+            if ok is not None:
+                for one_id in self._list_ids(ok):
+                    nk = self._ref(one_id)
+                    if nk is None or self.s2[nk]["class"] != "beGeneraterItemDataOne":
+                        continue
+                    ov = self._vals(nk)
+                    pool.entries.append(
+                        DropEntry(ov[ONE_CATEGORY], ov[ONE_ID], ov[ONE_RANK], ov[ONE_RATE])
+                    )
+            out.append(pool)
+        return out
+
+    def generators(self) -> list[Generator]:
+        out: list[Generator] = []
+        for k, rec in enumerate(self.s2):
+            if rec["class"] != "beGeneraterData":
+                continue
+            v = self._vals(k)
+            count = maximum = None
+            pools: list[DropPool] = []
+            last_pools: list[DropPool] = []
+            pk = self._ref(v[GENE_PLAYER_LIST])
+            if pk is not None and self.s2[pk]["class"] == "beGeneraterPlayerDataList":
+                for pid in sorted(set(self._list_ids(pk))):
+                    dk = self._ref(pid)
+                    if dk is None or self.s2[dk]["class"] != "beGeneraterPlayerData":
+                        continue
+                    pv = self._vals(dk)
+                    if count is None:
+                        count, maximum = pv[PLAYER_COUNT], pv[PLAYER_MAX]
+                    pools = pools or self._pools(pv[PLAYER_ITEMS])
+                    last_pools = last_pools or self._pools(pv[PLAYER_LAST_ITEMS])
+            out.append(
+                Generator(
+                    name=v[GENE_NAME],
+                    row=v[GENE_ROW],
+                    position=tuple(round(x, 4) for x in v[GENE_POS]),
+                    positions=self._vec3s(v[GENE_POS_LIST]),
+                    rotations=self._floats(v[GENE_ROT_LIST]),
+                    is_global=bool(v[GENE_GLOBAL]),
+                    start_mode=v[GENE_START_MODE],
+                    fill_mode=v[GENE_FILL_MODE],
+                    lua=v[GENE_LUA],
+                    gene_count=count,
+                    gene_max_count=maximum,
+                    pools=pools,
+                    last_pools=last_pools,
+                )
+            )
+        return out

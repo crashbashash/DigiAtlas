@@ -6,8 +6,8 @@ the static spreadsheets with something you can click through.
 
 ## Status
 
-Early planning. The data comes from the existing decompilation work and the
-spreadsheet prototypes (drop reference, enemy reference, Humid Cave map sample).
+Early development. The app shell is a pannable placeholder map; the PS2 data exporter and the
+schema are in place.
 
 ## Planned
 
@@ -19,8 +19,16 @@ spreadsheet prototypes (drop reference, enemy reference, Humid Cave map sample).
 
 ## Data
 
-Game-derived data and assets are not committed. Generated tables live under
-`data/generated/` (git-ignored) and are built from the decomp tooling.
+Game-derived data is never committed. DigiAtlas reads the user's own disc image and builds JSON
+under `data/generated/` (git-ignored). Each platform has its own reader that writes the same
+[schema](docs/schema.md), so platform differences stay out of the UI.
+
+```sh
+cd tools && python3 -m ps2_export.export "/path/to/Digimon World 4 (USA).iso" --out ../data/generated/ps2
+```
+
+The PS2 reader exports enemy stats, 85 stages of spawn generators across all three difficulties,
+and 344 drop pools. See [tools/README.md](tools/README.md) for what it can and cannot read yet.
 
 ## License
 

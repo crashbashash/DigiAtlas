@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://digiatlas.invalid/schema/v1/manifest.schema.json",
+  "title": "DigiAtlas export manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "platform",
+    "region",
+    "serial",
+    "source",
+    "exporter",
+    "generatedAt",
+    "counts",
+    "files",
+    "knownGaps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "platform": {
+      "enum": [
+        "ps2",
+        "gc",
+        "xbox",
+        "pc"
+      ],
+      "description": "Which platform reader produced the export."
+    },
+    "region": {
+      "type": "string"
+    },
+    "serial": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Disc serial, e.g. SLUS-20836."
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "kind",
+        "name"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "iso",
+            "folder"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "executableSha1": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "statTableVerified": {
+          "type": "boolean",
+          "description": "False when known anchor values differ: modified or non-vanilla disc."
+        }
+      }
+    },
+    "exporter": {
+      "type": "object",
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "knownGaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Fields this exporter cannot fill yet."
+    }
+  }
+}

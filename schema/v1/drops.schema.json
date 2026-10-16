@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://digiatlas.invalid/schema/v1/drops.schema.json",
+  "title": "Drop pools",
+  "type": "object",
+  "required": [
+    "pools"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "pools": {
+      "type": "object",
+      "description": "Keyed by pool name, e.g. nZ1gobr3 = Normal / zone Z1 / goblins / variant 3.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "entries",
+          "totalRate"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "category",
+                "id",
+                "rank",
+                "rate"
+              ],
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "description": "conItem, insItem, impItem, weapon, armor1, armor2 or abChip."
+                },
+                "id": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "rank": {
+                  "type": "integer"
+                },
+                "rate": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000,
+                  "description": "Out of 10000; the engine rolls RNG() % 10000."
+                }
+              }
+            }
+          },
+          "totalRate": {
+            "type": "integer",
+            "description": "Sum of rates. P(nothing drops) = 1 - totalRate/10000."
+          },
+          "difficulty": {
+            "enum": [
+              "normal",
+              "hard",
+              "veryhard"
+            ]
+          },
+          "zone": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "variant": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

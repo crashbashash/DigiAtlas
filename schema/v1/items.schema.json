@@ -38,6 +38,117 @@
               "null"
             ],
             "description": "In-game description text; lines separated by \\n."
+          },
+          "skillType": {
+            "enum": [
+              "Blunt",
+              "Slash",
+              "Stab",
+              "Bash",
+              "Shot",
+              "Crush"
+            ],
+            "description": "Weapons only: the skill the weapon trains and requires."
+          },
+          "stats": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Only non-zero stats are present; absent means 0. Values are as stored by the game.",
+            "properties": {
+              "strength": {
+                "type": "integer"
+              },
+              "defense": {
+                "type": "integer"
+              },
+              "wisdom": {
+                "type": "integer"
+              },
+              "spirit": {
+                "type": "integer"
+              },
+              "speed": {
+                "type": "integer"
+              },
+              "maxHp": {
+                "type": "integer"
+              },
+              "maxMp": {
+                "type": "integer"
+              },
+              "resistFire": {
+                "type": "integer"
+              },
+              "resistIce": {
+                "type": "integer"
+              },
+              "resistThunder": {
+                "type": "integer"
+              },
+              "resistDark": {
+                "type": "integer"
+              },
+              "resistStun": {
+                "type": "integer"
+              },
+              "resistPoison": {
+                "type": "integer"
+              },
+              "critRate": {
+                "type": "integer"
+              },
+              "paralysisRate": {
+                "type": "integer"
+              },
+              "hitRate": {
+                "type": "integer"
+              },
+              "defenseRate": {
+                "type": "integer"
+              },
+              "paralysisResist": {
+                "type": "integer"
+              },
+              "poisonResist": {
+                "type": "integer"
+              },
+              "bitRate": {
+                "type": "integer"
+              },
+              "expRate": {
+                "type": "integer"
+              },
+              "luckRate": {
+                "type": "integer"
+              },
+              "hpDrain": {
+                "type": "integer"
+              },
+              "mpDrain": {
+                "type": "integer"
+              },
+              "provokeRate": {
+                "type": "integer"
+              },
+              "equipLevel": {
+                "type": "integer"
+              },
+              "requiredSkill": {
+                "type": "integer"
+              },
+              "buyPrice": {
+                "type": "integer"
+              },
+              "sellPrice": {
+                "type": "integer"
+              },
+              "restoreHp": {
+                "type": "integer"
+              },
+              "restoreMp": {
+                "type": "integer"
+              }
+            }
           }
         }
       }

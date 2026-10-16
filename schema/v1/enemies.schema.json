@@ -24,7 +24,7 @@
           "model",
           "hp",
           "stats",
-          "unmapped",
+          "resist",
           "rates",
           "rarity"
         ],
@@ -73,13 +73,6 @@
               }
             }
           },
-          "unmapped": {
-            "type": "array",
-            "items": {
-              "type": "integer"
-            },
-            "description": "Stat columns not yet named, in column order."
-          },
           "rates": {
             "type": "object",
             "required": [
@@ -111,6 +104,39 @@
               "object"
             ],
             "description": "object = destructible (box, barrel, case)."
+          },
+          "resist": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fire",
+              "ice",
+              "thunder",
+              "dark",
+              "stun",
+              "poison"
+            ],
+            "properties": {
+              "fire": {
+                "type": "integer"
+              },
+              "ice": {
+                "type": "integer"
+              },
+              "thunder": {
+                "type": "integer"
+              },
+              "dark": {
+                "type": "integer"
+              },
+              "stun": {
+                "type": "integer"
+              },
+              "poison": {
+                "type": "integer"
+              }
+            },
+            "description": "Resistances as stored by the game (units unconfirmed)."
           }
         }
       }

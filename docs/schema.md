@@ -46,20 +46,32 @@ Players see `name`, never the internal ids.
   internal name, kept only for debugging and icon lookup. Names marked `disc` in the table appear in
   the game's own card album and are checked by the disc test; the rest follow the decompilation
   roster (Machinedramon variants, boss forms and object names are not in the game text).
+- **Enemy stats**: `hp`, `stats` (strength, defense, wisdom, spirit, speed, exp), `resist` (fire, ice,
+  thunder, dark, stun, poison), `rates` (crit, paralysis) and `rarity` (crown rank). Values are as
+  stored by the game; units for resistances and rates are not confirmed.
+- **Item stats**: `items[].stats` holds only non-zero values (absent means 0): strength, defense,
+  wisdom, spirit, speed, maxHp, maxMp, the resistances, critRate, hitRate, paralysisRate, equipLevel,
+  requiredSkill, buyPrice, sellPrice, restoreHp, restoreMp and a few rates. Weapons also carry
+  `skillType` (Blunt, Slash, Stab, Bash, Shot, Crush). Each label was checked against the in-game
+  description text by the disc tests (consumable HP/MP, armor equip level, chip stat bonuses,
+  weapon skill type and requirement). Columns whose meaning is unconfirmed (attack delay, upgrade
+  costs, item flags) are not exported.
 
 ## Not extracted yet
 
 Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, never invented:
 
-- `enemies.rows[].unmapped` holds stat columns 5-10, unnamed so far.
-- Numeric item stats (attack, equip level, resistances) are in the database but not decoded.
 - Stages carry only their engine id (`stagGF01`, `dng101b1`); no display names or floor maps yet.
 - Scripted pickups placed by triggers are not extracted; destructibles are (as generators).
 
 ## Data quirks
 
-Three Kokatorimon spawners in `stag0104` reference stat row 90, which is an empty slot in the game
-data. They are exported as found; treat them as inert.
+- Three Kokatorimon spawners in `stag0104` reference stat row 90, which is an empty slot in the game
+  data. They are exported as found; treat them as inert.
+- Dbl Axe, Rage Hammer, Hekatoncheir, Fang Smasher and Meteor Force (ids 100-124) are described as
+  "Bash Skill" in game but stored with the Blunt skill index. `skillType` follows the stored value.
+- The unique weapons (ids 266-275) display "Skill 1" but store a requirement of 0.
+- Placeholder entries (`???????`) are real items in the game's data (unknown weapon, core and board).
 
 ## Verification
 

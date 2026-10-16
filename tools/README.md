@@ -18,8 +18,8 @@ It takes a few seconds. Output stays out of git (`data/generated/` is ignored).
 | `igbpack.py` | igBinary stage packs: type directory, record chains, id remap table, list pool |
 | `generators.py` | Spawn generators and drop pools from a generator pack |
 | `stages.py` | Stage manifests (`NDMW.AFS` entries 80-177) and their generator packs |
-| `stats.py` | The 649-row enemy stat table (`AREA.AFS` entry 3) |
-| `database.py` | Item names/descriptions and the stat-row to model column (`AREA.AFS` entry 9, English) |
+| `database.py` | The game's databases from `AREA.AFS` entry 9 (English): named columns for items and enemies |
+| `stats.py` | Enemy stat rows built from the `enemy` database (649 rows) |
 | `names/enemies.json` | Curated enemy display names, by internal model |
 
 `igbpack.py` and `generators.py` are adapted from the DW4 decompilation tooling (`igb_inst.py`,

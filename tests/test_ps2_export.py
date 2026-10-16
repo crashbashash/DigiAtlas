@@ -94,62 +94,71 @@ class IsoAfsTests(unittest.TestCase):
 
 
 class StatsTests(unittest.TestCase):
-    def entry(self, hp: dict[int, int]) -> bytes:
-        data = bytearray(stats.STATS_OFFSET + 24 * stats.ROWS)
-        for row, value in hp.items():
-            struct.pack_into("<i", data, stats.HP_OFFSET + 4 * row, value)
-        struct.pack_into("<12h", data, stats.STATS_OFFSET + 24, *range(100, 112))
-        data[stats.RATES_OFFSET + 3 : stats.RATES_OFFSET + 6] = bytes([4, 5, 6])
-        return bytes(data)
+    def row(self, **over):
+        base = dict(HPMAX=58, TSUYOSA=1, MAMORI=2, KASHIKOSA=3, SEISHIN=4, SUBAYASA=5, EXP=6,
+                    RES_FIRE=7, RES_ICE=8, RES_THUNDER=9, RES_DARK=10, RES_STUN=11, RES_POISON=12,
+                    CHIMEIRITSU=13, MAHIRITSU=14, RARITY=0)
+        return {**base, **over}
 
-    def test_read_table(self):
-        rows = stats.read_table(self.entry({1: 58}))
-        self.assertEqual(len(rows), stats.ROWS)
-        r = rows[1]
-        self.assertEqual((r.hp, r.strength, r.defense, r.exp), (58, 100, 101, 111))
-        self.assertEqual(r.unmapped, [105, 106, 107, 108, 109, 110])
-        self.assertEqual((r.crit_rate, r.paralysis_rate, r.rarity), (4, 5, 6))
-        self.assertTrue(rows[0].is_empty)
+    def test_from_database(self):
+        r = stats.from_database([self.row(HPMAX=0), self.row()])[1]
+        self.assertEqual((r.row, r.hp, r.strength, r.defense, r.exp), (1, 58, 1, 2, 6))
+        self.assertEqual(r.resist, {"fire": 7, "ice": 8, "thunder": 9, "dark": 10, "stun": 11, "poison": 12})
+        self.assertEqual((r.crit_rate, r.paralysis_rate), (13, 14))
 
-    def test_short_entry_is_rejected(self):
-        with self.assertRaises(ValueError):
-            stats.read_table(b"\0" * 1000)
+    def test_empty_row(self):
+        self.assertTrue(stats.from_database([self.row(HPMAX=0)])[0].is_empty)
 
     def test_anchors(self):
-        good = {r: hp for r, hp in stats.ANCHORS}
-        self.assertTrue(stats.anchors_match(stats.read_table(self.entry(good))))
-        self.assertFalse(stats.anchors_match(stats.read_table(self.entry({}))))
+        rows = [self.row(HPMAX=0) for _ in range(400)]
+        for r, hp in stats.ANCHORS:
+            rows[r] = self.row(HPMAX=hp)
+        self.assertTrue(stats.anchors_match(stats.from_database(rows)))
+        self.assertFalse(stats.anchors_match(stats.from_database(rows[:10])))
+        rows[1] = self.row(HPMAX=59)
+        self.assertFalse(stats.anchors_match(stats.from_database(rows)))
 
 
 class DatabaseTests(unittest.TestCase):
     def test_decode_cp932_and_normalise(self):
-        raw = "\u0083\u0041".encode("latin1")  # not valid cp932 pair is tolerated
-        self.assertIsNotNone(database._decode(raw.decode("latin1")))
         shift_jis = "バトルホーク\r\nα".encode("cp932").decode("latin1")
         self.assertEqual(database._decode(shift_jis), "バトルホーク\nα")
-        self.assertEqual(database._decode(None), None)
+        self.assertIsNone(database._decode(None))
 
     def test_xdata_glyph_is_renamed(self):
         raw = "\u00b6 Data".encode("cp932").decode("latin1")
         self.assertEqual(database._decode(raw), "X-Data")
 
-    def test_parse_items_strides_and_slot_glyph(self):
-        cols = {c: [] for c in database.ITEM_LAYOUT}
-        cols["weapon"] = ["∈Battle Hawk α", "w_axe01", "TSUYOSA", "Axe", "∈Long Sword α", "w", "T", "Sword"]
-        cols["conItem"] = ["HP Disk α", "Recovers 450 HP", "g_000item"]
-        items = {(i.category, i.id): i for i in database.parse_items(cols)}
-        self.assertEqual(items[("weapon", 0)].name, "Battle Hawk α")
-        self.assertEqual(items[("weapon", 1)].description, "Sword")
-        self.assertEqual(items[("conItem", 0)].description, "Recovers 450 HP")
+    def tables(self, **over):
+        t = {c: [] for c in database.ITEM_DATABASES}
+        t.update(over)
+        return t
 
-    def test_parse_items_rejects_bad_stride(self):
-        cols = {c: [] for c in database.ITEM_LAYOUT}
-        cols["weapon"] = ["a", "b", "c"]
+    def test_parse_items_names_stats_and_skill(self):
+        weapon = [
+            {"NAME": "∈Battle Hawk α", "TXT": "Axe", "TSUYOSA": 78, "KASHIKOSA": 0, "SKILL": 0,
+             "SKILLPOINT": 1, "HANBAI": 196, "KAITORI": 49, "DELAY": 34},
+            {"NAME": "∈Long Sword α", "TXT": "Sword", "TSUYOSA": 5, "SKILL": 1},
+        ]
+        items = {(i.category, i.id): i for i in database.parse_items(self.tables(weapon=weapon))}
+        hawk = items[("weapon", 0)]
+        self.assertEqual((hawk.name, hawk.description, hawk.skill_type), ("Battle Hawk α", "Axe", "Blunt"))
+        # zeros and unconfirmed columns (DELAY) are left out
+        self.assertEqual(
+            hawk.stats,
+            {"strength": 78, "requiredSkill": 1, "buyPrice": 196, "sellPrice": 49},
+        )
+        self.assertEqual(items[("weapon", 1)].skill_type, "Slash")
+
+    def test_parse_items_requires_every_database(self):
+        t = self.tables()
+        del t["conItem"]
         with self.assertRaises(ValueError):
-            database.parse_items(cols)
+            database.parse_items(t)
 
     def test_enemy_models_skip_empty_rows(self):
-        self.assertEqual(database.enemy_models({"enemy": [None, "e_goburi", None, "e_ogre"]}), {1: "e_goburi", 3: "e_ogre"})
+        tables = {"enemy": [{"MODEL": None}, {"MODEL": "e_goburi"}, {"MODEL": ""}, {"MODEL": "e_ogre"}]}
+        self.assertEqual(database.enemy_models(tables), {1: "e_goburi", 3: "e_ogre"})
 
     def test_every_enemy_name_entry_is_well_formed(self):
         for model, entry in export.ENEMY_NAMES.items():
@@ -229,6 +238,44 @@ class DiscTests(unittest.TestCase):
         # DW4_Decomp docs/systems/drop-tables.md section 5: guard-room boss drops.
         self.assertTrue(items[("weapon", 175)]["name"].startswith("Mighty Talon"))
         self.assertTrue(items[("weapon", 200)]["name"].startswith("Beam Magnum"))
+
+    def test_item_stats_agree_with_description_text(self):
+        # The labels in database.STAT_KEYS are confirmed by comparing columns with the text.
+        import re
+
+        items = self.load("items.json")["items"]
+        checked = 0
+        for i in items:
+            text, stats = i["description"] or "", i.get("stats", {})
+            if m := re.search(r"Recovers (\d+) (HP|MP)", text):
+                self.assertEqual(stats.get("restore" + m[2].capitalize()), int(m[1]), i["name"])
+                checked += 1
+            if i["category"] in ("armor1", "armor2") and (m := re.search(r"Equip\. Level (\d+)", text)):
+                self.assertEqual(stats.get("equipLevel"), int(m[1]), i["name"])
+                checked += 1
+            if i["category"] == "abChip" and (m := re.match(r"(Wisdom|Spirit|Speed) up (\d+) pts", text)):
+                self.assertEqual(stats.get(m[1].lower()), int(m[2]), i["name"])
+                checked += 1
+        self.assertGreater(checked, 100)
+
+    def test_weapon_skill_text_matches_data_except_known_quirks(self):
+        import re
+
+        quirks, checked = [], 0
+        for i in self.load("items.json")["items"]:
+            if i["category"] != "weapon":
+                continue
+            m = re.search(r"Equip\. Skill (\w+) Skill\s+(\d+)", i["description"])
+            if not m:  # the "??????" placeholder weapon has no skill text or type
+                self.assertEqual((i["id"], i.get("skillType")), (276, None))
+                continue
+            checked += 1
+            unique = "nontransferable" in i["description"]
+            if m[1] != i["skillType"] or (not unique and int(m[2]) != i["stats"].get("requiredSkill", 0)):
+                quirks.append(i["id"])
+        self.assertEqual(checked, 276)
+        # Dbl Axe .. Meteor Force (ids 100-124) read "Bash Skill" but are stored as Blunt.
+        self.assertEqual(quirks, list(range(100, 125)))
 
     def test_every_dropped_item_has_a_name(self):
         items = {(i["category"], i["id"]) for i in self.load("items.json")["items"]}

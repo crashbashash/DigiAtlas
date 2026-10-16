@@ -23,9 +23,8 @@ EXPORTER = {"name": "digiatlas-ps2-export", "version": "0.1.0"}
 DIFFICULTIES = ("normal", "hard", "veryhard")
 POOL_NAME = re.compile(r"^(?P<d>[nhv])(?P<zone>Z\d+)(?P<family>[A-Za-z]+?)(?P<variant>\d*)$")
 KNOWN_GAPS = [
-    "enemies[].unmapped: stat columns 5-10 are exported raw",
     "enemies[].name: Machinedramon, Devimon/Lucemon form and object names are not in the game text",
-    "items[]: numeric item stats (attack, level, resistances) are not decoded yet",
+    "items[].stats: attack delay, upgrade costs and item flags are not exported (meaning unconfirmed)",
     "stages[].name and maps: stage ids only; floor maps are not extracted yet",
     "trigger-placed item spawns (scripted pickups) are not extracted yet",
 ]
@@ -99,17 +98,17 @@ def export(iso_path: str, out_dir: Path) -> dict:
     area, ndmw = Afs(src("AREA.AFS")), Afs(src("NDMW.AFS"))
 
     # --- text databases (English copy) -----------------------------------------------
-    columns = database.read_string_columns(area.entry(database.DATABASE_ENTRY))
-    models = database.enemy_models(columns)
+    tables = database.read_tables(area.entry(database.DATABASE_ENTRY))
+    models = database.enemy_models(tables)
 
     # --- enemies -----------------------------------------------------------------------
-    table = stats.read_table(area.entry(stats.STAT_ENTRY))
+    table = stats.from_database(tables["enemy"])
     anchors_ok = stats.anchors_match(table)
     unnamed = sorted({m for m in models.values() if m not in ENEMY_NAMES})
     if unnamed:
         raise SystemExit(f"no display name for models {unnamed}; add them to names/enemies.json")
     enemies = {
-        "rowCount": stats.ROWS,
+        "rowCount": len(table),
         "rows": [
             {
                 "row": r.row,
@@ -125,7 +124,7 @@ def export(iso_path: str, out_dir: Path) -> dict:
                     "speed": r.speed,
                     "exp": r.exp,
                 },
-                "unmapped": r.unmapped,
+                "resist": r.resist,
                 "rates": {"crit": r.crit_rate, "paralysis": r.paralysis_rate},
                 "rarity": r.rarity,
             }
@@ -156,10 +155,14 @@ def export(iso_path: str, out_dir: Path) -> dict:
         stage_records.append(rec)
 
     # --- items (every item in the game database) ---------------------------------------
-    items = [
-        {"category": i.category, "id": i.id, "name": i.name, "description": i.description}
-        for i in database.parse_items(columns)
-    ]
+    items = []
+    for i in database.parse_items(tables):
+        rec = {"category": i.category, "id": i.id, "name": i.name, "description": i.description}
+        if i.skill_type:
+            rec["skillType"] = i.skill_type
+        if i.stats:
+            rec["stats"] = i.stats
+        items.append(rec)
 
     manifest = {
         "schemaVersion": SCHEMA_VERSION,

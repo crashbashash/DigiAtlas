@@ -14,6 +14,7 @@ from .afs import Afs
 MIN_TRIANGLES = 200
 SKIP_PREFIXES = ("i_", "x_", "g_", "e_", "f_", "m_", "n_", "q_", "s_")  # interface, effects, models
 MARGIN = 150.0
+MIN_PART_SPAN = 60.0  # meshes narrower than this (trees, pillars, ornaments) are props, not terrain
 
 
 @dataclass
@@ -36,6 +37,17 @@ def _bbox(tris) -> tuple[float, float, float, float]:
 
 def _inside(box, x: float, z: float) -> bool:
     return box[0] <= x <= box[1] and box[2] <= z <= box[3]
+
+
+def _span(part) -> float:
+    xs = [p[0] for t in part for p in t]
+    zs = [p[2] for t in part for p in t]
+    return max(max(xs) - min(xs), max(zs) - min(zs))
+
+
+def terrain_triangles(s: scene.Scene, min_span: float = MIN_PART_SPAN):
+    """The scene's triangles without its small prop meshes."""
+    return [t for part in s.parts if _span(part) >= min_span for t in part]
 
 
 def choose_scene(scenes: list[scene.Scene], points: list[tuple[float, float]]) -> scene.Scene | None:
@@ -78,6 +90,6 @@ def build(ndmw: Afs, packs: list[int], spawns: list[tuple[float, float, float]])
     xs, zs = [x for x, _ in points], [z for _, z in points]
     pad = max(MARGIN, 0.25 * max(max(xs) - min(xs), max(zs) - min(zs)))
     roi = (min(xs) - pad, max(xs) + pad, min(zs) - pad, max(zs) + pad)
-    raster = render.render(s.triangles, roi, focus_y=ys[len(ys) // 2])
+    raster = render.render(terrain_triangles(s), roi, focus_y=ys[len(ys) // 2])
     coverage = sum(raster.covered(x, z) for x, z in points) / len(points)
     return StageMap(pack, s.name, roi, raster, coverage)

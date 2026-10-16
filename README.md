@@ -28,14 +28,22 @@ progress, your level), and scripted item pickups are not extracted yet.
 ## Running it
 
 ```sh
-# 1. Export the data from your own disc image (about 5 minutes with maps)
+./run.sh --iso "/path/to/Digimon World 4 (USA).iso"   # first run: exports the data, builds, opens the app
+./run.sh                                               # later runs: build (fast) and open
+```
+
+`run.sh` installs the JavaScript dependencies when needed, exports the data from your disc if
+`data/generated/ps2` is missing (about 5 minutes, with maps), builds the desktop app and starts it.
+Options: `--release` for an optimised build, `--reexport` to export again, `--dev` for a
+hot-reloading development window, and `--data DIR` to open a different exported folder. From the
+workspace root, `run-digiatlas.sh` does the same.
+
+By hand:
+
+```sh
 cd tools && python3 -m ps2_export.export "/path/to/Digimon World 4 (USA).iso" --out ../data/generated/ps2 --maps && cd ..
-
-# 2a. Desktop app (remembers the data folder; use "Change data folder" to pick another)
-npm install && npm run desktop
-
-# 2b. Or in a browser, served from data/generated/ps2 (or DIGIATLAS_DATA)
-npm run dev          # http://127.0.0.1:5175
+npm install && npm run desktop     # desktop app (remembers the data folder; "Change data folder" picks another)
+npm run dev                        # or a browser at http://127.0.0.1:5175, served from data/generated/ps2
 ```
 
 `npm test` runs the interface tests, `cargo test` (in `src-tauri`) the native ones, and

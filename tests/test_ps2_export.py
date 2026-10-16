@@ -316,6 +316,15 @@ class MapChoiceTests(unittest.TestCase):
         scenes = [self.tri_scene("i_hud", 900), self.tri_scene("x_fx", 900), self.tri_scene("", 900, count=5)]
         self.assertIsNone(maps.choose_scene(scenes, [(10.0, 10.0)]))
 
+    def test_small_prop_meshes_are_not_terrain(self):
+        def part(size):
+            return [((0.0, 0.0, 0.0), (size, 0.0, 0.0), (0.0, 0.0, size))]
+
+        s = scene.Scene(0, "", [], [part(10.0), part(59.0), part(60.0), part(400.0)])
+        spans = sorted(max(v[0] for t in tri for v in t) for tri in [[t] for t in maps.terrain_triangles(s)])
+        self.assertEqual(spans, [60.0, 400.0])
+        self.assertEqual(maps.terrain_triangles(s, min_span=5.0).__len__(), 4)
+
     def test_ties_go_to_the_larger_mesh(self):
         a, b = self.tri_scene("", 900, count=300), self.tri_scene("", 900, count=900)
         self.assertIs(maps.choose_scene([a, b], [(10.0, 10.0)]), b)

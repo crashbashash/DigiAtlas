@@ -46,6 +46,9 @@ class Scene:
     index: int  # igSceneInfo record
     name: str
     triangles: list[Triangle] = field(default_factory=list)
+    # The same triangles grouped by the geometry instance they came from (one mesh in the scene),
+    # so callers can tell a terrain slab from a tree or a pillar.
+    parts: list[list[Triangle]] = field(default_factory=list)
 
 
 class Geometry:
@@ -124,8 +127,10 @@ def _walk(graph: igbpack.Graph, geometry: Geometry, node: int, matrix, scene: Sc
             for gid in graph.list_values(attrs):
                 a = graph.ref(gid)
                 if a is not None and graph.s2[a]["class"] == "igGeometryAttr1_5":
-                    for t in geometry.mesh(a):
-                        scene.triangles.append(tuple(transform_point(matrix, p) for p in t))  # type: ignore[arg-type]
+                    part = [tuple(transform_point(matrix, p) for p in t) for t in geometry.mesh(a)]
+                    if part:
+                        scene.parts.append(part)  # type: ignore[arg-type]
+                        scene.triangles.extend(part)  # type: ignore[arg-type]
     if node in seen:  # shared subtrees are instanced; guard against cycles
         pass
     children = graph.ref(vals[NODE_CHILDREN]) if len(vals) > NODE_CHILDREN else None

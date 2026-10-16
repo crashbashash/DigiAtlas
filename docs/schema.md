@@ -77,7 +77,8 @@ Players see `name`, never the internal ids.
   written to `maps/<id>.png` (transparent where there is no geometry) with its world `bounds` and
   `pixelsPerUnit`, so `pixel = (world - min) * pixelsPerUnit`. Image x is world x and image y is world
   z (z grows downward); the in-game compass direction has not been checked. Floors are shaded by
-  height and walls are drawn as lines. The map is cropped to the spawn area plus a margin and is
+  closeness to the height where things spawn, and walls are drawn as lines. Small meshes (trees, pillars and
+  other ornaments, under 60 units across) and ground or sky planes larger than the crop are left out. The map is cropped to the spawn area plus a margin and is
   shared by all three difficulties. `coverage` is the share of spawn points on drawn geometry (1.0 for
   all but one stage). `fill` is the share of the image that has geometry: boss arenas, the debug and
   practice stages and two dungeon floors are above 0.97, meaning a flat floor with little to show.

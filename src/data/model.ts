@@ -9,6 +9,17 @@ export interface Room {
   stages: Stage[]; // floors / variants of one room
 }
 
+/** One map an item drops in. */
+export interface ItemMap {
+  stage: Stage;
+  /** Best chance per kill on this map, as a percentage. */
+  percent: number;
+  /** Spawners on the map that can drop it. */
+  spawners: number;
+  /** What drops it, best first (names only). */
+  droppedBy: string[];
+}
+
 export interface World {
   area: string;
   rooms: Room[];
@@ -219,6 +230,22 @@ export class Model {
     }
     for (const list of index.values()) list.sort((a, b) => b.percent - a.percent);
     return index;
+  }
+
+  /** The maps an item drops in for the chosen difficulty and player count, best chance first. */
+  mapsFor(key: string, d: Difficulty): ItemMap[] {
+    const byStage = new Map<string, ItemMap>();
+    for (const src of this.sourcesOf(key, d)) {
+      let m = byStage.get(src.stage.id);
+      if (!m) {
+        m = { stage: src.stage, percent: 0, spawners: 0, droppedBy: [] };
+        byStage.set(src.stage.id, m);
+      }
+      m.percent = Math.max(m.percent, src.percent);
+      m.spawners += src.generators.length;
+      if (!m.droppedBy.includes(src.enemyName)) m.droppedBy.push(src.enemyName);
+    }
+    return [...byStage.values()].sort((a, b) => b.percent - a.percent || a.stage.id.localeCompare(b.stage.id));
   }
 
   stageTitle(s: Stage): string {

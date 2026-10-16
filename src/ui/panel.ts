@@ -57,7 +57,7 @@ export class Panel {
       this.lastItem = sel.key;
       this.el.append(this.itemBanner(sel.key), this.sourcesSection(sel.key, d, stage), ...this.overview(stage, d));
     } else if (sel.kind === 'item') {
-      this.el.append(...this.itemInfo(sel.key));
+      this.el.append(...this.itemInfo(sel.key), ...this.mapsList(sel.key, d));
     } else if (sel.kind === 'species') {
       this.el.append(...this.speciesView(sel.name, d));
     } else if (stage && sel.kind === 'generator') {
@@ -304,6 +304,30 @@ export class Panel {
         : null,
     ];
     return out.filter(Boolean) as HTMLElement[];
+  }
+
+  /** The maps an item drops in; clicking one opens it in the main window with the droppers highlighted. */
+  private mapsList(key: string, d: Difficulty): HTMLElement[] {
+    const maps = this.model.mapsFor(key, d);
+    const where = `${DIFFICULTY_LABEL[d]}${this.model.players > 1 ? ` · ${this.model.players} players` : ''}`;
+    if (!maps.length) {
+      return [
+        h('div', { class: 'sub' }, `Drops in (${where})`),
+        h('p', { class: 'muted' }, 'No enemy or object drops this here. It may come from shops, quests or scripted rewards, or from another difficulty.'),
+      ];
+    }
+    return [
+      h('div', { class: 'sub' }, `Drops in ${maps.length} map${maps.length === 1 ? '' : 's'}, best chance first (${where})`),
+      h('div', { class: 'list maps' },
+        ...maps.map((m, i) =>
+          h('button', { class: 'row', title: m.droppedBy.join(', '), onclick: () => this.act.goToStage(m.stage.id) },
+            h('span', { class: 'rank muted' }, `${i + 1}.`),
+            h('span', { class: 'grow' }, this.model.stageTitle(m.stage), m.stage.area ? h('span', { class: 'muted' }, ` · ${m.stage.area}`) : null),
+            h('span', { class: 'pct' }, formatPercent(m.percent)),
+            h('span', { class: 'detail muted' }, m.droppedBy.slice(0, 4).join(', ') + (m.droppedBy.length > 4 ? ` +${m.droppedBy.length - 4}` : '')),
+          )),
+      ),
+    ];
   }
 
   /** Every enemy and object that drops an item, for the chosen difficulty and player count. */

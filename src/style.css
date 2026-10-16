@@ -135,6 +135,9 @@ td { padding: 3px 6px; vertical-align: top; border-top: 1px solid rgba(255, 255,
 #app.popout { display: flex; flex-direction: column; height: 100%; }
 .popout .panel { flex: 1; border: 0; overflow-y: auto; }
 .popout .back { display: none; }
+.popout .maps .row { padding: 6px 8px; }
+.popout .maps .rank { min-width: 22px; text-align: right; }
+.popout .maps .pct { color: var(--good); font-weight: 600; font-variant-numeric: tabular-nums; }
 .popout-footer { display: flex; justify-content: flex-end; padding: 10px 14px; background: var(--panel); border-top: 1px solid var(--line); }
 .popout-footer .primary { margin: 0; }
 .sources-section { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; }

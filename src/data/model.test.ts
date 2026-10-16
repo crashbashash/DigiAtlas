@@ -43,6 +43,22 @@ function model(): Model {
   return new Model(raw);
 }
 
+describe('mapsFor', () => {
+  it('lists each map once with its best chance and how many spawners drop the item', () => {
+    const m = model();
+    const maps = m.mapsFor('weapon:0', 'normal');
+    expect(maps.map((x) => x.stage.id)).toEqual(['dng101b1', 'stag0102']);
+    const abyss = maps.find((x) => x.stage.id === 'stag0102')!;
+    expect(abyss.percent).toBe(3);
+    expect(abyss.spawners).toBe(3);
+    expect(abyss.droppedBy).toEqual(['Goburimon', 'Ogremon']);
+  });
+
+  it('is empty for an item nothing drops', () => {
+    expect(model().mapsFor('weapon:99', 'normal')).toEqual([]);
+  });
+});
+
 describe('unused spawners', () => {
   const withUnused = (): Model => {
     const raw = model().raw;

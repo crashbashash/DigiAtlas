@@ -2,5 +2,5 @@
   "identifier": "default",
   "description": "Main DigiAtlas window and its item popouts",
   "windows": ["main", "popout-*"],
-  "permissions": ["core:default", "core:window:allow-close"]
+  "permissions": ["core:default", "core:window:allow-close", "core:window:allow-set-focus"]
 }

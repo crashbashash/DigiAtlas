@@ -3,7 +3,7 @@ import type { Model } from '../data/model';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty, type Stage } from '../data/types';
 import { clear, h } from './dom';
 import { MapView } from './mapview';
-import { openItemWindow } from './ipc';
+import { focusThisWindow, listenMessages, openItemWindow, send, type Context } from './ipc';
 import { Panel } from './panel';
 import { sidebarBrand } from './brand';
 import { Sidebar } from './sidebar';
@@ -88,6 +88,15 @@ export class App {
       save(this.store.state);
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
+    void listenMessages((m) => {
+      if (m.kind !== 'goto') return;
+      // A popout asked for a map: show it with the item highlighted and the view on the droppers.
+      this.store.set({ difficulty: m.ctx.difficulty, players: m.ctx.players, showUnused: m.ctx.showUnused });
+      this.goToStage(m.stageId);
+      this.store.set({ selection: { kind: 'item', key: m.itemKey } });
+      if (this.matches && this.matches.size) this.map.zoomTo(this.matches);
+      void focusThisWindow();
+    });
   }
 
   private goToStage(id: string, resetSelection = false): void {
@@ -107,7 +116,11 @@ export class App {
   }
 
   private openItem(key: string): void {
-    void openItemWindow(key, this.model.itemLabel(key));
+    void openItemWindow(key, this.model.itemLabel(key), this.context(this.store.state));
+  }
+
+  private context(s: State): Context {
+    return { difficulty: s.difficulty, players: s.players, showUnused: s.showUnused };
   }
 
   private setDifficulty(d: Difficulty): void {
@@ -175,6 +188,9 @@ export class App {
     this.model.players = s.players;
     this.model.hideUnused = !s.showUnused;
     this.syncAddress(s, prev);
+    if (prev && (prev.difficulty !== s.difficulty || prev.players !== s.players || prev.showUnused !== s.showUnused)) {
+      void send({ kind: 'context', ctx: this.context(s) });
+    }
     const stage = this.stage(s);
     if (!prev || prev.query !== s.query || prev.stageId !== s.stageId) this.sidebar.render(s.query, s.stageId);
     if (stage) {

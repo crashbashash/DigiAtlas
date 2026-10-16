@@ -1,53 +1,45 @@
-import { pan, zoomAt, type Viewport } from './viewport';
+import './style.css';
+import { chooseFolder, inDesktopApp, openRemembered, type DataSource } from './data/source';
+import { loadModel } from './data/model';
+import { App } from './ui/app';
+import { h } from './ui/dom';
 
-const canvas = document.getElementById('map') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d')!;
-const status = document.getElementById('status')!;
-let view: Viewport = { x: 0, y: 0, scale: 1 };
+const root = document.getElementById('app')!;
 
-function draw(): void {
-  const dpr = window.devicePixelRatio || 1;
-  const { clientWidth: w, clientHeight: h } = canvas;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  ctx.setTransform(dpr * view.scale, 0, 0, dpr * view.scale, dpr * view.x, dpr * view.y);
-  // Placeholder grid until floor maps load.
-  ctx.lineWidth = 1 / view.scale;
-  ctx.strokeStyle = '#2c313a';
-  for (let i = -50; i <= 50; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * 64, -3200);
-    ctx.lineTo(i * 64, 3200);
-    ctx.moveTo(-3200, i * 64);
-    ctx.lineTo(3200, i * 64);
-    ctx.stroke();
-  }
-  status.textContent = `Zoom ${(view.scale * 100).toFixed(0)}%`;
+function message(title: string, body: string, action?: { label: string; run: () => void }): void {
+  root.replaceChildren(
+    h('div', { class: 'welcome' },
+      h('h1', null, 'DigiAtlas'),
+      h('h2', null, title),
+      h('p', null, body),
+      action ? h('button', { class: 'primary', onclick: action.run }, action.label) : null,
+    ),
+  );
 }
 
-let drag: { x: number; y: number } | null = null;
-canvas.addEventListener('pointerdown', (e) => {
-  drag = { x: e.clientX, y: e.clientY };
-  canvas.setPointerCapture(e.pointerId);
-});
-canvas.addEventListener('pointermove', (e) => {
-  if (!drag) return;
-  view = pan(view, e.clientX - drag.x, e.clientY - drag.y);
-  drag = { x: e.clientX, y: e.clientY };
-  draw();
-});
-canvas.addEventListener('pointerup', () => (drag = null));
-canvas.addEventListener(
-  'wheel',
-  (e) => {
-    e.preventDefault();
-    view = zoomAt(view, e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.001));
-    draw();
-  },
-  { passive: false },
-);
-window.addEventListener('resize', draw);
-view = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2, scale: 1 };
-draw();
+async function start(source: DataSource): Promise<void> {
+  message('Loading data…', source.label);
+  try {
+    const model = await loadModel(source);
+    new App(root, model, source, inDesktopApp() ? pickAgain : null);
+  } catch (e) {
+    message('Could not load the data', String(e instanceof Error ? e.message : e), inDesktopApp() ? { label: 'Choose a different folder', run: pickAgain } : undefined);
+  }
+}
+
+async function pickAgain(): Promise<void> {
+  const source = await chooseFolder();
+  if (source) await start(source);
+}
+
+async function boot(): Promise<void> {
+  const source = await openRemembered();
+  if (source) return start(source);
+  message(
+    'Choose your exported data',
+    'DigiAtlas reads the folder written by the exporter (for example data/generated/ps2). Run `python3 -m ps2_export.export "<your Digimon World 4 USA ISO>" --out ../data/generated/ps2 --maps` from the tools folder, then pick that output folder here.',
+    { label: 'Choose data folder', run: pickAgain },
+  );
+}
+
+void boot();

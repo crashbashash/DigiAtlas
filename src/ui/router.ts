@@ -49,7 +49,7 @@ export function stateFromView(model: Model, v: View, fallback: State): State {
   const stageId = stage ? stage.id : fallback.stageId;
   const target = model.byId.get(stageId ?? '');
   const avail = target ? model.available(target) : [];
-  const wanted = v.difficulty ?? fallback.difficulty;
+  const wanted = v.difficulty ?? (target && model.entryDifficulty(target)) ?? fallback.difficulty;
   const difficulty = avail.includes(wanted) ? wanted : (avail[0] ?? wanted);
   let selection: Selection = { kind: 'none' };
   if (v.item && model.items.has(v.item)) selection = { kind: 'item', key: v.item };

@@ -323,7 +323,7 @@ export class Panel {
       links.map((t) =>
         h('button', { class: 'row', onclick: () => this.act.goToStage(t.stage.id) },
           h('span', { class: 'grow' }, `${t.label} · ${verb} ${t.other}`),
-          h('span', { class: 'muted' }, `${this.model.stageTitle(t.stage).replace(/ \([ehv]\)$/, '')}${t.difficulties.length < DIFFICULTIES.length ? ` · ${t.difficulties.map((x) => DIFFICULTY_LABEL[x]).join(', ')}` : ''}`)));
+          h('span', { class: 'muted' }, `${this.model.stageTitle(t.stage).replace(/ \((Normal|Hard|Very Hard)\)$/, '')}${t.difficulties.length < DIFFICULTIES.length ? ` · ${t.difficulties.map((x) => DIFFICULTY_LABEL[x]).join(', ')}` : ''}`)));
     const out: HTMLElement[] = [];
     if (getFrom.length) out.push(h('div', { class: 'sub' }, `Trade for it (${getFrom.length})`), h('div', { class: 'list maps' }, ...rows(getFrom, 'wants')));
     if (giveTo.length) out.push(h('div', { class: 'sub' }, `Trade it in (${giveTo.length})`), h('div', { class: 'list maps' }, ...rows(giveTo, 'gives')));

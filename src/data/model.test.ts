@@ -96,6 +96,16 @@ describe('traders by difficulty', () => {
   });
 });
 
+describe('entryDifficulty', () => {
+  it('is the difficulty a shop copy is entered on, and none for rooms with spawners', () => {
+    const m = model();
+    const hall = m.byId.get('dng101b1')!;
+    expect(m.entryDifficulty({ ...hall, variant: 'v', difficulties: {} })).toBe('veryhard');
+    expect(m.entryDifficulty({ ...hall, variant: 'v' })).toBeNull();
+    expect(m.entryDifficulty({ ...hall, variant: null, difficulties: {} })).toBeNull();
+  });
+});
+
 describe('mapsFor', () => {
   it('lists each map once with its best chance and how many spawners drop the item', () => {
     const m = model();
@@ -243,6 +253,6 @@ describe('Model', () => {
 
   it('titles stages with floor and variant', () => {
     const m = model();
-    expect(m.stageTitle({ ...m.byId.get('dng101b1')!, floor: 'B2', variant: 'h' })).toBe('Humid Cave B2 (h)');
+    expect(m.stageTitle({ ...m.byId.get('dng101b1')!, floor: 'B2', variant: 'h' })).toBe('Humid Cave B2 (Hard)');
   });
 });

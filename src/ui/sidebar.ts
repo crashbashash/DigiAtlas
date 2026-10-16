@@ -1,6 +1,6 @@
 import type { Model, Room } from '../data/model';
 import { categoryLabel, itemMatchesQuery } from '../data/logic';
-import type { Stage } from '../data/types';
+import { DIFFICULTY_LABEL, VARIANT_DIFFICULTY, type Stage } from '../data/types';
 import { clear, h } from './dom';
 
 export interface SidebarActions {
@@ -113,7 +113,7 @@ export class Sidebar {
     const chips = r.stages.length > 1
       ? h('div', { class: 'floors' }, ...r.stages.map((s) =>
           h('button', { class: 'chip' + (s.id === currentId ? ' on' : ''), onclick: () => this.act.goToStage(s.id) },
-            [s.floor, s.variant].filter(Boolean).join(' ') || s.id)))
+            [s.floor, s.variant ? DIFFICULTY_LABEL[VARIANT_DIFFICULTY[s.variant]] : null].filter(Boolean).join(' ') || s.id)))
       : null;
     return h('div', { class: 'room' + (active ? ' active' : '') },
       h('button', { class: 'name', onclick: () => this.act.goToStage(active ? currentId! : first.id) }, r.room),

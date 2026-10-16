@@ -130,6 +130,10 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
   Mamemon in the annex only appear in `e` and `v`). The first offer of the Agumon,
   Guilmon, Dorumon and Veemon tables takes an "Offering" (important item 11) for equipment. A Digimon with no table (chatter only) is left out; same-species
   traders are numbered by instance.
+- Stage variants: a trailing `e`, `h` or `v` on a dungeon id is the copy the game enters on Normal, Hard and
+  Very Hard. The entrance scripts branch on the game difficulty (0, 1, else) and call `funcStageChange`
+  with `<id>e`, `<id>h` or `<id>v` (seen for `dngq4b1`, `dngq5b1` and `dngq2b2`; the app labels every
+  variant this way).
 - Trader Hall (`dngq5b1e/h/v`) and the Home Server lobbies have no spawners. Their maps are the largest
   terrain scene cropped to the rooms (no markers). System scenes (logo, opening) have no map.
   Stage packs are followed on disc by their own generator packs only; Trader Hall's neighbours' packs

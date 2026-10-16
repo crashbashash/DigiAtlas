@@ -1,7 +1,7 @@
 import type { DataSource } from './source';
 import { dropTable, isUnused, itemKey, type DropRow } from './logic';
 import type { DropPool, Difficulty, Enemy, EnemyKind, Generator, Item, RawData, Stage, Trader } from './types';
-import { DIFFICULTIES } from './types';
+import { DIFFICULTIES, DIFFICULTY_LABEL, VARIANT_DIFFICULTY } from './types';
 
 export interface Room {
   area: string;
@@ -294,6 +294,11 @@ export class Model {
     return (stage.trades ?? []).filter((t) => (t.tables[d]?.length ?? 0) > 0);
   }
 
+  /** The difficulty a shop's e/h/v copy is entered on (its tables are the ones that apply there). */
+  entryDifficulty(stage: Stage): Difficulty | null {
+    return stage.variant && !this.hasSpawns(stage) ? VARIANT_DIFFICULTY[stage.variant] : null;
+  }
+
   /** Whether anything spawns in the room on any difficulty. */
   hasSpawns(stage: Stage): boolean {
     return DIFFICULTIES.some((d) => (stage.difficulties[d]?.generators.length ?? 0) > 0);
@@ -301,7 +306,7 @@ export class Model {
 
   stageTitle(s: Stage): string {
     const base = s.room ?? s.id;
-    const extra = [s.floor, s.variant ? `(${s.variant})` : null].filter(Boolean).join(' ');
+    const extra = [s.floor, s.variant ? `(${DIFFICULTY_LABEL[VARIANT_DIFFICULTY[s.variant]]})` : null].filter(Boolean).join(' ');
     return extra ? `${base} ${extra}` : base;
   }
 }

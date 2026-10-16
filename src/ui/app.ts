@@ -106,7 +106,9 @@ export class App {
     const stage = this.model.byId.get(id);
     if (!stage) return;
     const avail = this.model.available(stage);
-    const d = avail.includes(this.store.state.difficulty) ? this.store.state.difficulty : (avail[0] ?? 'normal');
+    // A shop's e/h/v copies are what the game enters on each difficulty, so open the matching tables.
+    const own = this.model.entryDifficulty(stage);
+    const d = own && avail.includes(own) ? own : avail.includes(this.store.state.difficulty) ? this.store.state.difficulty : (avail[0] ?? 'normal');
     const sel = this.store.state.selection;
     const keep = !resetSelection && (sel.kind === 'item' || sel.kind === 'species');
     this.store.set({ stageId: id, difficulty: d, selection: keep ? sel : { kind: 'none' } });

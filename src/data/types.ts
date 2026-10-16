@@ -112,6 +112,10 @@ export interface StageMap {
 
 export type StageKind = 'field' | 'dungeon' | 'boss' | 'hub' | 'system';
 
+/** A dungeon's e/h/v copies are the ones the game enters on Normal, Hard and Very Hard. */
+export type Variant = 'e' | 'h' | 'v';
+export const VARIANT_DIFFICULTY: Record<Variant, Difficulty> = { e: 'normal', h: 'hard', v: 'veryhard' };
+
 export interface ItemRef {
   category: string;
   id: number;
@@ -140,7 +144,7 @@ export interface Stage {
   room: string | null;
   kind: StageKind;
   floor: string | null;
-  variant: 'e' | 'h' | 'v' | null;
+  variant: Variant | null;
   banner: string | null;
   map: StageMap | null;
   trades: Trader[];

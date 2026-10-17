@@ -10,20 +10,30 @@ Early development. The PS2 exporter, the data schema and a first working viewer 
 
 ## What it does
 
-- Browse every stage by world, room and floor, each with a top-down map.
-- Markers show every enemy, boss and breakable object a stage can spawn, with a difficulty dropdown
-  (Normal, Hard, Very Hard) that switches the spawns, enemy stats and drop tables together, and a
-  players dropdown (1 to 4) because spawn counts and some drops scale with the number of players.
-- Spawners that no game script starts are left out by default (a "Show unused" box brings them back), and the
+The app opens on a home page with one search box over items, enemies and rooms, and entry points
+into each section. From any result you can keep going: an item's page shows its stats, every map it
+drops in (best chance first) and its trades; picking a map opens it with the droppers highlighted.
+
+- **Home:** search, "continue where you left off", the worlds, item categories and bosses.
+- **Item pages** (`#/item/weapon:175`): description and stats; **Where it drops**, ranked by chance per
+  kill, each opening the map zoomed to the droppers; **Trades & appraisal**, with the traders who give or
+  take it and what the Appraiser makes of it.
+- **Maps** (`#/map/stag0102`): every stage by world, room and floor, with a top-down map. Markers show
+  every enemy, boss and breakable object a stage can spawn; a selected item or enemy stays highlighted as
+  you move between rooms, with a banner saying whether it drops here and where it drops best if not.
+  Enemies with several stat variants (crown ranks) are one row that expands. Long drop tables fold the
+  rare drops away. Hover or select a radar spawner to see how close you must get for it to start.
+- **Search** (`#/search?q=sword`, or a whole category: `#/search?cat=weapon`).
+- Difficulty (Normal, Hard, Very Hard), players (1 to 4) and unused spawners change the spawns, stats
+  and drop chances together. They are kept in the address, so links reproduce what you saw, and the
+  last ones chosen are remembered.
+- Spawners that no game script starts are left out by default ("Show unused" brings them back), and the
   spawner panel says what starts each one: the trigger circle, or the script condition, in words.
 - Click a marker or an enemy in the list for its stats, resistances, how many spawn and a drop table
   with chances (including the chance of nothing).
-- Search an item to see every enemy and object that drops it, with the chance, and jump to the stage.
-- Search an enemy to see its stat variants and every stage it appears in.
-- The address bar holds the stage, difficulty and selection (`#/stag0102?d=normal&item=weapon:175`), so
-  links and the back button work; the last view is remembered.
-- Shortcuts: `/` focuses search, `Enter` opens the first result, `Esc` clears the search, then the
-  selection. Double-click the map or press Fit to reset it; "Zoom to matches" frames highlighted spawners.
+- Keyboard: `/` opens search from anywhere; arrow keys and `Enter` pick a result; `Esc` closes search
+  or clears the selection. The room list is a tree (arrow keys move, open and close). Double-click the
+  map or press Fit to reset it; "Zoom to matches" frames highlighted spawners.
 
 Markers show what a stage can spawn. Some enemies are started by game scripts under conditions (story
 progress, your level), and scripted item pickups are not extracted yet.
@@ -50,7 +60,7 @@ npm run dev                        # or a browser at http://127.0.0.1:5175, serv
 ```
 
 `npm test` runs the interface tests, `cargo test` (in `src-tauri`) the native ones, and
-`python3 -m unittest discover -s tests` the exporter tests.
+`python3 -m unittest discover -s tests` the exporter tests. GitHub Actions runs all three, plus the format check and build, on every push and pull request.
 
 ## Data
 

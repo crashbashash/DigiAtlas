@@ -1,0 +1,110 @@
+import { useMemo } from 'preact/hooks';
+import { lastMap } from '../app/navigation';
+import { routes } from '../app/route';
+import { itemCategories } from '../data/search';
+import { Link } from './common';
+import { useApp } from './context';
+import logoUrl from './logo.svg';
+import { SearchBox } from './SearchBox';
+
+/** The landing page: search for anything, or start from one of the sections. */
+export function Home() {
+  const { model, changeData } = useApp();
+  const recent = lastMap();
+  const recentStage = recent ? model.byId.get(recent) : undefined;
+  const categories = useMemo(() => itemCategories(model), [model]);
+  const bosses = useMemo(
+    () =>
+      [
+        ...new Set([...model.enemies.values()].filter((e) => e.kind === 'boss').map((e) => e.name)),
+      ].sort(),
+    [model],
+  );
+  const m = model.raw.manifest;
+
+  return (
+    <div class="home">
+      <section class="hero">
+        <img class="hero-logo" src={logoUrl} alt="" width={64} height={64} />
+        <h1>DigiAtlas</h1>
+        <p class="tagline">
+          Digimon World 4 at a glance: where items drop and how often, what spawns where, and the
+          stats behind it.
+        </p>
+        <SearchBox
+          large
+          autoFocus
+          placeholder="Search an item, enemy or room, for example Long Sword or Goburimon"
+        />
+        {recentStage && (
+          <p class="continue">
+            Continue on <Link to={routes.map(recentStage.id)}>{model.stageTitle(recentStage)}</Link>
+            {recentStage.area && <span class="muted"> · {recentStage.area}</span>}
+          </p>
+        )}
+      </section>
+
+      <div class="sections">
+        <section class="section-card">
+          <h2>Maps and spawns</h2>
+          <p class="muted">Every room with its enemies, boxes, traders and what drops there.</p>
+          <ul class="link-list">
+            {model.worlds.map((w) => (
+              <li>
+                <Link to={routes.map(w.rooms[0].stages[0].id)}>{w.area}</Link>
+                <span class="muted">{w.rooms.length} rooms</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section class="section-card">
+          <h2>Items</h2>
+          <p class="muted">Stats, the best places to farm them, trades and appraisal.</p>
+          <ul class="link-list">
+            {categories.map((c) => (
+              <li>
+                <Link to={routes.search('', c.category)}>{c.label}</Link>
+                <span class="muted">{c.count}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section class="section-card">
+          <h2>Bosses</h2>
+          <p class="muted">
+            Stats, resistances and where each one appears. Search any enemy by name.
+          </p>
+          <ul class="link-list">
+            {bosses.map((name) => (
+              <li>
+                <Link to={routes.map(recent, { kind: 'species', name })}>{name}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section class="section-card planned">
+          <h2>Calculators</h2>
+          <p class="muted">
+            Damage, buffs and debuffs, worked out from the game's own formulas. Planned.
+          </p>
+        </section>
+      </div>
+
+      <footer class="home-footer muted">
+        Data from your {m.region.toUpperCase()} {m.platform.toUpperCase()} disc
+        {m.serial ? ` (${m.serial})` : ''}
+        {changeData && (
+          <>
+            {' · '}
+            <button type="button" class="link" onClick={changeData}>
+              Change data folder
+            </button>
+          </>
+        )}
+      </footer>
+    </div>
+  );
+}

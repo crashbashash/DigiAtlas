@@ -7,7 +7,7 @@
 #   ./run.sh --iso GAME.iso --reexport   export again even if data exists
 #   ./run.sh --dev                hot-reloading development window instead of a build
 #   ./run.sh --data DIR           anything the script does not know goes to the app
-#   ./run.sh --open "#/stag0101?d=hard"   start on a view (the address-bar format)
+#   ./run.sh --open "#/map/stag0101?d=hard"   start on a view (the address-bar format)
 #
 # The data folder is data/generated/ps2 (or DIGIATLAS_DATA). The app also lets you pick one.
 set -euo pipefail

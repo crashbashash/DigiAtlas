@@ -38,7 +38,9 @@ class TauriSource implements DataSource {
   imageUrl(file: string): Promise<string> {
     let url = this.urls.get(file);
     if (!url) {
-      url = this.bytes(file).then((b) => URL.createObjectURL(new Blob([b as BlobPart], { type: 'image/png' })));
+      url = this.bytes(file).then((b) =>
+        URL.createObjectURL(new Blob([b as BlobPart], { type: 'image/png' })),
+      );
       this.urls.set(file, url);
     }
     return url;

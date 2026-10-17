@@ -1,20 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import { Model } from './model';
+import { clampPlayers, Model } from './model';
 import type { DropPool, Enemy, Generator, RawData, Stage } from './types';
 
 const enemy = (row: number, name: string, kind: Enemy['kind'] = 'enemy'): Enemy => ({
-  row, name, kind, model: 'm', hp: 10 * row,
+  row,
+  name,
+  kind,
+  model: 'm',
+  hp: 10 * row,
   stats: { strength: 1, defense: 1, wisdom: 1, spirit: 1, speed: 1, exp: 1 },
   resist: { fire: 0, ice: 0, thunder: 0, dark: 0, stun: 0, poison: 0 },
-  rates: { crit: 0, paralysis: 0 }, rarity: 0,
+  rates: { crit: 0, paralysis: 0 },
+  rarity: 0,
 });
 
 const gen = (name: string, row: number, drops: Record<string, string> | undefined): Generator => ({
-  name, row, count: 2, maxCount: 1, spawns: [[0, 0, 0]], rotations: [], startMode: 'direct', fillMode: 'wipeout', drops,
+  name,
+  row,
+  count: 2,
+  maxCount: 1,
+  spawns: [[0, 0, 0]],
+  rotations: [],
+  startMode: 'direct',
+  fillMode: 'wipeout',
+  drops,
 });
 
-const stage = (id: string, area: string, room: string, kind: Stage['kind'], gens: Generator[] | null): Stage => ({
-  id, area, room, kind, floor: null, variant: null, banner: null, map: null, trades: [],
+const stage = (
+  id: string,
+  area: string,
+  room: string,
+  kind: Stage['kind'],
+  gens: Generator[] | null,
+): Stage => ({
+  id,
+  area,
+  room,
+  kind,
+  floor: null,
+  variant: null,
+  banner: null,
+  map: null,
+  trades: [],
   difficulties: gens ? { normal: { generators: gens }, hard: { generators: gens } } : {},
 });
 
@@ -25,53 +52,104 @@ const pool = (...entries: [string, number, number][]): DropPool => ({
 
 function model(): Model {
   const raw: RawData = {
-    manifest: { schemaVersion: 1, platform: 'ps2', region: 'usa', serial: null, counts: {}, knownGaps: [] },
+    manifest: {
+      schemaVersion: 1,
+      platform: 'ps2',
+      region: 'usa',
+      serial: null,
+      counts: {},
+      knownGaps: [],
+    },
     enemies: { rows: [enemy(1, 'Goburimon'), enemy(2, 'Ogremon'), enemy(9, 'Box', 'object')] },
-    items: { items: [
-      { category: 'weapon', id: 0, name: 'Battle Hawk α', description: null },
-      { category: 'conItem', id: 0, name: 'HP Disk α', description: null },
-    ] },
-    drops: { pools: { nA: pool(['weapon', 0, 300], ['conItem', 0, 1000]), nB: pool(['weapon', 0, 100]) } },
-    stages: { stages: [
-      stage('dng101b1', 'Death Valley', 'Humid Cave', 'dungeon', [gen('G1', 1, { normal: 'nA', hard: 'nB' })]),
-      stage('stag0102', 'Death Valley', 'Abyss of Grief', 'field', [
-        gen('G1', 1, { normal: 'nA', hard: 'nB' }), gen('G2', 1, { normal: 'nA', hard: 'nB' }), gen('G3', 2, { normal: 'nB' }), gen('B1', 9, undefined),
-      ]),
-      stage('stagML12', 'Home Server', 'Main Lobby', 'hub', null),
-    ] },
+    items: {
+      items: [
+        { category: 'weapon', id: 0, name: 'Battle Hawk α', description: null },
+        { category: 'conItem', id: 0, name: 'HP Disk α', description: null },
+      ],
+    },
+    drops: {
+      pools: { nA: pool(['weapon', 0, 300], ['conItem', 0, 1000]), nB: pool(['weapon', 0, 100]) },
+    },
+    stages: {
+      stages: [
+        stage('dng101b1', 'Death Valley', 'Humid Cave', 'dungeon', [
+          gen('G1', 1, { normal: 'nA', hard: 'nB' }),
+        ]),
+        stage('stag0102', 'Death Valley', 'Abyss of Grief', 'field', [
+          gen('G1', 1, { normal: 'nA', hard: 'nB' }),
+          gen('G2', 1, { normal: 'nA', hard: 'nB' }),
+          gen('G3', 2, { normal: 'nB' }),
+          gen('B1', 9, undefined),
+        ]),
+        stage('stagML12', 'Home Server', 'Main Lobby', 'hub', null),
+      ],
+    },
   };
   return new Model(raw);
 }
 
 const at = { position: { x: 0, y: 0, z: 0 }, facing: 0 };
-const swap = (give: [string, number], get: [string, number]) => ({ give: { category: give[0], id: give[1] }, get: { category: get[0], id: get[1] } });
+const swap = (give: [string, number], get: [string, number]) => ({
+  give: { category: give[0], id: give[1] },
+  get: { category: get[0], id: get[1] },
+});
 
 describe('tradesFor', () => {
   it('finds the traders who hand over an item and what they want for it', () => {
     const m = model();
     const hall = m.byId.get('stag0102')!;
     hall.trades = [
-      { trader: 'Agumon', number: 1, ...at, tables: { hard: [swap(['conItem', 0], ['weapon', 0])] } },
-      { trader: 'Agumon', number: 2, ...at, tables: { hard: [swap(['weapon', 0], ['conItem', 0])] } },
+      {
+        trader: 'Agumon',
+        number: 1,
+        ...at,
+        tables: { hard: [swap(['conItem', 0], ['weapon', 0])] },
+      },
+      {
+        trader: 'Agumon',
+        number: 2,
+        ...at,
+        tables: { hard: [swap(['weapon', 0], ['conItem', 0])] },
+      },
     ];
     const got = m.tradesFor('weapon:0');
-    expect(got.getFrom.map((t) => [t.stage.id, t.label, t.other])).toEqual([['stag0102', 'Agumon 1', 'HP Disk α']]);
+    expect(got.getFrom.map((t) => [t.stage.id, t.label, t.other])).toEqual([
+      ['stag0102', 'Agumon 1', 'HP Disk α'],
+    ]);
     expect(got.giveTo.map((t) => [t.label, t.other])).toEqual([['Agumon 2', 'HP Disk α']]);
   });
 
   it('records which difficulties a trade is on', () => {
     const m = model();
     m.byId.get('stag0102')!.trades = [
-      { trader: 'Agumon', number: null, ...at, tables: { normal: [swap(['conItem', 0], ['weapon', 0])], veryhard: [swap(['conItem', 0], ['weapon', 0])], hard: [swap(['conItem', 0], ['weapon', 1])] } },
+      {
+        trader: 'Agumon',
+        number: null,
+        ...at,
+        tables: {
+          normal: [swap(['conItem', 0], ['weapon', 0])],
+          veryhard: [swap(['conItem', 0], ['weapon', 0])],
+          hard: [swap(['conItem', 0], ['weapon', 1])],
+        },
+      },
     ];
-    expect(m.tradesFor('weapon:0').getFrom.map((t) => t.difficulties)).toEqual([['normal', 'veryhard']]);
+    expect(m.tradesFor('weapon:0').getFrom.map((t) => t.difficulties)).toEqual([
+      ['normal', 'veryhard'],
+    ]);
   });
 
   it('lists a trade once when a room has several variants with the same traders', () => {
     const m = model();
     const a = m.byId.get('stag0102')!;
     const b = m.byId.get('dng101b1')!;
-    const traders = [{ trader: 'Agumon', number: null, ...at, tables: { hard: [swap(['conItem', 0], ['weapon', 0])] } }];
+    const traders = [
+      {
+        trader: 'Agumon',
+        number: null,
+        ...at,
+        tables: { hard: [swap(['conItem', 0], ['weapon', 0])] },
+      },
+    ];
     a.trades = traders;
     b.trades = traders;
     a.room = b.room = 'Trader Hall';
@@ -86,8 +164,21 @@ describe('traders by difficulty', () => {
     const hall = m.byId.get('dng101b1')!;
     hall.difficulties = {};
     hall.trades = [
-      { trader: 'Agumon', number: 1, ...at, tables: { normal: [swap(['conItem', 0], ['weapon', 0])], hard: [swap(['conItem', 0], ['weapon', 1])] } },
-      { trader: 'BK WarGreymon', number: null, ...at, tables: { veryhard: [swap(['conItem', 0], ['weapon', 2])] } },
+      {
+        trader: 'Agumon',
+        number: 1,
+        ...at,
+        tables: {
+          normal: [swap(['conItem', 0], ['weapon', 0])],
+          hard: [swap(['conItem', 0], ['weapon', 1])],
+        },
+      },
+      {
+        trader: 'BK WarGreymon',
+        number: null,
+        ...at,
+        tables: { veryhard: [swap(['conItem', 0], ['weapon', 2])] },
+      },
     ];
     expect(m.available(hall)).toEqual(['normal', 'hard', 'veryhard']);
     expect(m.tradersAt(hall, 'hard').map((t) => t.trader)).toEqual(['Agumon']);
@@ -110,14 +201,38 @@ describe('appraisal', () => {
   const withAppraiser = (): Model => {
     const raw = model().raw;
     raw.items.items.push(
-      { category: 'weapon', id: 276, name: 'Unidentified Weapon', description: null, unidentified: true },
+      {
+        category: 'weapon',
+        id: 276,
+        name: 'Unidentified Weapon',
+        description: null,
+        unidentified: true,
+      },
       { category: 'weapon', id: 25, name: 'Battle Hawk β', description: null },
     );
     const tier = (n: number, min: number, max: number | null, results: [number, number][]) => ({
-      tier: n, minLevel: min, maxLevel: max,
-      results: { weapon: results.map(([id, rate]) => ({ category: 'weapon' as const, id, rate })), armor1: [], armor2: [] },
+      tier: n,
+      minLevel: min,
+      maxLevel: max,
+      results: {
+        weapon: results.map(([id, rate]) => ({ category: 'weapon' as const, id, rate })),
+        armor1: [],
+        armor2: [],
+      },
     });
-    raw.items.appraisal = { cost: 300, tiers: [tier(1, 0, 40, [[0, 6000], [25, 4000]]), tier(2, 41, null, [[0, 2500], [25, 7500]])] };
+    raw.items.appraisal = {
+      cost: 300,
+      tiers: [
+        tier(1, 0, 40, [
+          [0, 6000],
+          [25, 4000],
+        ]),
+        tier(2, 41, null, [
+          [0, 2500],
+          [25, 7500],
+        ]),
+      ],
+    };
     return new Model(raw);
   };
 
@@ -125,7 +240,10 @@ describe('appraisal', () => {
     const t = withAppraiser().appraisalTable('weapon:276')!;
     expect(t.cost).toBe(300);
     expect(t.columns).toEqual(['Lv 1–40', 'Lv 41+']);
-    expect(t.rows.map((r) => [r.label, r.percents])).toEqual([['Battle Hawk β', [40, 75]], ['Battle Hawk α', [60, 25]]]);
+    expect(t.rows.map((r) => [r.label, r.percents])).toEqual([
+      ['Battle Hawk β', [40, 75]],
+      ['Battle Hawk α', [60, 25]],
+    ]);
   });
 
   it('joins neighbouring tiers that give the same results', () => {
@@ -134,13 +252,19 @@ describe('appraisal', () => {
     a.tiers.push({ ...a.tiers[1], tier: 3, minLevel: 101, maxLevel: null });
     a.tiers[1] = { ...a.tiers[1], maxLevel: 100 };
     expect(m.appraisalTable('weapon:276')!.columns).toEqual(['Lv 1–40', 'Lv 41+']);
-    expect(m.appraisedFrom('weapon:25')!.ranges).toEqual([{ label: 'Lv 1–40', percent: 40 }, { label: 'Lv 41+', percent: 75 }]);
+    expect(m.appraisedFrom('weapon:25')!.ranges).toEqual([
+      { label: 'Lv 1–40', percent: 40 },
+      { label: 'Lv 41+', percent: 75 },
+    ]);
   });
 
   it('says which tiers can produce an ordinary item', () => {
     const from = withAppraiser().appraisedFrom('weapon:25')!;
     expect(from.from).toBe('Unidentified Weapon');
-    expect(from.ranges.map((r) => [r.label, r.percent])).toEqual([['Lv 1–40', 40], ['Lv 41+', 75]]);
+    expect(from.ranges.map((r) => [r.label, r.percent])).toEqual([
+      ['Lv 1–40', 40],
+      ['Lv 41+', 75],
+    ]);
   });
 
   it('has nothing for items the appraiser cannot make or data without it', () => {
@@ -179,17 +303,18 @@ describe('unused spawners', () => {
     const stage = m.byId.get('stag0102')!;
     expect([...m.hidden(stage, 'hard')]).toEqual([1]);
     expect(m.unusedCount(stage, 'hard')).toBe(1);
-    m.hideUnused = false;
-    expect(m.hidden(stage, 'hard').size).toBe(0);
+    expect(m.hidden(stage, 'hard', { players: 1, hideUnused: false }).size).toBe(0);
     expect(m.unusedCount(stage, 'hard')).toBe(1);
   });
 
   it('do not count as item sources unless shown', () => {
     const m = withUnused();
-    const stageOf = (list: ReturnType<Model['sourcesOf']>) => list.filter((s) => s.stage.id === 'stag0102' && s.enemyName === 'Goburimon');
+    const stageOf = (list: ReturnType<Model['sourcesOf']>) =>
+      list.filter((s) => s.stage.id === 'stag0102' && s.enemyName === 'Goburimon');
     expect(stageOf(m.sourcesOf('weapon:0', 'hard'))[0].generators).toEqual([0]);
-    m.hideUnused = false;
-    expect(stageOf(m.sourcesOf('weapon:0', 'hard'))[0].generators).toEqual([0, 1]);
+    expect(
+      stageOf(m.sourcesOf('weapon:0', 'hard', { players: 1, hideUnused: false }))[0].generators,
+    ).toEqual([0, 1]);
   });
 });
 
@@ -210,33 +335,33 @@ describe('player counts', () => {
     const m = scaled();
     const stage = m.byId.get('stag0102')!;
     expect(m.generators(stage, 'hard')[0].count).toBe(2);
-    m.players = 3;
-    const g = m.generators(stage, 'hard')[0];
+    const g = m.generators(stage, 'hard', { players: 3, hideUnused: true })[0];
     expect([g.count, g.maxCount, g.drops?.hard]).toEqual([4, 4, 'nA']);
     expect(m.poolFor(g, 'hard')?.totalRate).toBe(1300);
   });
 
   it('leaves spawners without per-player data unchanged', () => {
     const m = scaled();
-    m.players = 4;
-    expect(m.generators(m.byId.get('dng101b1')!, 'hard')[0].count).toBe(2);
+    expect(
+      m.generators(m.byId.get('dng101b1')!, 'hard', { players: 4, hideUnused: true })[0].count,
+    ).toBe(2);
   });
 
   it('keeps item sources separate per player count', () => {
     const m = scaled();
     const before = m.sourcesOf('conItem:0', 'hard').length;
-    m.players = 2;
-    expect(m.sourcesOf('conItem:0', 'hard').length).toBeGreaterThan(before);
-    m.players = 1;
+    const two = { players: 2, hideUnused: true };
+    expect(m.sourcesOf('conItem:0', 'hard', two).length).toBeGreaterThan(before);
     expect(m.sourcesOf('conItem:0', 'hard').length).toBe(before);
   });
 
   it('clamps the number of players', () => {
-    const m = model();
-    m.players = 9;
-    expect(m.players).toBe(4);
-    m.players = 0;
-    expect(m.players).toBe(1);
+    expect(clampPlayers(9)).toBe(4);
+    expect(clampPlayers(0)).toBe(1);
+    expect(clampPlayers(Number.NaN)).toBe(1);
+    const m = scaled();
+    const g = m.generators(m.byId.get('stag0102')!, 'hard', { players: 9, hideUnused: true })[0];
+    expect(g.count).toBe(5);
   });
 });
 
@@ -274,7 +399,9 @@ describe('Model', () => {
     const raw = model().raw;
     raw.enemies.rows.push(enemy(3, 'Goburimon'));
     raw.stages.stages[1].difficulties.hard!.generators.push(gen('G5', 3, { hard: 'nB' }));
-    const sources = new Model(raw).sourcesOf('weapon:0', 'hard').filter((s) => s.stage.id === 'stag0102' && s.enemyName === 'Goburimon');
+    const sources = new Model(raw)
+      .sourcesOf('weapon:0', 'hard')
+      .filter((s) => s.stage.id === 'stag0102' && s.enemyName === 'Goburimon');
     expect(sources).toHaveLength(1);
     expect(sources[0].variants).toBe(2);
     expect(sources[0].generators).toEqual([0, 1, 4]);
@@ -282,7 +409,10 @@ describe('Model', () => {
 
   it('numbers items that share a name', () => {
     const raw = model().raw;
-    raw.items.items.push({ category: 'insItem', id: 1, name: 'X-Data', description: null }, { category: 'insItem', id: 2, name: 'X-Data', description: null });
+    raw.items.items.push(
+      { category: 'insItem', id: 1, name: 'X-Data', description: null },
+      { category: 'insItem', id: 2, name: 'X-Data', description: null },
+    );
     const m = new Model(raw);
     expect(m.itemLabel('insItem:1')).toBe('X-Data (1 of 2)');
     expect(m.itemLabel('insItem:2')).toBe('X-Data (2 of 2)');
@@ -298,6 +428,8 @@ describe('Model', () => {
 
   it('titles stages with floor and variant', () => {
     const m = model();
-    expect(m.stageTitle({ ...m.byId.get('dng101b1')!, floor: 'B2', variant: 'h' })).toBe('Humid Cave B2 (Hard)');
+    expect(m.stageTitle({ ...m.byId.get('dng101b1')!, floor: 'B2', variant: 'h' })).toBe(
+      'Humid Cave B2 (Hard)',
+    );
   });
 });

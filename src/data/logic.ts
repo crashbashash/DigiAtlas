@@ -87,7 +87,11 @@ export function dropTable(pool: DropPool | null | undefined): DropTable {
 }
 
 export const formatPercent = (p: number): string =>
-  p >= 10 ? p.toFixed(0) + '%' : p >= 1 ? p.toFixed(1).replace(/\.0$/, '') + '%' : p.toFixed(2).replace(/0$/, '') + '%';
+  p >= 10
+    ? p.toFixed(0) + '%'
+    : p >= 1
+      ? p.toFixed(1).replace(/\.0$/, '') + '%'
+      : p.toFixed(2).replace(/0$/, '') + '%';
 
 export function startModeText(mode: string): string {
   switch (mode) {
@@ -126,13 +130,24 @@ export interface EnemyGroup {
 }
 
 /** Spawn generators grouped by what they spawn, in first-seen order. */
-export function groupByEnemy(generators: Generator[], enemies: Map<number, Enemy>, skip?: Set<number>): EnemyGroup[] {
+export function groupByEnemy(
+  generators: Generator[],
+  enemies: Map<number, Enemy>,
+  skip?: Set<number>,
+): EnemyGroup[] {
   const groups = new Map<number, EnemyGroup>();
   generators.forEach((g, i) => {
     if (skip?.has(i)) return;
     let grp = groups.get(g.row);
     if (!grp) {
-      grp = { row: g.row, enemy: enemies.get(g.row), spawners: 0, points: 0, total: 0, generators: [] };
+      grp = {
+        row: g.row,
+        enemy: enemies.get(g.row),
+        spawners: 0,
+        points: 0,
+        total: 0,
+        generators: [],
+      };
       groups.set(g.row, grp);
     }
     grp.spawners += 1;
@@ -185,7 +200,9 @@ export function startSummary(g: Generator, enemy: Enemy | undefined): string {
   const starts = (info.refs ?? []).filter((r) => r.verb === 'START' || r.verb === 'RESTART');
   if (!starts.length) return 'A script controls it';
   const first = starts[0];
-  const text = first.when.length ? `Started by a script when ${first.when.join(', and ')}` : 'Started by a script';
+  const text = first.when.length
+    ? `Started by a script when ${first.when.join(', and ')}`
+    : 'Started by a script';
   const more = starts.length > 1 ? ` (+${starts.length - 1} more)` : '';
   return (text.length > 110 ? text.slice(0, 107) + '…' : text) + more;
 }

@@ -1,5 +1,5 @@
 import type { DataSource } from '../data/source';
-import { traderLabel, type Model } from '../data/model';
+import { traderLabel, type Model, type Scope } from '../data/model';
 import type { Difficulty, Enemy, EnemyKind, Stage } from '../data/types';
 import { h } from './dom';
 import { makeMarkers, type Marker } from './markers';
@@ -9,7 +9,11 @@ export const KIND_COLOR: Record<EnemyKind, string> = {
   boss: '#ffcc4d',
   object: '#6bc7ff',
 };
-export const KIND_LABEL: Record<EnemyKind, string> = { enemy: 'Enemy', boss: 'Boss', object: 'Box / crate / barrel' };
+export const KIND_LABEL: Record<EnemyKind, string> = {
+  enemy: 'Enemy',
+  boss: 'Boss',
+  object: 'Box / crate / barrel',
+};
 
 interface View {
   tx: number;
@@ -86,17 +90,36 @@ export class MapView {
         h('span', null, h('i', { style: `background:${KIND_COLOR[k]}` }), KIND_LABEL[k]),
       ),
       h('span', null, h('i', { style: `background:${TRADER_COLOR}` }), 'Trader'),
-      h('span', { class: 'muted' }, 'Dashed circle = how close you must get · number = enemies at that spot'),
+      h(
+        'span',
+        {
+          class: 'muted',
+          title:
+            'A number on a marker is how many enemies spawn at that spot. Hover or select a marker to see how close you must get for it to start.',
+        },
+        'Number = enemies at a spot',
+      ),
     );
   }
 
-  show(stage: Stage, d: Difficulty, highlight: Set<number> | null, selected: number | null, litPins: Set<number> | null = null): void {
+  show(
+    stage: Stage,
+    d: Difficulty,
+    scope: Scope,
+    highlight: Set<number> | null,
+    selected: number | null,
+    litPins: Set<number> | null = null,
+  ): void {
     const stageChanged = stage.id !== this.stageId;
     this.stageId = stage.id;
     this.highlight = highlight;
     this.selected = selected;
     this.litPins = litPins;
-    this.markers = this.buildMarkers(stage, d);
+    this.markers = makeMarkers(
+      this.model.generators(stage, d, scope),
+      this.model.enemies,
+      scope.hideUnused,
+    );
     this.pins = this.model.tradersAt(stage, d).map((t, index) => ({
       index,
       x: t.position.x,
@@ -129,10 +152,6 @@ export class MapView {
     this.draw();
   }
 
-  private buildMarkers(stage: Stage, d: Difficulty): Marker[] {
-    return makeMarkers(this.model.generators(stage, d), this.model.enemies, this.model.hideUnused);
-  }
-
   private computeBounds(stage: Stage): void {
     if (stage.map) {
       this.bounds = { ...stage.map.bounds };
@@ -162,7 +181,7 @@ export class MapView {
     const zs = ms.map((m) => m.z);
     const spanX = Math.max(Math.max(...xs) - Math.min(...xs), 200);
     const spanZ = Math.max(Math.max(...zs) - Math.min(...zs), 200);
-    const scale = Math.min(MAX_SCALE, (Math.min(w / spanX, hgt / spanZ)) * 0.75);
+    const scale = Math.min(MAX_SCALE, Math.min(w / spanX, hgt / spanZ) * 0.75);
     this.view = {
       scale,
       tx: w / 2 - ((Math.min(...xs) + Math.max(...xs)) / 2) * scale,
@@ -275,7 +294,9 @@ export class MapView {
   }
 
   private rank(m: Marker): number {
-    return (m.gi === this.selected ? 100 : 0) + (m.kind === 'object' ? 0 : m.kind === 'enemy' ? 1 : 2);
+    return (
+      (m.gi === this.selected ? 100 : 0) + (m.kind === 'object' ? 0 : m.kind === 'enemy' ? 1 : 2)
+    );
   }
 
   private drawGrid(ctx: CanvasRenderingContext2D, v: View): void {
@@ -297,14 +318,18 @@ export class MapView {
     }
   }
 
-  /** How close you must get for a radar spawner to start; stronger on hover or selection. */
+  /**
+   * How close you must get for a radar spawner to start. Drawn only for the spawners you are looking
+   * at (hovered, selected or highlighted): drawn for all of them, busy rooms turn into overlapping rings.
+   */
   private drawTrigger(ctx: CanvasRenderingContext2D, m: Marker): void {
     if (!m.trigger) return;
-    const strong = m.gi === this.selected || m.gi === this.hover?.gi;
+    const focused = m.gi === this.selected || m.gi === this.hover?.gi;
+    if (!focused && !this.highlight?.has(m.gi)) return;
     ctx.globalAlpha = 1;
-    ctx.fillStyle = `${KIND_COLOR[m.kind]}${strong ? '26' : '0d'}`;
-    ctx.strokeStyle = `${KIND_COLOR[m.kind]}${strong ? 'dd' : '4d'}`;
-    ctx.lineWidth = strong ? 1.8 : 1;
+    ctx.fillStyle = `${KIND_COLOR[m.kind]}${focused ? '26' : '14'}`;
+    ctx.strokeStyle = `${KIND_COLOR[m.kind]}${focused ? 'dd' : '80'}`;
+    ctx.lineWidth = focused ? 1.8 : 1.2;
     ctx.setLineDash([5, 4]);
     ctx.beginPath();
     ctx.arc(
@@ -328,7 +353,13 @@ export class MapView {
     ctx.setLineDash([2, 3]);
     for (const [x, z] of m.others) {
       ctx.beginPath();
-      ctx.arc(this.view.tx + x * this.view.scale, this.view.ty + z * this.view.scale, 5, 0, Math.PI * 2);
+      ctx.arc(
+        this.view.tx + x * this.view.scale,
+        this.view.ty + z * this.view.scale,
+        5,
+        0,
+        Math.PI * 2,
+      );
       ctx.stroke();
     }
     ctx.setLineDash([]);
@@ -382,7 +413,9 @@ export class MapView {
     let best: Pin | null = null;
     let bestD = (HIT_RADIUS + 4) ** 2;
     for (const p of this.pins) {
-      const d = (this.view.tx + p.x * this.view.scale - px) ** 2 + (this.view.ty + p.z * this.view.scale - py) ** 2;
+      const d =
+        (this.view.tx + p.x * this.view.scale - px) ** 2 +
+        (this.view.ty + p.z * this.view.scale - py) ** 2;
       if (d <= bestD) {
         best = p;
         bestD = d;
@@ -470,7 +503,10 @@ export class MapView {
       return;
     }
     this.canvas.style.cursor = 'pointer';
-    this.tip.replaceChildren(h('strong', null, p.label), h('span', { class: 'muted' }, `${p.trades} trades on this difficulty`));
+    this.tip.replaceChildren(
+      h('strong', null, p.label),
+      h('span', { class: 'muted' }, `${p.trades} trades on this difficulty`),
+    );
     this.tip.hidden = false;
     this.tip.style.left = `${px + 14}px`;
     this.tip.style.top = `${py + 14}px`;
@@ -480,13 +516,21 @@ export class MapView {
     if (m === this.hover && m === null) return;
     const before = this.hover;
     this.hover = m;
-    if ((before?.others || m?.others) && before?.gi !== m?.gi) this.draw();
+    // Hover reveals a spawner's other spots and its trigger ring, so those need a redraw.
+    const reveals = (x: Marker | null) => !!(x?.others || x?.trigger);
+    if ((reveals(before) || reveals(m)) && before?.gi !== m?.gi) this.draw();
     this.canvas.style.cursor = m ? 'pointer' : 'grab';
     if (!m) {
       if (!this.hoverPin) this.tip.hidden = true;
       return;
     }
-    this.tip.replaceChildren(h('strong', null, m.label), ...m.detail.split('\n').filter(Boolean).map((t) => h('span', { class: 'muted' }, t)));
+    this.tip.replaceChildren(
+      h('strong', null, m.label),
+      ...m.detail
+        .split('\n')
+        .filter(Boolean)
+        .map((t) => h('span', { class: 'muted' }, t)),
+    );
     this.tip.hidden = false;
     this.tip.style.left = `${px + 14}px`;
     this.tip.style.top = `${py + 14}px`;

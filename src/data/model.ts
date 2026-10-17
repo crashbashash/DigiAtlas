@@ -1,7 +1,23 @@
 import type { DataSource } from './source';
 import { dropTable, isUnused, itemKey, type DropRow } from './logic';
-import type { DropPool, Difficulty, Enemy, EnemyKind, Generator, Item, RawData, Stage, Trader } from './types';
-import { DIFFICULTIES, DIFFICULTY_LABEL, VARIANT_DIFFICULTY, type AppraisalTier, type GearKind } from './types';
+import type {
+  DropPool,
+  Difficulty,
+  Enemy,
+  EnemyKind,
+  Generator,
+  Item,
+  RawData,
+  Stage,
+  Trader,
+} from './types';
+import {
+  DIFFICULTIES,
+  DIFFICULTY_LABEL,
+  VARIANT_DIFFICULTY,
+  type AppraisalTier,
+  type GearKind,
+} from './types';
 
 export interface Room {
   area: string;
@@ -40,7 +56,11 @@ export interface AppraisalTable {
   cost: number;
   /** Level ranges; neighbouring tiers that give the same results are one column. */
   columns: string[];
-  rows: { key: string; label: string; /** Percent chance per column, 0 where it cannot come up. */ percents: number[] }[];
+  rows: {
+    key: string;
+    label: string;
+    /** Percent chance per column, 0 where it cannot come up. */ percents: number[];
+  }[];
 }
 
 /** Where an item can come from at the appraiser: the unidentified item to take there and the chance per tier. */
@@ -68,6 +88,23 @@ function runs(tiers: AppraisalTier[], same: (a: number, b: number) => boolean): 
   return out;
 }
 
+/**
+ * The settings the numbers depend on besides difficulty: spawn counts and drops change with the
+ * number of players, and spawners that no script starts can be left out. Passed to every
+ * calculation that needs them instead of living on the model.
+ */
+export interface Scope {
+  /** Number of players, 1 to 4. */
+  players: number;
+  /** Leave out spawners that no script starts (they most likely never appear). */
+  hideUnused: boolean;
+}
+
+export const DEFAULT_SCOPE: Scope = { players: 1, hideUnused: true };
+
+/** Clamp a player count to the game's 1 to 4. */
+export const clampPlayers = (n: number): number => Math.min(4, Math.max(1, Math.round(n) || 1));
+
 export interface World {
   area: string;
   rooms: Room[];
@@ -85,10 +122,17 @@ export interface ItemSource {
   generators: number[];
 }
 
-const AREA_ORDER = ['Death Valley', 'Dry Land', 'Venom Jungle', 'Machine Pit', 'Fortress', 'Home Server'];
+const AREA_ORDER = [
+  'Death Valley',
+  'Dry Land',
+  'Venom Jungle',
+  'Machine Pit',
+  'Fortress',
+  'Home Server',
+];
 const KIND_ORDER: Record<string, number> = { field: 0, dungeon: 1, boss: 2, hub: 3, system: 4 };
-// Test stages go to the bottom of their world.
-const LAST = new Set(['stag0000', 'stag0001']);
+// The developers' Debug and Practice stages are not part of the game a player sees.
+const DEV_STAGES = new Set(['stag0000', 'stag0001']);
 
 function naturalKey(id: string): string {
   return id.replace(/\d+/g, (n) => n.padStart(4, '0'));
@@ -102,15 +146,18 @@ export class Model {
   readonly byId = new Map<string, Stage>();
   readonly worlds: World[];
   private readonly sourceCache = new Map<string, Map<string, ItemSource[]>>();
-  private playerCount = 1;
-  private hide = true;
 
   constructor(readonly raw: RawData) {
     for (const e of raw.enemies.rows) this.enemies.set(e.row, e);
     for (const i of raw.items.items) this.items.set(itemKey(i.category, i.id), i);
     this.buildLabels();
     // Only stages that spawn something are worth browsing.
-    this.stages = raw.stages.stages.filter((s) => s.map !== null || DIFFICULTIES.some((d) => (s.difficulties[d]?.generators.length ?? 0) > 0));
+    this.stages = raw.stages.stages.filter(
+      (s) =>
+        !DEV_STAGES.has(s.id) &&
+        (s.map !== null ||
+          DIFFICULTIES.some((d) => (s.difficulties[d]?.generators.length ?? 0) > 0)),
+    );
     for (const s of this.stages) this.byId.set(s.id, s);
     this.worlds = this.buildWorlds();
   }
@@ -124,7 +171,9 @@ export class Model {
       else groups.set(i.name, [key]);
     }
     for (const [name, keys] of groups) {
-      keys.forEach((k, n) => this.labels.set(k, keys.length > 1 ? `${name} (${n + 1} of ${keys.length})` : name));
+      keys.forEach((k, n) =>
+        this.labels.set(k, keys.length > 1 ? `${name} (${n + 1} of ${keys.length})` : name),
+      );
     }
   }
 
@@ -140,7 +189,6 @@ export class Model {
     const rooms = new Map<string, Room>();
     const sorted = [...this.stages].sort(
       (a, b) =>
-        Number(LAST.has(a.id)) - Number(LAST.has(b.id)) ||
         (KIND_ORDER[a.kind] ?? 9) - (KIND_ORDER[b.kind] ?? 9) ||
         naturalKey(a.id).localeCompare(naturalKey(b.id)),
     );
@@ -170,29 +218,11 @@ export class Model {
     return [...worlds.values()].sort((a, b) => rank(a.area) - rank(b.area));
   }
 
-  /** How many players the numbers are for (1 to 4). Spawn counts and drops depend on it. */
-  get players(): number {
-    return this.playerCount;
-  }
-
-  set players(n: number) {
-    this.playerCount = Math.min(4, Math.max(1, Math.round(n)));
-  }
-
-  /** Leave out spawners that no script starts (they most likely never appear). */
-  get hideUnused(): boolean {
-    return this.hide;
-  }
-
-  set hideUnused(v: boolean) {
-    this.hide = v;
-  }
-
-  /** Indices of the spawners that are currently left out. */
-  hidden(stage: Stage, d: Difficulty): Set<number> {
+  /** Indices of the spawners that are left out for this scope. */
+  hidden(stage: Stage, d: Difficulty, scope: Scope = DEFAULT_SCOPE): Set<number> {
     const out = new Set<number>();
-    if (!this.hide) return out;
-    this.generators(stage, d).forEach((g, i) => {
+    if (!scope.hideUnused) return out;
+    this.generators(stage, d, scope).forEach((g, i) => {
       if (isUnused(g, this.enemies.get(g.row))) out.add(i);
     });
     return out;
@@ -203,10 +233,11 @@ export class Model {
     return this.generators(stage, d).filter((g) => isUnused(g, this.enemies.get(g.row))).length;
   }
 
-  /** A spawner as it behaves for the chosen number of players. */
-  forPlayers(g: Generator): Generator {
-    const slot = g.players?.[this.playerCount - 1];
-    if (!slot || this.playerCount === 1 && !g.players) return g;
+  /** A spawner as it behaves for a number of players. */
+  forPlayers(g: Generator, players: number): Generator {
+    const n = clampPlayers(players);
+    const slot = g.players?.[n - 1];
+    if (!slot) return g;
     return {
       ...g,
       count: slot.count,
@@ -216,16 +247,19 @@ export class Model {
     };
   }
 
-  generators(stage: Stage, d: Difficulty): Generator[] {
+  generators(stage: Stage, d: Difficulty, scope: Scope = DEFAULT_SCOPE): Generator[] {
     const raw = stage.difficulties[d]?.generators ?? [];
-    if (this.playerCount === 1 && !raw.some((g) => g.players)) return raw;
-    return raw.map((g) => this.forPlayers(g));
+    if (!raw.some((g) => g.players)) return raw;
+    return raw.map((g) => this.forPlayers(g, scope.players));
   }
 
   /** Difficulties a stage actually has data for. */
   available(stage: Stage): Difficulty[] {
     // A shop has no spawners, but its traders still differ by difficulty.
-    return DIFFICULTIES.filter((d) => (stage.difficulties[d]?.generators.length ?? 0) > 0 || this.tradersAt(stage, d).length > 0);
+    return DIFFICULTIES.filter(
+      (d) =>
+        (stage.difficulties[d]?.generators.length ?? 0) > 0 || this.tradersAt(stage, d).length > 0,
+    );
   }
 
   poolFor(g: Generator, d: Difficulty, last = false): DropPool | null {
@@ -238,33 +272,40 @@ export class Model {
   }
 
   /** Where an item drops (per kill) for one difficulty, best chance first. */
-  sourcesOf(key: string, d: Difficulty): ItemSource[] {
-    const cacheKey = `${d}:${this.playerCount}:${this.hide}`;
+  sourcesOf(key: string, d: Difficulty, scope: Scope = DEFAULT_SCOPE): ItemSource[] {
+    const cacheKey = `${d}:${clampPlayers(scope.players)}:${scope.hideUnused}`;
     let index = this.sourceCache.get(cacheKey);
     if (!index) {
-      index = this.buildSources(d);
+      index = this.buildSources(d, scope);
       this.sourceCache.set(cacheKey, index);
     }
     return index.get(key) ?? [];
   }
 
-  private buildSources(d: Difficulty): Map<string, ItemSource[]> {
+  private buildSources(d: Difficulty, scope: Scope): Map<string, ItemSource[]> {
     const index = new Map<string, ItemSource[]>();
     for (const stage of this.stages) {
-      const gens = this.generators(stage, d);
+      const gens = this.generators(stage, d, scope);
       // A stage's spawners often share a pool, and several stat rows can be one enemy (crown ranks);
       // collapse them to one row per stage, enemy name and chance.
       const seen = new Map<string, ItemSource>();
       const rows = new Map<string, Set<number>>();
       gens.forEach((g, gi) => {
         const enemy = this.enemies.get(g.row);
-        if (this.hide && isUnused(g, enemy)) return;
+        if (scope.hideUnused && isUnused(g, enemy)) return;
         const name = enemy?.name ?? `Row ${g.row}`;
         for (const row of this.tableFor(g, d).rows as DropRow[]) {
           const k = `${row.key}|${stage.id}|${name}|${row.rate}`;
           let src = seen.get(k);
           if (!src) {
-            src = { stage, enemyName: name, kind: enemy?.kind ?? 'enemy', variants: 0, percent: row.percent, generators: [] };
+            src = {
+              stage,
+              enemyName: name,
+              kind: enemy?.kind ?? 'enemy',
+              variants: 0,
+              percent: row.percent,
+              generators: [],
+            };
             seen.set(k, src);
             rows.set(k, new Set());
             const list = index.get(row.key);
@@ -282,9 +323,9 @@ export class Model {
   }
 
   /** The maps an item drops in for the chosen difficulty and player count, best chance first. */
-  mapsFor(key: string, d: Difficulty): ItemMap[] {
+  mapsFor(key: string, d: Difficulty, scope: Scope = DEFAULT_SCOPE): ItemMap[] {
     const byStage = new Map<string, ItemMap>();
-    for (const src of this.sourcesOf(key, d)) {
+    for (const src of this.sourcesOf(key, d, scope)) {
       let m = byStage.get(src.stage.id);
       if (!m) {
         m = { stage: src.stage, percent: 0, spawners: 0, droppedBy: [] };
@@ -294,7 +335,9 @@ export class Model {
       m.spawners += src.generators.length;
       if (!m.droppedBy.includes(src.enemyName)) m.droppedBy.push(src.enemyName);
     }
-    return [...byStage.values()].sort((a, b) => b.percent - a.percent || a.stage.id.localeCompare(b.stage.id));
+    return [...byStage.values()].sort(
+      (a, b) => b.percent - a.percent || a.stage.id.localeCompare(b.stage.id),
+    );
   }
 
   /** The traders who hand an item over (`getFrom`) and the ones who take it in (`giveTo`). */
@@ -309,7 +352,13 @@ export class Model {
             const get = itemKey(o.get.category, o.get.id);
             // The variants of a room (e/h/v) share traders; list each trade once, with the difficulties it applies on.
             const add = (list: TradeLink[], other: string) => {
-              const same = list.find((l) => l.label === label && l.other === other && l.stage.room === stage.room && l.stage.floor === stage.floor);
+              const same = list.find(
+                (l) =>
+                  l.label === label &&
+                  l.other === other &&
+                  l.stage.room === stage.room &&
+                  l.stage.floor === stage.floor,
+              );
               if (!same) list.push({ stage, label, other, difficulties: [d] });
               else if (!same.difficulties.includes(d)) same.difficulties.push(d);
             };
@@ -336,7 +385,11 @@ export class Model {
     a.tiers.forEach((t, n) => {
       for (const r of t.results[category]) {
         const k = itemKey(r.category, r.id);
-        if (!rows.has(k)) rows.set(k, a.tiers.map(() => 0));
+        if (!rows.has(k))
+          rows.set(
+            k,
+            a.tiers.map(() => 0),
+          );
         rows.get(k)![n] += r.rate / 100;
       }
     });
@@ -346,8 +399,15 @@ export class Model {
       cost: a.cost,
       columns: groups.map(([from, to]) => levelRange(a.tiers[from], a.tiers[to])),
       rows: [...rows]
-        .map(([k, percents]) => ({ key: k, label: this.itemLabel(k), percents: groups.map(([from]) => percents[from]) }))
-        .sort((x, y) => Math.max(...y.percents) - Math.max(...x.percents) || x.label.localeCompare(y.label)),
+        .map(([k, percents]) => ({
+          key: k,
+          label: this.itemLabel(k),
+          percents: groups.map(([from]) => percents[from]),
+        }))
+        .sort(
+          (x, y) =>
+            Math.max(...y.percents) - Math.max(...x.percents) || x.label.localeCompare(y.label),
+        ),
     };
   }
 
@@ -359,12 +419,20 @@ export class Model {
     const category = item.category;
     if (category !== 'weapon' && category !== 'armor1' && category !== 'armor2') return null;
     const percent = a.tiers.map((tier) =>
-      tier.results[category].filter((r) => itemKey(r.category, r.id) === key).reduce((n, r) => n + r.rate / 100, 0));
+      tier.results[category]
+        .filter((r) => itemKey(r.category, r.id) === key)
+        .reduce((n, r) => n + r.rate / 100, 0),
+    );
     const ranges = runs(a.tiers, (x, y) => percent[x] === percent[y])
       .filter(([from]) => percent[from] > 0)
-      .map(([from, to]) => ({ label: levelRange(a.tiers[from], a.tiers[to]), percent: percent[from] }));
+      .map(([from, to]) => ({
+        label: levelRange(a.tiers[from], a.tiers[to]),
+        percent: percent[from],
+      }));
     const from = this.unidentified(category);
-    return ranges.length && from ? { cost: a.cost, from: this.itemLabel(itemKey(from.category, from.id)), ranges } : null;
+    return ranges.length && from
+      ? { cost: a.cost, from: this.itemLabel(itemKey(from.category, from.id)), ranges }
+      : null;
   }
 
   /** The traders in a room that have something to swap on this difficulty. */
@@ -382,9 +450,23 @@ export class Model {
     return DIFFICULTIES.some((d) => (stage.difficulties[d]?.generators.length ?? 0) > 0);
   }
 
+  /** Short label for one of a room's stages: its floor and difficulty, or "Map N" when it has neither. */
+  chipLabel(room: Room, s: Stage): string {
+    const parts = [
+      s.floor,
+      s.variant ? DIFFICULTY_LABEL[VARIANT_DIFFICULTY[s.variant]] : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(' ') : `Map ${room.stages.indexOf(s) + 1}`;
+  }
+
   stageTitle(s: Stage): string {
     const base = s.room ?? s.id;
-    const extra = [s.floor, s.variant ? `(${DIFFICULTY_LABEL[VARIANT_DIFFICULTY[s.variant]]})` : null].filter(Boolean).join(' ');
+    const extra = [
+      s.floor,
+      s.variant ? `(${DIFFICULTY_LABEL[VARIANT_DIFFICULTY[s.variant]]})` : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
     return extra ? `${base} ${extra}` : base;
   }
 }
@@ -397,6 +479,7 @@ export async function loadModel(source: DataSource): Promise<Model> {
     source.json<RawData['drops']>('drops.json'),
     source.json<RawData['stages']>('stages.json'),
   ]);
-  if (manifest.schemaVersion !== 1) throw new Error(`Unsupported data version ${manifest.schemaVersion}`);
+  if (manifest.schemaVersion !== 1)
+    throw new Error(`Unsupported data version ${manifest.schemaVersion}`);
   return new Model({ manifest, enemies, items, drops, stages });
 }

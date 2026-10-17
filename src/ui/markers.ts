@@ -28,7 +28,11 @@ export interface Marker {
  *  - boxes, barrels and crates are one marker per placed object.
  * The game starts counting from the first spot (assumed; the code never sets the cursor).
  */
-export function makeMarkers(generators: Generator[], enemies: Map<number, Enemy>, hideUnused = false): Marker[] {
+export function makeMarkers(
+  generators: Generator[],
+  enemies: Map<number, Enemy>,
+  hideUnused = false,
+): Marker[] {
   const out: Marker[] = [];
   generators.forEach((g, gi) => {
     const e = enemies.get(g.row);
@@ -40,19 +44,29 @@ export function makeMarkers(generators: Generator[], enemies: Map<number, Enemy>
     const unused = isUnused(g, e);
     if (unused && hideUnused) return;
     const start = startSummary(g, e);
-    const trigger = g.trigger ? { x: g.trigger.center[0], z: g.trigger.center[2], radius: g.trigger.radius } : null;
+    const trigger = g.trigger
+      ? { x: g.trigger.center[0], z: g.trigger.center[2], radius: g.trigger.radius }
+      : null;
 
     const partial = kind !== 'object' && count !== null && count >= 1 && spots.length > count;
     const used = partial ? spots.slice(0, count) : spots;
     const others = partial ? spots.slice(count).map((p) => [p[0], p[2]] as [number, number]) : null;
-    const per = kind !== 'object' && count !== null && count > spots.length ? Math.round(count / spots.length) : 1;
+    const per =
+      kind !== 'object' && count !== null && count > spots.length
+        ? Math.round(count / spots.length)
+        : 1;
     const detail = [
       stat && `${stat} · ${count ?? '?'} total`,
-      partial ? `Spawns at the first ${count} of ${spots.length} spots (it places them in order)` : '',
+      partial
+        ? `Spawns at the first ${count} of ${spots.length} spots (it places them in order)`
+        : '',
       per > 1 ? `${count} in total, over ${spots.length} spot${spots.length === 1 ? '' : 's'}` : '',
       start,
-    ].filter(Boolean).join('\n');
-    for (const [x, , z] of used) out.push({ gi, x, z, kind, label, detail, badge: per, others, trigger, unused });
+    ]
+      .filter(Boolean)
+      .join('\n');
+    for (const [x, , z] of used)
+      out.push({ gi, x, z, kind, label, detail, badge: per, others, trigger, unused });
   });
   return out;
 }

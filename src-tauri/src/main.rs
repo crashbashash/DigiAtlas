@@ -55,7 +55,7 @@ fn initial_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
         .find(|p| is_export(p))
 }
 
-/// `--open "#/stag0101?d=hard&enemy=Numemon"` starts the app on that view (same format as the address bar).
+/// `--open "#/map/stag0101?d=hard&enemy=Numemon"` starts the app on that view (same format as the address bar).
 #[tauri::command]
 fn start_view() -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
@@ -98,28 +98,6 @@ async fn choose_data_dir(
     Ok(Some(dir.to_string_lossy().into_owned()))
 }
 
-/// Opens (or focuses) a popout window running the same frontend. `hash` is the address-bar format,
-/// for example `#/popout?item=weapon:0&d=normal`.
-#[tauri::command]
-async fn open_popout(app: tauri::AppHandle, label: String, hash: String, title: String) -> Result<(), String> {
-    if !label.starts_with("popout-") || !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
-        return Err(format!("Not a popout label: {label}"));
-    }
-    if let Some(existing) = app.get_webview_window(&label) {
-        existing.set_focus().map_err(|e| e.to_string())?;
-        return Ok(());
-    }
-    let mut builder = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(format!("index.html{hash}").into()))
-        .title(title)
-        .inner_size(440.0, 520.0)
-        .min_inner_size(340.0, 300.0);
-    if let Some(main) = app.get_webview_window("main") {
-        builder = builder.parent(&main).map_err(|e| e.to_string())?;
-    }
-    builder.build().map_err(|e| e.to_string())?;
-    Ok(())
-}
-
 #[tauri::command]
 fn read_data_file(state: State<DataDir>, rel: String) -> Result<Response, String> {
     let dir = state.0.lock().map_err(|e| e.to_string())?.clone().ok_or("No data folder is chosen")?;
@@ -137,7 +115,7 @@ fn main() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_data_dir, choose_data_dir, read_data_file, start_view, open_popout])
+        .invoke_handler(tauri::generate_handler![get_data_dir, choose_data_dir, read_data_file, start_view])
         .run(tauri::generate_context!())
         .expect("Could not start DigiAtlas");
 }

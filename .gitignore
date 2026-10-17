@@ -20,3 +20,6 @@ __pycache__/
 .venv/
 .env
 .env.*
+
+# Rust build output
+/importer/target/

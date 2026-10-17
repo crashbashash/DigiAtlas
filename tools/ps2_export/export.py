@@ -30,8 +30,8 @@ KNOWN_GAPS = [
     "maps: top-down footprints only (floors and walls from the terrain mesh); no room names or icons",
     "trigger-placed item spawns (scripted pickups) are not extracted yet",
 ]
-ENEMY_NAMES = json.loads((Path(__file__).parent / "names" / "enemies.json").read_text())
-STAGE_NAMES = json.loads((Path(__file__).parent / "names" / "stages.json").read_text())
+ENEMY_NAMES = json.loads((Path(__file__).resolve().parents[2] / "importer" / "names" / "enemies.json").read_text())
+STAGE_NAMES = json.loads((Path(__file__).resolve().parents[2] / "importer" / "names" / "stages.json").read_text())
 KINDS = {"e": "enemy", "f": "boss", "g": "object"}
 
 

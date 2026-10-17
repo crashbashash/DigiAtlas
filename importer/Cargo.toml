@@ -1,0 +1,26 @@
+[package]
+name = "digiatlas-importer"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Reads a Digimon World 4 disc image and writes DigiAtlas data (schema v1)."
+
+[lib]
+name = "importer"
+
+[[bin]]
+name = "digiatlas-import"
+path = "src/bin/digiatlas-import.rs"
+
+[dependencies]
+serde = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
+regex = "1"
+encoding_rs = "0.8"
+flate2 = "1"
+crc32fast = "1"
+sha1_smol = "1"
+
+[profile.dev]
+# The importer walks every byte of large archives; debug builds would be unusably slow.
+opt-level = 2

@@ -1,0 +1,31 @@
+//! Loading-screen banners: one 256x256 picture per stage with the area and room name baked in.
+//!
+//! `ld*.igb` packs in AREA.AFS hold them, one set per language; the USA set is the highest entry
+//! of each name. `ldag<id>` belongs to `stag<id>` and `ldg<id>` to `dng<id>`.
+
+use std::collections::HashMap;
+
+use crate::afs::Afs;
+use crate::error::Result;
+use crate::igb::Graph;
+use crate::textures::{self, Texture};
+
+pub fn pack_name(stage_id: &str) -> Option<String> {
+    if let Some(rest) = stage_id.strip_prefix("stag") {
+        return Some(format!("ldag{}.igb", rest.to_lowercase()));
+    }
+    stage_id.strip_prefix("dng").map(|rest| format!("ldg{rest}.igb"))
+}
+
+/// A stage's banner, or None when it has no loading-pack entry or only a small placeholder.
+pub fn load(area: &Afs, names: &HashMap<String, Vec<(String, i64)>>, stage_id: &str) -> Result<Option<Texture>> {
+    let Some(entries) = pack_name(stage_id).and_then(|n| names.get(&n)) else {
+        return Ok(None);
+    };
+    let Some(entry) = entries.iter().filter(|(a, _)| a == "AREA.AFS").map(|(_, e)| *e).max() else {
+        return Ok(None);
+    };
+    let graph = Graph::new(area.entry(entry as usize)?)?;
+    let tex = textures::decode_all(&graph)?.into_iter().next();
+    Ok(tex.filter(|t| (t.width, t.height) == (256, 256)))
+}

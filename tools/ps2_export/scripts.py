@@ -28,7 +28,7 @@ def load_flag_names() -> dict[int, str]:
     import json
     from pathlib import Path
 
-    raw = json.loads((Path(__file__).parent / "names" / "flags.json").read_text())
+    raw = json.loads((Path(__file__).resolve().parents[2] / "importer" / "names" / "flags.json").read_text())
     return {int(k): v["meaning"] for k, v in raw.items() if not k.startswith("_")}
 
 

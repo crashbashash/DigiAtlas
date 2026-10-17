@@ -61,11 +61,11 @@ function SearchOverlay({ close }: { close(): void }) {
 export function App({
   model,
   source,
-  changeData,
+  reimport,
 }: {
   model: Model;
   source: DataSource;
-  changeData: (() => void) | null;
+  reimport: (() => void) | null;
 }) {
   const loc = useLocation();
   const [remembered, setRemembered] = useState<Settings>(rememberedSettings);
@@ -84,7 +84,7 @@ export function App({
     source,
     settings,
     scope,
-    changeData,
+    reimport,
     go: (route, replace = false) => navigate(route, settings, replace),
     setSettings: (patch) => {
       const next = { ...settings, ...patch };

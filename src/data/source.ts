@@ -1,4 +1,4 @@
-// Where exported data comes from: a dev server in the browser, or the chosen folder in the desktop app.
+// Where the data comes from: a dev server in the browser, or the disc the desktop app imported.
 
 export interface DataSource {
   readonly label: string;
@@ -23,11 +23,9 @@ class HttpSource implements DataSource {
 type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
 class TauriSource implements DataSource {
+  readonly label = 'imported disc';
   private readonly urls = new Map<string, Promise<string>>();
-  constructor(
-    private readonly invoke: Invoke,
-    readonly label: string,
-  ) {}
+  constructor(private readonly invoke: Invoke) {}
   private async bytes(file: string): Promise<Uint8Array> {
     const buf = await this.invoke<ArrayBuffer>('read_data_file', { rel: file });
     return new Uint8Array(buf);
@@ -53,23 +51,69 @@ async function tauriInvoke(): Promise<Invoke> {
   return (await import('@tauri-apps/api/core')).invoke as Invoke;
 }
 
-/** The folder the desktop app has remembered, if any. */
-export async function openRemembered(): Promise<DataSource | null> {
-  if (!inDesktopApp()) return new HttpSource();
-  const invoke = await tauriInvoke();
-  const dir = await invoke<string | null>('get_data_dir');
-  return dir ? new TauriSource(invoke, dir) : null;
+/**
+ * What the desktop app has imported: nothing yet, data ready to show, or data an older importer
+ * wrote (or an unfinished one), which must be imported again before it is shown.
+ */
+export type DataState = { state: 'none' } | { state: 'ready' } | { state: 'stale'; reason: string };
+
+/** The browser dev mode always reads the dev server's folder. */
+export async function dataState(): Promise<DataState> {
+  if (!inDesktopApp()) return { state: 'ready' };
+  return (await tauriInvoke())<DataState>('data_state');
 }
 
-/** Ask the user for a folder (desktop app only). */
-export async function chooseFolder(): Promise<DataSource | null> {
-  const invoke = await tauriInvoke();
-  const dir = await invoke<string | null>('choose_data_dir');
-  return dir ? new TauriSource(invoke, dir) : null;
+/** The data to show, once `dataState()` is ready. */
+export async function openData(): Promise<DataSource> {
+  return inDesktopApp() ? new TauriSource(await tauriInvoke()) : new HttpSource();
 }
+
+export interface ImportProgress {
+  done: number;
+  total: number;
+  message: string;
+}
+
+/** Choosing a disc image and importing it; the desktop app's, or a stand-in for previews. */
+export interface DiscImporter {
+  /** Ask for a disc image; null when the user cancels. */
+  choose(): Promise<string | null>;
+  /** Import it, reporting each step; rejects with a readable message when it fails. */
+  run(path: string, onProgress: (p: ImportProgress) => void): Promise<void>;
+}
+
+type ImportEvent =
+  | ({ event: 'progress' } & ImportProgress)
+  | { event: 'finished' }
+  | { event: 'failed'; message: string };
+
+export const desktopImporter: DiscImporter = {
+  async choose() {
+    return (await tauriInvoke())<string | null>('choose_disc_image');
+  },
+  async run(path, onProgress) {
+    const { invoke, Channel } = await import('@tauri-apps/api/core');
+    return new Promise<void>((resolve, reject) => {
+      const events = new Channel<ImportEvent>((e) => {
+        if (e.event === 'progress') onProgress(e);
+        else if (e.event === 'finished') resolve();
+        else reject(new Error(e.message));
+      });
+      invoke('import_disc', { path, events }).catch((e: unknown) =>
+        reject(e instanceof Error ? e : new Error(String(e))),
+      );
+    });
+  },
+};
 
 /** A view requested on the command line (`--open "#/stag0101?d=hard"`), desktop app only. */
 export async function requestedView(): Promise<string | null> {
   if (!inDesktopApp()) return null;
   return (await tauriInvoke())<string | null>('start_view');
+}
+
+/** A disc image to import on start (`--iso PATH`), desktop app only. */
+export async function requestedIso(): Promise<string | null> {
+  if (!inDesktopApp()) return null;
+  return (await tauriInvoke())<string | null>('start_iso');
 }

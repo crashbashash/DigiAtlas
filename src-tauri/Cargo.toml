@@ -12,3 +12,8 @@ tauri = { version = "2", features = [] }
 tauri-plugin-dialog = { version = "2", default-features = false, features = ["xdg-portal"] }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
+digiatlas-importer = { path = "../importer" }
+
+# The importer walks every byte of the disc; unoptimised it would take many minutes in debug builds.
+[profile.dev.package.digiatlas-importer]
+opt-level = 2

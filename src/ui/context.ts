@@ -14,8 +14,8 @@ export interface AppServices {
   go(route: Route, replace?: boolean): void;
   setSettings(patch: Partial<Settings>): void;
   openSearch(): void;
-  /** Pick another exported data folder (desktop app only). */
-  changeData: (() => void) | null;
+  /** Import the disc again (desktop app only). */
+  reimport: (() => void) | null;
 }
 
 export const AppContext = createContext<AppServices | null>(null);

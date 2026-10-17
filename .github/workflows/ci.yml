@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 # Game data is never in the repository, so these checks use the unit tests' small built-in
-# fixtures; the exporter's disc test is skipped without DIGIATLAS_PS2_ISO.
+# fixtures; the importer's disc checks are skipped without DIGIATLAS_PS2_ISO.
 jobs:
   interface:
     name: Interface (format, types, build, tests)
@@ -30,19 +30,6 @@ jobs:
       - run: npm run build
       - run: npm test
 
-  exporter:
-    name: PS2 exporter
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: python3 -m unittest discover -s tests
-
   importer:
     name: Importer (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -59,12 +46,14 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: importer
-      # Not yet run: the crate is not rustfmt-clean, and `cargo clippy --all-targets -- -D warnings`
-      # still reports lints. Once both pass, add `cargo fmt --check` (ubuntu only) and clippy here.
-      - run: cargo build --all-targets --locked
+      - run: cargo fmt --check
+        if: runner.os == 'Linux'
+      - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
 
   native:
@@ -94,9 +83,14 @@ jobs:
       # The native build embeds the built interface.
       - run: npm run build
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       # src-tauri may depend on ../importer by path; its build output lands in src-tauri/target.
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       # Compiles and runs the native unit tests; no `tauri build` bundle is produced.
+      - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+        if: runner.os == 'Linux'
+      - run: cargo clippy --all-targets --locked --manifest-path src-tauri/Cargo.toml -- -D warnings
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml

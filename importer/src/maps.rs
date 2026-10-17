@@ -1,5 +1,4 @@
 //! Top-down stage maps built from each stage's own terrain geometry.
-//! Port of tools/ps2_export/maps.py; must produce the same images and bounds.
 //!
 //! A stage pack holds several scenes (terrain, props, interface, characters). The terrain scene is
 //! the large one that actually covers the places generators spawn things, so it is chosen by how
@@ -171,12 +170,7 @@ pub fn choose_scene(scenes: &[Scene], points: &[(f64, f64)]) -> Option<usize> {
 
 /// The world rectangle the raster covers.
 fn bounds(r: &Raster) -> [f64; 4] {
-    [
-        r.min_x,
-        r.min_x + r.width as f64 / r.pixels_per_unit,
-        r.min_z,
-        r.min_z + r.height as f64 / r.pixels_per_unit,
-    ]
+    [r.min_x, r.min_x + r.width as f64 / r.pixels_per_unit, r.min_z, r.min_z + r.height as f64 / r.pixels_per_unit]
 }
 
 /// The stage's collision mesh: an unnamed scene in the same pack, much smaller than the visible
@@ -236,7 +230,8 @@ pub fn build(ndmw: &Afs, packs: &[usize], spawns: &[[f64; 3]], extra: &[(f64, f6
     let points: Vec<(f64, f64)> = spawns.iter().map(|p| (p[0], p[2])).collect();
     let ys = sorted(spawns.iter().map(|p| p[1]).collect());
     // (key, pack, scenes, terrain scene index)
-    let mut best: Option<((f64, usize), usize, Vec<Scene>, usize)> = None;
+    type Choice = ((f64, usize), usize, Vec<Scene>, usize);
+    let mut best: Option<Choice> = None;
     for &pack in packs {
         let Some(scenes) = pack_scenes(ndmw, pack)? else { continue };
         let Some(s) = choose_scene(&scenes, &points) else { continue };
@@ -252,7 +247,10 @@ pub fn build(ndmw: &Afs, packs: &[usize], spawns: &[[f64; 3]], extra: &[(f64, f6
     let terrain = &scenes[s];
     let xs = points.iter().map(|p| p.0);
     let zs = points.iter().map(|p| p.1);
-    let pad = py_max([MARGIN, 0.25 * py_max([py_max(xs.clone()) - py_min(xs.clone()), py_max(zs.clone()) - py_min(zs.clone())])]);
+    let pad = py_max([
+        MARGIN,
+        0.25 * py_max([py_max(xs.clone()) - py_min(xs.clone()), py_max(zs.clone()) - py_min(zs.clone())]),
+    ]);
     let roi = [py_min(xs.clone()) - pad, py_max(xs) + pad, py_min(zs.clone()) - pad, py_max(zs) + pad];
     let parts = terrain_parts(terrain, MIN_PART_SPAN);
     let mut raster = render::render(parts.iter().copied().flatten(), roi, Some(ys[ys.len() / 2]));

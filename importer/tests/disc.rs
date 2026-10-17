@@ -22,6 +22,8 @@ fn exported() -> Option<&'static Path> {
     OUT.get_or_init(|| {
         let iso = disc()?;
         let out = std::env::temp_dir().join(format!("digiatlas-disc-test-{}", std::process::id()));
+        // A fresh folder: files left by an earlier run would change the counts.
+        let _ = std::fs::remove_dir_all(&out);
         importer::export(&iso, &out, false, &mut |_| {}).expect("export the disc");
         Some(out)
     })
@@ -33,11 +35,21 @@ fn load(name: &str) -> Value {
 }
 
 fn stages() -> BTreeMap<String, Value> {
-    load("stages.json")["stages"].as_array().unwrap().iter().map(|s| (s["id"].as_str().unwrap().to_string(), s.clone())).collect()
+    load("stages.json")["stages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| (s["id"].as_str().unwrap().to_string(), s.clone()))
+        .collect()
 }
 
 fn generators<'a>(stage: &'a Value, difficulty: &str) -> HashMap<&'a str, &'a Value> {
-    stage["difficulties"][difficulty]["generators"].as_array().unwrap().iter().map(|g| (g["name"].as_str().unwrap(), g)).collect()
+    stage["difficulties"][difficulty]["generators"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|g| (g["name"].as_str().unwrap(), g))
+        .collect()
 }
 
 fn every_generator(f: &mut dyn FnMut(&str, &Value)) {
@@ -97,21 +109,34 @@ fn difficulty_packs_scale_spawn_rows() {
     needs_disc!();
     // Goblin Fortress guard room: the same spawner points at stronger rows per difficulty.
     let stage = &stages()["stagGF01"];
-    let rows: BTreeMap<&str, &Value> = stage["difficulties"].as_object().unwrap().iter().map(|(d, v)| (d.as_str(), &v["generators"][0]["row"])).collect();
+    let rows: BTreeMap<&str, &Value> = stage["difficulties"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(d, v)| (d.as_str(), &v["generators"][0]["row"]))
+        .collect();
     assert_eq!(rows, BTreeMap::from([("hard", &json!(6)), ("normal", &json!(2)), ("veryhard", &json!(10))]));
 }
 
 #[test]
 fn known_names() {
     needs_disc!();
-    let enemies: HashMap<i64, Value> = load("enemies.json")["rows"].as_array().unwrap().iter().map(|r| (r["row"].as_i64().unwrap(), r.clone())).collect();
+    let enemies: HashMap<i64, Value> = load("enemies.json")["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| (r["row"].as_i64().unwrap(), r.clone()))
+        .collect();
     assert_eq!(enemies[&1]["name"], "Goburimon");
     assert_eq!(enemies[&1]["hp"], 58);
     assert_eq!(enemies[&36]["name"], "Ogremon");
     assert_eq!(enemies[&370]["kind"], "object");
     let items = load("items.json");
     let name = |cat: &str, id: i64| {
-        items["items"].as_array().unwrap().iter().find(|i| i["category"] == cat && i["id"] == id).unwrap()["name"].as_str().unwrap().to_string()
+        items["items"].as_array().unwrap().iter().find(|i| i["category"] == cat && i["id"] == id).unwrap()["name"]
+            .as_str()
+            .unwrap()
+            .to_string()
     };
     // DW4_Decomp docs/systems/drop-tables.md section 5: guard-room boss drops.
     assert!(name("weapon", 175).starts_with("Mighty Talon"));
@@ -223,7 +248,12 @@ fn goblin_pass_scripts_match_what_the_scripts_do() {
     assert_eq!(trap["status"], "referenced");
     assert!(trap["refs"][0]["when"][0].as_str().unwrap().contains("this is the first time (event 339)"));
     let whens = |g: &str| -> Vec<String> {
-        gens[g]["script"]["refs"].as_array().unwrap().iter().flat_map(|r| r["when"].as_array().unwrap().iter().map(|w| w.as_str().unwrap().to_string())).collect()
+        gens[g]["script"]["refs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|r| r["when"].as_array().unwrap().iter().map(|w| w.as_str().unwrap().to_string()))
+            .collect()
     };
     assert!(whens("GENE-22").iter().any(|w| w.contains("this is the first time (event 355)")));
     let epic = gens["GENE-e00"]["script"]["refs"][0]["when"].as_array().unwrap();
@@ -239,7 +269,10 @@ fn goblin_pass_scripts_match_what_the_scripts_do() {
 fn every_spawner_has_a_script_status() {
     needs_disc!();
     every_generator(&mut |id, g| {
-        assert!(["referenced", "dynamic", "unknown", "none"].contains(&g["script"]["status"].as_str().unwrap()), "{id}");
+        assert!(
+            ["referenced", "dynamic", "unknown", "none"].contains(&g["script"]["status"].as_str().unwrap()),
+            "{id}"
+        );
     });
 }
 
@@ -248,7 +281,9 @@ fn player_counts_scale_spawners() {
     needs_disc!();
     let all = stages();
     let gens = generators(&all["stag0101"], "normal");
-    let counts = |g: &str, key: &str| -> Vec<i64> { gens[g]["players"].as_array().unwrap().iter().map(|e| e[key].as_i64().unwrap()).collect() };
+    let counts = |g: &str, key: &str| -> Vec<i64> {
+        gens[g]["players"].as_array().unwrap().iter().map(|e| e[key].as_i64().unwrap()).collect()
+    };
     // The bridge spawner places 2, 3, 4 or 5 enemies for 1 to 4 players.
     assert_eq!(counts("GENE-00", "count"), [2, 3, 4, 5]);
     // A lone Numemon grows by one per player but is capped at one alive at a time.
@@ -283,7 +318,10 @@ fn radar_triggers_match_the_documented_radii() {
     });
     assert!(!radii.is_empty());
     let all = stages();
-    assert_eq!(generators(&all["stag0101"], "normal")["GENE-00"]["trigger"], json!({"center": [455.0, 50.0, 15.0], "radius": 65.0}));
+    assert_eq!(
+        generators(&all["stag0101"], "normal")["GENE-00"]["trigger"],
+        json!({"center": [455.0, 50.0, 15.0], "radius": 65.0})
+    );
 }
 
 #[test]
@@ -328,7 +366,8 @@ fn shop_and_lobby_rooms_get_a_map_without_spawn_points() {
     let ndmw = ndmw();
     let all = stages();
     for id in ["dngq5b1e", "dngq5b1h", "dngq5b1v", "stagML11"] {
-        let built = maps::build(&ndmw, &packs(&all[id]), &[], &[]).unwrap().unwrap_or_else(|| panic!("{id} has no map"));
+        let built =
+            maps::build(&ndmw, &packs(&all[id]), &[], &[]).unwrap().unwrap_or_else(|| panic!("{id} has no map"));
         assert!(built.raster.fill() < 0.9, "{id}"); // an outline, not a flat arena
     }
 }
@@ -342,7 +381,12 @@ fn trader_hall_trades() {
         .as_array()
         .unwrap()
         .iter()
-        .map(|i| ((i["category"].as_str().unwrap().to_string(), i["id"].as_i64().unwrap()), i["name"].as_str().unwrap().to_string()))
+        .map(|i| {
+            (
+                (i["category"].as_str().unwrap().to_string(), i["id"].as_i64().unwrap()),
+                i["name"].as_str().unwrap().to_string(),
+            )
+        })
         .collect();
     let key = |side: &Value| (side["category"].as_str().unwrap().to_string(), side["id"].as_i64().unwrap());
     let mut counts = BTreeMap::new();
@@ -353,14 +397,18 @@ fn trader_hall_trades() {
             assert!(!t["tables"].as_object().unwrap().is_empty(), "{id} {}", t["trader"]);
             for offers in t["tables"].as_object().unwrap().values() {
                 for o in offers.as_array().unwrap() {
-                    assert!(item_names.contains_key(&key(&o["give"])) && item_names.contains_key(&key(&o["get"])), "{id} {o}");
+                    assert!(
+                        item_names.contains_key(&key(&o["give"])) && item_names.contains_key(&key(&o["get"])),
+                        "{id} {o}"
+                    );
                 }
             }
         }
     }
     // Everyone stands in the room, and the variants differ in who is there.
     assert_eq!(counts, BTreeMap::from([("dngq5b1e", 10), ("dngq5b1h", 8), ("dngq5b1v", 10)]));
-    let agumons: Vec<&Value> = all["dngq5b1h"]["trades"].as_array().unwrap().iter().filter(|t| t["trader"] == "Agumon").collect();
+    let agumons: Vec<&Value> =
+        all["dngq5b1h"]["trades"].as_array().unwrap().iter().filter(|t| t["trader"] == "Agumon").collect();
     assert_eq!(agumons.iter().map(|t| t["number"].clone()).collect::<Vec<_>>(), [json!(1), json!(2)]);
     assert_eq!(agumons[0]["position"], json!({"x": -80.0, "y": 10.0, "z": 20.0}));
     assert_eq!(item_names[&key(&agumons[0]["tables"]["hard"][0]["give"])], "Offering");
@@ -385,7 +433,12 @@ fn appraiser_tables() {
     for tier in block["tiers"].as_array().unwrap() {
         for (category, found) in tier["results"].as_object().unwrap() {
             let found = found.as_array().unwrap();
-            assert_eq!(found.iter().map(|r| r["rate"].as_i64().unwrap()).sum::<i64>(), 10000, "{} {category}", tier["tier"]);
+            assert_eq!(
+                found.iter().map(|r| r["rate"].as_i64().unwrap()).sum::<i64>(),
+                10000,
+                "{} {category}",
+                tier["tier"]
+            );
             for r in found {
                 let item = items[&(r["category"].as_str().unwrap().to_string(), r["id"].as_i64().unwrap())];
                 assert!(item.get("unidentified").is_none());
@@ -402,8 +455,11 @@ fn unidentified_placeholders() {
     needs_disc!();
     let items = load("items.json");
     let items = items["items"].as_array().unwrap();
-    let flagged: BTreeSet<(String, i64)> =
-        items.iter().filter(|i| i["unidentified"] == true).map(|i| (i["category"].as_str().unwrap().to_string(), i["id"].as_i64().unwrap())).collect();
+    let flagged: BTreeSet<(String, i64)> = items
+        .iter()
+        .filter(|i| i["unidentified"] == true)
+        .map(|i| (i["category"].as_str().unwrap().to_string(), i["id"].as_i64().unwrap()))
+        .collect();
     assert_eq!(flagged, BTreeSet::from([("armor1".into(), 31), ("armor2".into(), 44), ("weapon".into(), 276)]));
     assert!(items.iter().all(|i| !i["name"].as_str().unwrap().contains('?')));
     assert!(items.iter().filter(|i| i["unidentified"] == true).all(|i| i["stats"].get("equipLevel").is_none()));
@@ -413,8 +469,12 @@ fn unidentified_placeholders() {
 fn every_dropped_item_has_a_name() {
     needs_disc!();
     let items = load("items.json");
-    let known: BTreeSet<(String, i64)> =
-        items["items"].as_array().unwrap().iter().map(|i| (i["category"].as_str().unwrap().to_string(), i["id"].as_i64().unwrap())).collect();
+    let known: BTreeSet<(String, i64)> = items["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| (i["category"].as_str().unwrap().to_string(), i["id"].as_i64().unwrap()))
+        .collect();
     for pool in load("drops.json")["pools"].as_object().unwrap().values() {
         for e in pool["entries"].as_array().unwrap() {
             assert!(known.contains(&(e["category"].as_str().unwrap().to_string(), e["id"].as_i64().unwrap())), "{e}");
@@ -427,7 +487,8 @@ fn spawner_rows_resolve_except_the_known_empty_slot() {
     needs_disc!();
     // Three Kokatorimon spawners in stag0104 point at row 90, an empty slot between the Blossomon
     // and Kokatorimon rows (a quirk of the game's data).
-    let rows: BTreeSet<i64> = load("enemies.json")["rows"].as_array().unwrap().iter().map(|r| r["row"].as_i64().unwrap()).collect();
+    let rows: BTreeSet<i64> =
+        load("enemies.json")["rows"].as_array().unwrap().iter().map(|r| r["row"].as_i64().unwrap()).collect();
     let mut missing = BTreeSet::new();
     every_generator(&mut |_, g| {
         let row = g["row"].as_i64().unwrap();
@@ -445,10 +506,28 @@ fn disc_sourced_enemy_names_appear_in_the_card_album() {
     let files = iso::list_files(&source).unwrap();
     let area = Afs::open(iso::open_disc_file(&source, &files, "AREA.AFS").unwrap()).unwrap();
     let graph = importer::igb::Graph::new(area.entry(621).unwrap()).unwrap();
-    let album: BTreeSet<&str> = graph.s2.iter().filter(|r| r.class == "igNamedObject").filter_map(|r| r.name.as_deref()).collect();
+    let album: BTreeSet<&str> =
+        graph.s2.iter().filter(|r| r.class == "igNamedObject").filter_map(|r| r.name.as_deref()).collect();
     for (model, entry) in names::enemies().as_object().unwrap() {
         if !model.starts_with('_') && entry["source"] == "disc" {
             assert!(album.contains(entry["name"].as_str().unwrap()), "{model} is not in the card album");
         }
+    }
+}
+
+#[test]
+fn output_matches_the_published_schema() {
+    needs_disc!();
+    let schemas = Path::new(env!("CARGO_MANIFEST_DIR")).join("../schema/v1");
+    for name in ["manifest", "enemies", "drops", "stages", "items"] {
+        let schema: Value =
+            serde_json::from_str(&std::fs::read_to_string(schemas.join(format!("{name}.schema.json"))).unwrap())
+                .unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        assert!(!validator.is_valid(&json!({"unexpected": true})), "{name} schema accepts anything");
+        let doc = load(&format!("{name}.json"));
+        let errors: Vec<String> =
+            validator.iter_errors(&doc).take(5).map(|e| format!("{} at {}", e, e.instance_path)).collect();
+        assert!(errors.is_empty(), "{name}.json: {errors:#?}");
     }
 }

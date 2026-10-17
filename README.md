@@ -53,7 +53,7 @@ progress, your level), and scripted item pickups are not extracted yet.
 ```
 
 The first time, DigiAtlas asks for your Digimon World 4 disc image (USA, PS2; an `.iso` dump of
-your own disc). It reads the disc once, which takes a minute or two, and keeps the data, so you can
+your own disc). It reads the disc once, which takes under a minute, and keeps the data, so you can
 move or delete the image afterwards. "Re-import from disc" at the bottom of the home page reads it
 again; when a newer DigiAtlas reads more from the disc, it asks for the image again instead of
 showing the old data.
@@ -82,8 +82,10 @@ cargo run --release --manifest-path importer/Cargo.toml -- "/path/to/Digimon Wor
 In the browser, `?import=welcome`, `?import=stale` or `?import=failed` previews the desktop app's
 import screens with a stand-in importer.
 
-`npm test` runs the interface tests, `cargo test` (in `src-tauri`) the native ones, and
-`python3 -m unittest discover -s tests` the exporter tests. GitHub Actions runs all three, plus the format check and build, on every push and pull request.
+`npm test` runs the interface tests, and `cargo test` the native ones (in `src-tauri`) and the
+importer's (in `importer`; see [importer/README.md](importer/README.md) for the checks against a
+real disc). GitHub Actions runs them, plus the format and lint checks, on Linux, Windows and macOS
+on every push and pull request.
 
 ## Data
 
@@ -91,11 +93,11 @@ Game-derived data is never committed. DigiAtlas reads the user's own disc image 
 importer (the `importer` crate, which writes the [schema](docs/schema.md)) and caches the result in
 the app's data folder, under `data/ps2-usa/`:
 
-| OS | Cache folder |
-|---|---|
-| Linux | `~/.local/share/io.github.crashbashash.digiatlas/data/ps2-usa` |
-| Windows | `%APPDATA%\io.github.crashbashash.digiatlas\data\ps2-usa` |
-| macOS | `~/Library/Application Support/io.github.crashbashash.digiatlas/data/ps2-usa` |
+| OS      | Cache folder                                                                  |
+| ------- | ----------------------------------------------------------------------------- |
+| Linux   | `~/.local/share/io.github.crashbashash.digiatlas/data/ps2-usa`                |
+| Windows | `%APPDATA%\io.github.crashbashash.digiatlas\data\ps2-usa`                     |
+| macOS   | `~/Library/Application Support/io.github.crashbashash.digiatlas/data/ps2-usa` |
 
 (This is Tauri's app data directory; the name is the `identifier` in `src-tauri/tauri.conf.json`.)
 An import is written to `ps2-usa.new` next to it and swapped in only when it has finished, so a
@@ -106,8 +108,8 @@ is not shown but imported again.
 Each platform has its own reader that writes the same schema, so platform differences stay out of
 the UI. The PS2 reader exports 580 enemy and object rows with names and stats, 590 items with names
 and descriptions, 98 named stages, 81 stages of spawn generators across all three difficulties
-(with world positions), 344 drop pools, loading banners, and top-down maps for 82 stages. See
-[tools/README.md](tools/README.md) for what it can and cannot read yet.
+(with world positions), 344 drop pools, loading banners, and top-down maps for 89 stages. See
+[importer/README.md](importer/README.md) for how it reads them.
 
 ## License
 

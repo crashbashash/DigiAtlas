@@ -1,9 +1,9 @@
 //! Lua 4.0.1 bytecode decompiler for the scripts inside DW4 stage packs.
 //!
-//! Port of tools/ps2_export/luadec.py. The stage readers parse the decompiled text with regexes, so
-//! this must produce the Python output byte for byte, quirks included: wherever the Python raises
-//! (an out-of-range constant or jump target, a truncated chunk) this returns `Err`, and
-//! `decompile_chunks` skips that chunk the same way.
+//! The stage readers parse the decompiled text with regexes, so the text format matters, quirks
+//! included; it matches the Python decompiler this was ported from. Wherever that one raised (an
+//! out-of-range constant or jump target, a truncated chunk) this returns `Err`, and
+//! `decompile_chunks` skips that chunk.
 //!
 //! Instruction layout (verified against reference Lua 4.0.1): `OP(6) | B(9 bits @6) | A(17 bits @15)`.
 //! Jump opcodes are the stock pop variants, so scripts have no `and`/`or` short-circuit, and local
@@ -143,6 +143,7 @@ impl<'a> Reader<'a> {
 }
 
 fn parse_function(c: &mut Reader) -> Result<Function> {
+    let _depth = Depth::enter()?;
     c.string()?; // source
     c.i32()?; // lineDefined
     let numparams = c.i32()?;
@@ -282,8 +283,41 @@ fn render_number(v: f64) -> Result<String> {
     }
 }
 
+/// How deep expressions and nested blocks may go. Real scripts stay far below it; a damaged
+/// chunk past it is skipped, as the Python skipped one that hit its recursion limit, instead of
+/// exhausting the stack or memory.
+const MAX_DEPTH: usize = 300;
+
+thread_local! {
+    static DEPTH: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Counts one level of recursion while it lives.
+struct Depth;
+
+impl Depth {
+    fn enter() -> Result<Depth> {
+        let depth = DEPTH.with(|d| {
+            d.set(d.get() + 1);
+            d.get()
+        });
+        let guard = Depth;
+        if depth > MAX_DEPTH {
+            fail!("nested more than {MAX_DEPTH} levels deep");
+        }
+        Ok(guard)
+    }
+}
+
+impl Drop for Depth {
+    fn drop(&mut self) {
+        DEPTH.with(|d| d.set(d.get() - 1));
+    }
+}
+
 /// Source text of an expression; `None` only for a global named by a null string.
 fn render(expr: &Expr) -> Result<Option<String>> {
+    let _depth = Depth::enter()?;
     Ok(Some(match expr {
         Expr::Nil => "nil".into(),
         Expr::Int(v) => v.to_string(),
@@ -310,12 +344,9 @@ fn render(expr: &Expr) -> Result<Option<String>> {
             }
         }
         Expr::Call(func, args) => format!("{}({})", need(render_with(func, PREC_ATOM)?)?, join(args)?),
-        Expr::Method(recv, name, args) => format!(
-            "{}:{}({})",
-            need(render_with(recv, PREC_ATOM)?)?,
-            need(name.clone())?,
-            join(args)?
-        ),
+        Expr::Method(recv, name, args) => {
+            format!("{}:{}({})", need(render_with(recv, PREC_ATOM)?)?, need(name.clone())?, join(args)?)
+        }
         Expr::Table(t) => {
             let t = t.borrow();
             let mut parts = vec!["???".to_string(); t.array];
@@ -643,6 +674,7 @@ impl<'f> Decompiler<'f> {
         if let Some((result, stop)) = self.memo.get(&(start, end)) {
             return Ok((result.clone(), *stop));
         }
+        let _depth = Depth::enter()?;
         let saved_stack = self.stack.clone();
         let saved_stmts = std::mem::take(&mut self.stmts);
         let saved_pc = self.pc;
@@ -870,11 +902,8 @@ impl<'f> Decompiler<'f> {
                         for (i, name) in params.iter().enumerate() {
                             inner.local_names.insert(i as i64, name.clone());
                         }
-                        let body: Vec<String> = inner
-                            .decompile()?
-                            .into_iter()
-                            .map(|(lev, t)| "    ".repeat(lev + 1) + &t)
-                            .collect();
+                        let body: Vec<String> =
+                            inner.decompile()?.into_iter().map(|(lev, t)| "    ".repeat(lev + 1) + &t).collect();
                         format!("function({})\n{}\nend", params.join(", "), body.join("\n"))
                     }
                     None => "function() end".into(),
@@ -898,11 +927,8 @@ fn is_single_if(stmts: &[Stmt]) -> bool {
 
 /// Decompiled source of a function (statements joined with newlines, four-space indents).
 pub fn decompile_function_source(function: &Function) -> Result<String> {
-    let lines: Vec<String> = Decompiler::new(function)
-        .decompile()?
-        .into_iter()
-        .map(|(lev, text)| "    ".repeat(lev) + &text)
-        .collect();
+    let lines: Vec<String> =
+        Decompiler::new(function).decompile()?.into_iter().map(|(lev, text)| "    ".repeat(lev) + &text).collect();
     Ok(lines.join("\n"))
 }
 
@@ -964,6 +990,17 @@ mod tests {
     }
 
     #[test]
+    fn skips_expressions_nested_past_the_limit() {
+        let mut e = g("x");
+        for _ in 0..MAX_DEPTH + 10 {
+            e = Rc::new(Expr::Unop("-", e));
+        }
+        assert!(render(&e).is_err());
+        assert_eq!(DEPTH.with(|d| d.get()), 0);
+        assert_eq!(text(&bin("+", g("a"), g("b"))), "a + b");
+    }
+
+    #[test]
     fn prints_numbers_like_the_python() {
         assert_eq!(render_number(1.0).unwrap(), "1");
         assert_eq!(render_number(-0.0).unwrap(), "0");
@@ -1016,10 +1053,7 @@ mod tests {
             iab(OP_CALL, 0, 0),
             OP_END,
         ];
-        assert_eq!(
-            source(code, &["x", "f", "g"], &[]),
-            "if x == 1 then\n    f()\nelseif x == 2 then\n    g()\nend"
-        );
+        assert_eq!(source(code, &["x", "f", "g"], &[]), "if x == 1 then\n    f()\nelseif x == 2 then\n    g()\nend");
     }
 
     #[test]
@@ -1091,6 +1125,8 @@ mod tests {
             }
         }
         let mut chunk = b"\x1bLua\x40\x01\x04\x04\x04\x20\x06\x09\x08".to_vec();
+        // Lua 4's header check number, not an attempt at pi.
+        #[allow(clippy::approx_constant)]
         chunk.extend(3.14159265358979_f64.to_le_bytes());
         string(&mut chunk, "@test");
         ints(&mut chunk, &[0, 0]); // lineDefined, numparams

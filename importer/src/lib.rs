@@ -1,6 +1,7 @@
 //! DigiAtlas importer: reads a Digimon World 4 (USA) PS2 disc image and writes DigiAtlas data
-//! (schema v1, see docs/schema.md). A port of the original Python exporter (tools/ps2_export) that
-//! writes the same data, so the app can import a disc on any platform without Python.
+//! (schema v1, see docs/schema.md). It began as a port of a Python exporter and was checked to
+//! write the same data, byte for byte and pixel for pixel; comments that mention Python explain
+//! details of the output that come from it.
 
 pub mod error;
 pub mod pyfmt;
@@ -29,4 +30,4 @@ pub mod export;
 pub mod names;
 
 pub use error::{Error, Result};
-pub use export::{export, Progress, IMPORTER_VERSION};
+pub use export::{export, Progress, IMPORTER_VERSION, STACK_SIZE};

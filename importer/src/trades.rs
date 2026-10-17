@@ -1,5 +1,4 @@
 //! Item trades offered by the Digimon in a shop room (Trader Hall).
-//! Port of tools/ps2_export/trades.py; must produce the same traders and offers.
 //!
 //! Each trader's dialogue script is a chain of "if you hold item X, offer item Y" branches. A branch
 //! sets `g_SItemDB/g_SItemID` (what you hand over) and `g_TItemDB/g_TItemID` (what you get). The first
@@ -15,7 +14,9 @@ use crate::luadec;
 
 fn offer_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r#"g_SItemDB = "(\w+)"\s+g_SItemID = (\d+)\s+g_TItemDB = "(\w+)"\s+g_TItemID = (\d+)"#).unwrap())
+    RE.get_or_init(|| {
+        Regex::new(r#"g_SItemDB = "(\w+)"\s+g_SItemID = (\d+)\s+g_TItemDB = "(\w+)"\s+g_TItemID = (\d+)"#).unwrap()
+    })
 }
 
 fn speaker_re() -> &'static Regex {
@@ -95,7 +96,9 @@ pub fn parse(source: &str, digimon: &HashMap<String, String>) -> Option<Trader> 
     let speaker = speaker_re().captures(source)?;
     let offers: Vec<Offer> = offer_re()
         .captures_iter(source)
-        .filter_map(|m| Some(Offer { give: (m[1].to_string(), m[2].parse().ok()?), get: (m[3].to_string(), m[4].parse().ok()?) }))
+        .filter_map(|m| {
+            Some(Offer { give: (m[1].to_string(), m[2].parse().ok()?), get: (m[3].to_string(), m[4].parse().ok()?) })
+        })
         .collect();
     if offers.is_empty() {
         return None;
@@ -126,7 +129,9 @@ pub fn scripts(data: &[u8]) -> HashMap<String, String> {
         }
         let Some(obj) = g.vals(k).get(1).and_then(|v| g.r#ref(v)) else { continue };
         let vals = g.vals(obj);
-        let (Some(size), Some(memory)) = (vals.first().and_then(|v| v.int()), vals.get(1).and_then(|v| v.int())) else { continue };
+        let (Some(size), Some(memory)) = (vals.first().and_then(|v| v.int()), vals.get(1).and_then(|v| v.int())) else {
+            continue;
+        };
         let (Ok(size), Ok(memory)) = (usize::try_from(size), usize::try_from(memory)) else { continue };
         let source = g
             .block(memory, size)
@@ -148,10 +153,11 @@ pub struct PackScripts {
 /// The traders standing in a stage, sorted by name then instance.
 pub fn extract(packs: &[Vec<u8>], digimon: &HashMap<String, String>) -> Vec<Placed> {
     let marker: &[u8] = b"g_TItemID";
-    let scripted = packs.iter().filter(|data| data.windows(marker.len()).any(|w| w == marker)).map(|data| PackScripts {
-        files: scripts(data),
-        chunks: luadec::decompile_chunks(data).into_iter().map(|(_, source)| source).collect(),
-    });
+    let scripted =
+        packs.iter().filter(|data| data.windows(marker.len()).any(|w| w == marker)).map(|data| PackScripts {
+            files: scripts(data),
+            chunks: luadec::decompile_chunks(data).into_iter().map(|(_, source)| source).collect(),
+        });
     extract_from(scripted, digimon)
 }
 
@@ -254,7 +260,10 @@ be:DMrun()"#;
         );
         assert_eq!(
             placements(src),
-            [("agumon".to_string(), 0, [-80.0, 10.0, 20.0], 90.0), ("girumon".to_string(), 1, [-240.5, 10.0, -180.0], -45.0)]
+            [
+                ("agumon".to_string(), 0, [-80.0, 10.0, 20.0], 90.0),
+                ("girumon".to_string(), 1, [-240.5, 10.0, -180.0], -45.0)
+            ]
         );
     }
 
@@ -274,11 +283,16 @@ be:DMrun()"#;
             .to_string()],
         };
         let out = extract_from([pack], &agumon());
-        let summary: Vec<_> =
-            out.iter().map(|t| (t.name.as_str(), t.instance, t.position, t.tables.iter().map(|(d, _)| *d).collect::<Vec<_>>())).collect();
+        let summary: Vec<_> = out
+            .iter()
+            .map(|t| (t.name.as_str(), t.instance, t.position, t.tables.iter().map(|(d, _)| *d).collect::<Vec<_>>()))
+            .collect();
         assert_eq!(
             summary,
-            [("Agumon", 1, [-80.0, 10.0, 20.0], vec!["hard"]), ("Mamemon", 0, [1.0, 2.0, 3.0], vec!["normal", "hard", "veryhard"])]
+            [
+                ("Agumon", 1, [-80.0, 10.0, 20.0], vec!["hard"]),
+                ("Mamemon", 0, [1.0, 2.0, 3.0], vec!["normal", "hard", "veryhard"])
+            ]
         );
     }
 }

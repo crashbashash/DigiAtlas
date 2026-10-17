@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use serde::Serialize;
 use std::{
     fs,
     panic::{catch_unwind, AssertUnwindSafe},
@@ -9,7 +10,6 @@ use std::{
         Arc, Mutex,
     },
 };
-use serde::Serialize;
 use tauri::{ipc::Channel, ipc::Response, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
@@ -201,17 +201,18 @@ fn import_disc(cache: State<Cache>, path: String, events: Channel<ImportEvent>) 
     }
     let importing = cache.importing.clone();
     let dir = cache.dir.clone();
-    let spawned = std::thread::Builder::new().name("disc-import".into()).spawn(move || {
-        let mut progress = |p: importer::Progress| {
-            let _ = events.send(ImportEvent::Progress { done: p.done, total: p.total, message: p.message });
-        };
-        let outcome = import_into(&iso, &dir, &mut progress);
-        importing.store(false, Ordering::SeqCst);
-        let _ = events.send(match outcome {
-            Ok(()) => ImportEvent::Finished,
-            Err(message) => ImportEvent::Failed { message },
+    let spawned =
+        std::thread::Builder::new().name("disc-import".into()).stack_size(importer::STACK_SIZE).spawn(move || {
+            let mut progress = |p: importer::Progress| {
+                let _ = events.send(ImportEvent::Progress { done: p.done, total: p.total, message: p.message });
+            };
+            let outcome = import_into(&iso, &dir, &mut progress);
+            importing.store(false, Ordering::SeqCst);
+            let _ = events.send(match outcome {
+                Ok(()) => ImportEvent::Finished,
+                Err(message) => ImportEvent::Failed { message },
+            });
         });
-    });
     if let Err(e) = spawned {
         cache.importing.store(false, Ordering::SeqCst);
         return Err(e.to_string());
@@ -230,10 +231,11 @@ async fn open_popout(app: tauri::AppHandle, label: String, hash: String, title: 
         existing.set_focus().map_err(|e| e.to_string())?;
         return Ok(());
     }
-    let mut builder = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(format!("index.html{hash}").into()))
-        .title(title)
-        .inner_size(440.0, 520.0)
-        .min_inner_size(340.0, 300.0);
+    let mut builder =
+        tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App(format!("index.html{hash}").into()))
+            .title(title)
+            .inner_size(440.0, 520.0)
+            .min_inner_size(340.0, 300.0);
     if let Some(main) = app.get_webview_window("main") {
         builder = builder.parent(&main).map_err(|e| e.to_string())?;
     }

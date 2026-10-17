@@ -15,10 +15,16 @@ use crate::error::{Error, Result};
 use crate::generators::{DropPool, Generator, Pack, PlayerSlot};
 use crate::igb::Value as Field;
 use crate::iso::{self, Source};
-use crate::{appraisal, banners, database, fail, manifest as archive_manifest, maps, names, png, pyfmt, scripts, stages, stats, trades};
+use crate::{
+    appraisal, banners, database, fail, manifest as archive_manifest, maps, names, png, pyfmt, scripts, stages, stats,
+    trades,
+};
 
 pub const SCHEMA_VERSION: i64 = 1;
 /// Bumped whenever the data the importer writes changes, so the app knows a cache is stale.
+/// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
+pub const STACK_SIZE: usize = 64 << 20;
+
 pub const IMPORTER_VERSION: &str = "1.0.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
@@ -49,7 +55,8 @@ fn kinds(prefix: char) -> &'static str {
 /// The disc serial from SYSTEM.CNF (`SLUS-20836`).
 fn serial(system_cnf: &[u8]) -> Option<String> {
     static RE: OnceLock<regex::bytes::Regex> = OnceLock::new();
-    let re = RE.get_or_init(|| regex::bytes::Regex::new(r"(?-u)BOOT2\s*=\s*cdrom0:\\?([A-Z]{4}_\d{3}\.\d{2})").unwrap());
+    let re =
+        RE.get_or_init(|| regex::bytes::Regex::new(r"(?-u)BOOT2\s*=\s*cdrom0:\\?([A-Z]{4}_\d{3}\.\d{2})").unwrap());
     let raw = String::from_utf8_lossy(&re.captures(system_cnf)?[1]).into_owned();
     Some(format!("{}-{}{}", &raw[..4], &raw[5..8], &raw[9..]))
 }
@@ -69,7 +76,8 @@ fn field_json(v: &Field) -> Value {
 
 fn pool_record(pool: &DropPool) -> Value {
     static POOL_NAME: OnceLock<Regex> = OnceLock::new();
-    let re = POOL_NAME.get_or_init(|| Regex::new(r"^(?P<d>[nhv])(?P<zone>Z\d+)(?P<family>[A-Za-z]+?)(?P<variant>\d*)$").unwrap());
+    let re = POOL_NAME
+        .get_or_init(|| Regex::new(r"^(?P<d>[nhv])(?P<zone>Z\d+)(?P<family>[A-Za-z]+?)(?P<variant>\d*)$").unwrap());
     let entries: Vec<Value> = pool
         .entries
         .iter()
@@ -283,7 +291,9 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     let flag_names = scripts::load_flag_names();
     let mut player_digimon: HashMap<String, String> = HashMap::new();
     for r in tables.get("shinka").map(Vec::as_slice).unwrap_or(&[]) {
-        if let (Some(model), Some(name)) = (r.get("MODEL_NAME").and_then(database::Cell::str), r.get("NAME").and_then(database::Cell::str)) {
+        if let (Some(model), Some(name)) =
+            (r.get("MODEL_NAME").and_then(database::Cell::str), r.get("NAME").and_then(database::Cell::str))
+        {
             if !model.is_empty() && !name.is_empty() {
                 player_digimon.insert(model.to_string(), name.to_string());
             }
@@ -325,7 +335,8 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     std::fs::create_dir_all(&banner_dir)?;
     let all_stages = stages::list_stages(&ndmw)?;
     let stage_names = names::stages();
-    let mut unnamed: Vec<&str> = all_stages.iter().map(|s| s.id.as_str()).filter(|id| stage_names.get(id).is_none()).collect();
+    let mut unnamed: Vec<&str> =
+        all_stages.iter().map(|s| s.id.as_str()).filter(|id| stage_names.get(id).is_none()).collect();
     unnamed.sort();
     if !unnamed.is_empty() {
         fail!("no name entry for stages {unnamed:?}; add them to importer/names/stages.json");
@@ -338,7 +349,11 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         progress(Progress {
             done: n + 1,
             total,
-            message: format!("{} · {}", label["area"].as_str().unwrap_or("Stages"), label["room"].as_str().unwrap_or(&st.id)),
+            message: format!(
+                "{} · {}",
+                label["area"].as_str().unwrap_or("Stages"),
+                label["room"].as_str().unwrap_or(&st.id)
+            ),
         });
         let tex = banners::load(&area, &archive_names, &st.id)?;
         if let Some(t) = &tex {
@@ -352,10 +367,15 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         rec.insert("banner".into(), if tex.is_some() { json!(format!("banners/{}.png", st.id)) } else { Value::Null });
         rec.insert("manifestEntry".into(), json!(st.manifest_entry));
         rec.insert("packs".into(), json!(st.packs));
-        let gen_packs: Map<String, Value> = st.generator_packs.iter().map(|(d, e)| ((*d).to_string(), json!(e))).collect();
+        let gen_packs: Map<String, Value> =
+            st.generator_packs.iter().map(|(d, e)| ((*d).to_string(), json!(e))).collect();
         rec.insert("generatorPacks".into(), if gen_packs.is_empty() { Value::Null } else { Value::Object(gen_packs) });
         let pack_data: Vec<Vec<u8>> = st.packs.iter().map(|&pk| ndmw.entry(pk)).collect::<Result<_>>()?;
-        let stage_scripts = if st.generator_packs.is_empty() { None } else { Some(scripts::analyse(&pack_data, &player_digimon, &flag_names)) };
+        let stage_scripts = if st.generator_packs.is_empty() {
+            None
+        } else {
+            Some(scripts::analyse(&pack_data, &player_digimon, &flag_names))
+        };
         let mut map_points: Vec<[f64; 3]> = Vec::new();
         let mut difficulties = Map::new();
         for difficulty in DIFFICULTIES {
@@ -363,7 +383,12 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
             let gens = Pack::new(ndmw.entry(idx)?)?.generators()?;
             map_points.extend(gens.iter().flat_map(|g| g.spawns()));
             for g in &gens {
-                let fallback = [PlayerSlot { count: Field::Int(0), max_count: Field::Int(0), pools: g.pools.clone(), last_pools: g.last_pools.clone() }];
+                let fallback = [PlayerSlot {
+                    count: Field::Int(0),
+                    max_count: Field::Int(0),
+                    pools: g.pools.clone(),
+                    last_pools: g.last_pools.clone(),
+                }];
                 let slots: &[PlayerSlot] = if g.slots.is_empty() { &fallback } else { &g.slots };
                 for slot in slots {
                     for pool in slot.pools.iter().chain(&slot.last_pools) {
@@ -406,7 +431,8 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
 
     // --- appraiser (what an unidentified item turns into) ---------------------------------
     progress(Progress { done: total - 1, total, message: "Reading items and the appraiser".into() });
-    let mut hub_packs: Vec<usize> = all_stages.iter().filter(|s| s.id.starts_with("stagML")).flat_map(|s| s.packs.iter().copied()).collect();
+    let mut hub_packs: Vec<usize> =
+        all_stages.iter().filter(|s| s.id.starts_with("stagML")).flat_map(|s| s.packs.iter().copied()).collect();
     hub_packs.sort();
     hub_packs.dedup();
     let appraisal_block = appraisal::find_tables(&ndmw, &hub_packs)?.map(|t| appraisal::build(&t));
@@ -437,7 +463,12 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let count_generators: usize = stage_records
         .iter()
-        .map(|s| s["difficulties"].as_object().map(|d| d.values().map(|v| v["generators"].as_array().map_or(0, Vec::len)).sum::<usize>()).unwrap_or(0))
+        .map(|s| {
+            s["difficulties"]
+                .as_object()
+                .map(|d| d.values().map(|v| v["generators"].as_array().map_or(0, Vec::len)).sum::<usize>())
+                .unwrap_or(0)
+        })
         .sum();
     let manifest = json!({
         "schemaVersion": SCHEMA_VERSION,
@@ -513,7 +544,9 @@ mod tests {
     fn a_record_carries_the_trigger() {
         let rec = generator_record(&generator([1.0, 2.0, 3.0], vec![[1.0, 2.0, 3.0]], true, "radar", 625.0), None);
         assert_eq!(rec["trigger"], json!({"center": [1.0, 2.0, 3.0], "radius": 25.0}));
-        assert!(generator_record(&generator([1.0, 2.0, 3.0], vec![], true, "direct", 0.0), None).get("trigger").is_none());
+        assert!(generator_record(&generator([1.0, 2.0, 3.0], vec![], true, "direct", 0.0), None)
+            .get("trigger")
+            .is_none());
     }
 
     fn slots(rows: &[(i64, i64, &str)]) -> Vec<PlayerSlot> {
@@ -555,7 +588,10 @@ mod tests {
         };
         let rec = pool_record(&p);
         assert_eq!(rec["totalRate"], 1850);
-        assert_eq!((&rec["difficulty"], &rec["zone"], &rec["family"], &rec["variant"]), (&json!("hard"), &json!("Z1"), &json!("gobr"), &json!("3")));
+        assert_eq!(
+            (&rec["difficulty"], &rec["zone"], &rec["family"], &rec["variant"]),
+            (&json!("hard"), &json!("Z1"), &json!("gobr"), &json!("3"))
+        );
         assert_eq!(pool_record(&pool("comonNOTG01")), json!({"entries": [], "totalRate": 0}));
     }
 
@@ -568,29 +604,32 @@ mod tests {
     #[test]
     fn several_traders_of_one_digimon_are_numbered() {
         let offer = vec![trades::Offer { give: ("weapon".into(), 1), get: ("weapon".into(), 2) }];
-        let placed = |name: &str, instance, position, facing, tables: Vec<(&'static str, Vec<trades::Offer>)>| trades::Placed {
-            name: name.into(),
-            instance,
-            position,
-            facing,
-            tables,
+        let placed = |name: &str, instance, position, facing, tables: Vec<(&'static str, Vec<trades::Offer>)>| {
+            trades::Placed { name: name.into(), instance, position, facing, tables }
         };
         let out = trades_json(&[
             placed("Agumon", 0, [-80.0, 10.0, 20.0], 90.0, vec![("hard", offer.clone())]),
             placed("Agumon", 1, [240.0, 10.0, -180.0], -45.0, vec![("hard", offer.clone())]),
             placed("Dorumon", 0, [0.0, 10.0, 0.0], 0.0, vec![]),
         ]);
-        let numbered: Vec<(&str, Value)> = out.as_array().unwrap().iter().map(|x| (x["trader"].as_str().unwrap(), x["number"].clone())).collect();
+        let numbered: Vec<(&str, Value)> =
+            out.as_array().unwrap().iter().map(|x| (x["trader"].as_str().unwrap(), x["number"].clone())).collect();
         assert_eq!(numbered, [("Agumon", json!(1)), ("Agumon", json!(2)), ("Dorumon", Value::Null)]);
         assert_eq!(out[0]["position"], json!({"x": -80.0, "y": 10.0, "z": 20.0}));
         assert_eq!(out[0]["facing"], 90.0);
-        assert_eq!(out[0]["tables"]["hard"][0], json!({"give": {"category": "weapon", "id": 1}, "get": {"category": "weapon", "id": 2}}));
+        assert_eq!(
+            out[0]["tables"]["hard"][0],
+            json!({"give": {"category": "weapon", "id": 1}, "get": {"category": "weapon", "id": 2}})
+        );
     }
 
     #[test]
     fn names_enemies_with_kind_overrides_and_parts() {
         let orb = enemy_naming("f_luce2").unwrap();
-        assert_eq!((orb["role"].as_str(), orb["partOf"].as_str(), orb["kind"].as_str()), (Some("part"), Some("Lucemon"), Some("boss")));
+        assert_eq!(
+            (orb["role"].as_str(), orb["partOf"].as_str(), orb["kind"].as_str()),
+            (Some("part"), Some("Lucemon"), Some("boss"))
+        );
         assert_eq!(enemy_naming("e_goburi").unwrap()["kind"], "enemy");
         assert!(enemy_naming("nope").is_err());
     }

@@ -30,7 +30,8 @@ impl Stage {
 /// Floor, variant and kind derived from the engine id (`dng101b2` is floor B2).
 pub fn describe(stage_id: &str) -> serde_json::Map<String, Json> {
     static FLOOR: OnceLock<regex::Regex> = OnceLock::new();
-    let floor = FLOOR.get_or_init(|| regex::Regex::new(r"^dng(?:\d{3}|q\d)(?P<kind>[bf])(?P<n>\d+)(?P<variant>[ehv])?$").unwrap());
+    let floor = FLOOR
+        .get_or_init(|| regex::Regex::new(r"^dng(?:\d{3}|q\d)(?P<kind>[bf])(?P<n>\d+)(?P<variant>[ehv])?$").unwrap());
     let mut kind = "field";
     let (mut fl, mut variant) = (Json::Null, Json::Null);
     if stage_id.starts_with("dng") {
@@ -62,10 +63,7 @@ fn parse_manifest(data: &[u8]) -> (Option<String>, Vec<usize>) {
     let pack_ref = PACK_REF.get_or_init(|| Regex::new(r"(?-u)\[0\.(\d+)\]").unwrap());
     let printable = PRINTABLE.get_or_init(|| Regex::new(r"(?-u)[ -~]{4,}").unwrap());
     let stage_id = STAGE_ID.get_or_init(|| Regex::new(r"(?-u)^(stag[0-9A-Za-z]+|dng[0-9a-z]+)$").unwrap());
-    let packs = pack_ref
-        .captures_iter(data)
-        .filter_map(|c| std::str::from_utf8(&c[1]).ok()?.parse().ok())
-        .collect();
+    let packs = pack_ref.captures_iter(data).filter_map(|c| std::str::from_utf8(&c[1]).ok()?.parse().ok()).collect();
     let ids: Vec<&[u8]> = printable.find_iter(data).map(|m| m.as_bytes()).filter(|t| stage_id.is_match(t)).collect();
     (ids.last().map(|t| String::from_utf8_lossy(t).into_owned()), packs)
 }

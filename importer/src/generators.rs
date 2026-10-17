@@ -215,7 +215,8 @@ impl Pack {
                 }
             }
             let first = slots.first();
-            let position = v[GENE_POS].floats().map(|p| [p[0], p[1], p[2]].map(|x| pyfmt::round(x, 4))).unwrap_or([0.0; 3]);
+            let position =
+                v[GENE_POS].floats().map(|p| [p[0], p[1], p[2]].map(|x| pyfmt::round(x, 4))).unwrap_or([0.0; 3]);
             out.push(Generator {
                 name: v[GENE_NAME].str().unwrap_or("").to_string(),
                 row: v[GENE_ROW].clone(),
@@ -230,7 +231,11 @@ impl Pack {
                 gene_count: first.map(|s| s.count.clone()),
                 gene_max_count: first.map(|s| s.max_count.clone()),
                 pools: slots.iter().find(|s| !s.pools.is_empty()).map(|s| s.pools.clone()).unwrap_or_default(),
-                last_pools: slots.iter().find(|s| !s.last_pools.is_empty()).map(|s| s.last_pools.clone()).unwrap_or_default(),
+                last_pools: slots
+                    .iter()
+                    .find(|s| !s.last_pools.is_empty())
+                    .map(|s| s.last_pools.clone())
+                    .unwrap_or_default(),
                 slots,
             });
         }
@@ -242,7 +247,13 @@ impl Pack {
 pub(crate) mod tests {
     use super::*;
 
-    pub fn generator(position: [f64; 3], positions: Vec<[f64; 3]>, is_global: bool, start_mode: &str, start_data: f64) -> Generator {
+    pub fn generator(
+        position: [f64; 3],
+        positions: Vec<[f64; 3]>,
+        is_global: bool,
+        start_mode: &str,
+        start_data: f64,
+    ) -> Generator {
         Generator {
             name: "GENE-00".into(),
             row: Value::Int(1),

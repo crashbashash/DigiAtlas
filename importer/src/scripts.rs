@@ -1,5 +1,4 @@
 //! What the game's scripts do to each spawner, read from the decompiled stage scripts.
-//! Port of tools/ps2_export/scripts.py; must produce the same conditions text.
 //!
 //! Stage packs carry Lua 4.0.1 chunks. A call like `be:sd("GENERATER", nil, -1, "START", "GENE-53")`
 //! starts a spawner; `RESTART` rearms it and `STOP` ends it. Each call sits under the `if` conditions
@@ -84,7 +83,8 @@ pub fn ranges(numbers: &[i64]) -> String {
     for n in sorted_unique(numbers) {
         let prev = (n - 1).to_string();
         let extend = out.last().is_some_and(|last| {
-            last.ends_with(&prev) && (last.contains('-') && last.split('-').last() == Some(prev.as_str()) || *last == prev)
+            last.ends_with(&prev)
+                && (last.contains('-') && last.split('-').next_back() == Some(prev.as_str()) || *last == prev)
         });
         if extend {
             let last = out.last_mut().unwrap();
@@ -121,7 +121,12 @@ fn events(numbers: &[i64], state: &str, meanings: &HashMap<i64, String>) -> Stri
 /// `digimon` maps player model names (`p_agumon`) to display names ("Agumon"); `meanings` names
 /// story flags; `latched` are flags the same script sets after testing them, which makes the test
 /// "the first time" and not a story fact.
-pub fn describe(cond: &str, digimon: &HashMap<String, String>, meanings: &HashMap<i64, String>, latched: &HashSet<i64>) -> String {
+pub fn describe(
+    cond: &str,
+    digimon: &HashMap<String, String>,
+    meanings: &HashMap<i64, String>,
+    latched: &HashSet<i64>,
+) -> String {
     if let Some(m) = negation_re().captures(cond) {
         let inner = describe(&m[1], digimon, meanings, latched);
         if events_re().is_match(&inner) {
@@ -167,12 +172,22 @@ pub fn describe(cond: &str, digimon: &HashMap<String, String>, meanings: &HashMa
             let slot = int(&m[2]) + 1;
             parts.push(if &m[1] == "==" { format!("player {slot}") } else { format!("not player {slot}") });
         } else if let Some(m) = entry_re().captures(piece) {
-            parts.push(if &m[1] == "==" { format!("entered by gate {}", &m[2]) } else { format!("not entered by gate {}", &m[2]) });
+            parts.push(if &m[1] == "==" {
+                format!("entered by gate {}", &m[2])
+            } else {
+                format!("not entered by gate {}", &m[2])
+            });
         } else if let Some(m) = mat_re().captures(piece) {
             let on = (&m[1] == "==") == (&m[2] != "0");
             parts.push(if on { "a player touches the trigger" } else { "triggered by something else" }.to_string());
-        } else if let Some((m, name)) = playing_re().captures(piece).and_then(|m| digimon.get(&m[2]).map(|name| (m, name))) {
-            parts.push(if &m[1] == "==" { format!("you play as {name}") } else { format!("you do not play as {name}") });
+        } else if let Some((m, name)) =
+            playing_re().captures(piece).and_then(|m| digimon.get(&m[2]).map(|name| (m, name)))
+        {
+            parts.push(if &m[1] == "==" {
+                format!("you play as {name}")
+            } else {
+                format!("you do not play as {name}")
+            });
         } else {
             parts.push(piece.to_string());
         }
@@ -338,7 +353,8 @@ pub fn analyse_sources<'a>(
 
 /// Every spawner reference in a stage's packs.
 pub fn analyse(packs: &[Vec<u8>], digimon: &HashMap<String, String>, meanings: &HashMap<i64, String>) -> StageScripts {
-    let chunks: Vec<String> = packs.iter().flat_map(|blob| luadec::decompile_chunks(blob)).map(|(_, source)| source).collect();
+    let chunks: Vec<String> =
+        packs.iter().flat_map(|blob| luadec::decompile_chunks(blob)).map(|(_, source)| source).collect();
     analyse_sources(chunks.iter().map(String::as_str), digimon, meanings)
 }
 

@@ -19,9 +19,7 @@ const TABLES: [(&str, &str); 3] = [("weapon", "coweapon"), ("armor1", "coarmor1"
 /// (tier, lowest level, highest level or None) for tiers 1 to 6.
 fn tier_levels() -> Vec<(i64, i64, Option<i64>)> {
     let lows: Vec<i64> = std::iter::once(0).chain(LEVEL_BOUNDS).collect();
-    (0..lows.len())
-        .map(|n| (n as i64 + 1, lows[n], LEVEL_BOUNDS.get(n).map(|b| b - 1)))
-        .collect()
+    (0..lows.len()).map(|n| (n as i64 + 1, lows[n], LEVEL_BOUNDS.get(n).map(|b| b - 1))).collect()
 }
 
 fn results(rows: &[Row], tier: i64) -> Vec<(Cell, Cell)> {
@@ -76,14 +74,24 @@ mod tests {
     use super::*;
 
     fn row(id: i64, rate: i64) -> Row {
-        [("ID", Cell::Int(id)), ("RATE", Cell::Int(rate)), ("RANK", Cell::Int(0))].into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+        [("ID", Cell::Int(id)), ("RATE", Cell::Int(rate)), ("RANK", Cell::Int(0))]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect()
     }
 
     #[test]
     fn tiers_follow_the_level_bounds() {
         assert_eq!(
             tier_levels(),
-            [(1, 0, Some(40)), (2, 41, Some(100)), (3, 101, Some(200)), (4, 201, Some(300)), (5, 301, Some(400)), (6, 401, None)]
+            [
+                (1, 0, Some(40)),
+                (2, 41, Some(100)),
+                (3, 101, Some(200)),
+                (4, 201, Some(300)),
+                (5, 301, Some(400)),
+                (6, 401, None)
+            ]
         );
     }
 
@@ -100,10 +108,14 @@ mod tests {
     fn lists_every_kind_per_tier() {
         let mut one: Vec<Row> = (0..100).map(|_| row(0, 0)).collect();
         one.extend([row(1, 0), row(3, 10000)]);
-        let tables: Tables = ["coweapon", "coarmor1", "coarmor2"].iter().map(|n| (n.to_string(), one.clone())).collect();
+        let tables: Tables =
+            ["coweapon", "coarmor1", "coarmor2"].iter().map(|n| (n.to_string(), one.clone())).collect();
         let out = build(&tables);
         assert_eq!(out["cost"], 300);
-        assert_eq!(out["tiers"][0]["results"]["armor1"], serde_json::json!([{"category": "armor1", "id": 3, "rate": 10000}]));
+        assert_eq!(
+            out["tiers"][0]["results"]["armor1"],
+            serde_json::json!([{"category": "armor1", "id": 3, "rate": 10000}])
+        );
         assert_eq!(out["tiers"][5]["results"]["weapon"], serde_json::json!([]));
     }
 }

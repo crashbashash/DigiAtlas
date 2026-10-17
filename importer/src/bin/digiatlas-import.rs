@@ -24,7 +24,13 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     };
     let started = std::time::Instant::now();
-    let result = importer::export(&iso, &out, maps, &mut |p| eprintln!("[{}/{}] {}", p.done, p.total, p.message));
+    let worker = std::thread::Builder::new().stack_size(importer::STACK_SIZE).spawn(move || {
+        importer::export(&iso, &out, maps, &mut |p| eprintln!("[{}/{}] {}", p.done, p.total, p.message))
+    });
+    let result = match worker.map(|w| w.join()) {
+        Ok(Ok(result)) => result,
+        _ => Err(importer::Error("the import stopped unexpectedly".into())),
+    };
     match result {
         Ok(manifest) => {
             println!("{}", serde_json::to_string_pretty(&manifest["counts"]).unwrap_or_default());

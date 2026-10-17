@@ -72,9 +72,21 @@ mod tests {
 
     fn row(hp: i64) -> Row {
         let mut r: Row = [
-            ("TSUYOSA", 1), ("MAMORI", 2), ("KASHIKOSA", 3), ("SEISHIN", 4), ("SUBAYASA", 5), ("EXP", 6),
-            ("RES_FIRE", 7), ("RES_ICE", 8), ("RES_THUNDER", 9), ("RES_DARK", 10), ("RES_STUN", 11),
-            ("RES_POISON", 12), ("CHIMEIRITSU", 13), ("MAHIRITSU", 14), ("RARITY", 0),
+            ("TSUYOSA", 1),
+            ("MAMORI", 2),
+            ("KASHIKOSA", 3),
+            ("SEISHIN", 4),
+            ("SUBAYASA", 5),
+            ("EXP", 6),
+            ("RES_FIRE", 7),
+            ("RES_ICE", 8),
+            ("RES_THUNDER", 9),
+            ("RES_DARK", 10),
+            ("RES_STUN", 11),
+            ("RES_POISON", 12),
+            ("CHIMEIRITSU", 13),
+            ("MAHIRITSU", 14),
+            ("RARITY", 0),
         ]
         .into_iter()
         .map(|(k, v)| (k.to_string(), Cell::Int(v)))

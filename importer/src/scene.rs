@@ -1,4 +1,4 @@
-//! Scene graphs and geometry from a stage pack. Port of tools/ps2_export/scene.py.
+//! Scene graphs and geometry from a stage pack.
 //!
 //! A pack holds several scenes (terrain, props, characters), each an `igSceneInfo` pointing at a
 //! root node. Nodes form a tree through `igNodeList` child lists; an `igTransform` carries a 4x4
@@ -121,7 +121,13 @@ impl<'g> Geometry<'g> {
             if g.has_block(sid) && g.block_size(sid).map(|s| s as i64) == Some(12 * count) {
                 let base = g.block_start(sid)?;
                 return (0..count as usize)
-                    .map(|j| Some([f32_at(&g.b, base + 12 * j)?, f32_at(&g.b, base + 12 * j + 4)?, f32_at(&g.b, base + 12 * j + 8)?]))
+                    .map(|j| {
+                        Some([
+                            f32_at(&g.b, base + 12 * j)?,
+                            f32_at(&g.b, base + 12 * j + 4)?,
+                            f32_at(&g.b, base + 12 * j + 8)?,
+                        ])
+                    })
                     .collect();
             }
         }
@@ -145,7 +151,8 @@ impl<'g> Geometry<'g> {
             let pv = g.vals(pl);
             let (Some(block), Some(count)) = (field(&pv, 0), field(&pv, 1)) else { return idx };
             let Some(start) = usize::try_from(block).ok().and_then(|b| g.block_start(b)) else { return idx };
-            let lengths: Option<Vec<usize>> = (0..count.max(0) as usize).map(|j| u32_at(&g.b, start + 4 * j).map(|l| l as usize)).collect();
+            let lengths: Option<Vec<usize>> =
+                (0..count.max(0) as usize).map(|j| u32_at(&g.b, start + 4 * j).map(|l| l as usize)).collect();
             let Some(lengths) = lengths else { return idx };
             if lengths.iter().sum::<usize>() != vertex_count {
                 return idx;
@@ -165,7 +172,9 @@ impl<'g> Geometry<'g> {
     fn mesh(&mut self, attr: usize) -> &[Triangle] {
         if !self.cache.contains_key(&attr) {
             let tris = match self.positions(attr) {
-                Some(pos) => self.indices(attr, pos.len()).into_iter().map(|[a, b, c]| [pos[a], pos[b], pos[c]]).collect(),
+                Some(pos) => {
+                    self.indices(attr, pos.len()).into_iter().map(|[a, b, c]| [pos[a], pos[b], pos[c]]).collect()
+                }
                 None => Vec::new(),
             };
             self.cache.insert(attr, tris);
@@ -182,7 +191,8 @@ pub fn scenes(graph: &Graph) -> Result<Vec<Scene>> {
         if rec.class != "igSceneInfo" {
             continue;
         }
-        let mut scene = Scene { index: k, name: rec.name.clone().unwrap_or_default(), triangles: Vec::new(), parts: Vec::new() };
+        let mut scene =
+            Scene { index: k, name: rec.name.clone().unwrap_or_default(), triangles: Vec::new(), parts: Vec::new() };
         if let Some(root) = graph.vals(k).get(SCENE_ROOT).and_then(|v| graph.r#ref(v)) {
             walk(graph, &mut geometry, root, &IDENTITY, &mut scene);
         }

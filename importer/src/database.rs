@@ -21,17 +21,37 @@ const SKILL_TYPES: [&str; 6] = ["Blunt", "Slash", "Stab", "Bash", "Shot", "Crush
 /// Engine column -> exported stat key, in export order. Only columns whose meaning is confirmed
 /// are exported; zero values are left out.
 const STAT_KEYS: [(&str, &str); 31] = [
-    ("TSUYOSA", "strength"), ("MAMORI", "defense"), ("KASHIKOSA", "wisdom"), ("SEISHIN", "spirit"),
-    ("SUBAYASA", "speed"), ("MAXHP", "maxHp"), ("MAXMP", "maxMp"),
-    ("RES_FIRE", "resistFire"), ("RES_ICE", "resistIce"), ("RES_THUNDER", "resistThunder"),
-    ("RES_DARK", "resistDark"), ("RES_STUN", "resistStun"), ("RES_POISON", "resistPoison"),
-    ("CHIMEIRITSU", "critRate"), ("MAHIRITSU", "paralysisRate"), ("MEICHURITSU", "hitRate"),
-    ("BOUGYORITSU", "defenseRate"), ("MAHITEIKOU", "paralysisResist"), ("DOKUTEIKOU", "poisonResist"),
-    ("BITRITSU", "bitRate"), ("EXPRITSU", "expRate"), ("LUCKRITSU", "luckRate"),
-    ("HPDRAIN", "hpDrain"), ("MPDRAIN", "mpDrain"), ("CHOHATURITSU", "provokeRate"),
-    ("LVPOINT", "equipLevel"), ("SKILLPOINT", "requiredSkill"),
-    ("HANBAI", "buyPrice"), ("KAITORI", "sellPrice"),
-    ("HP", "restoreHp"), ("MP", "restoreMp"),
+    ("TSUYOSA", "strength"),
+    ("MAMORI", "defense"),
+    ("KASHIKOSA", "wisdom"),
+    ("SEISHIN", "spirit"),
+    ("SUBAYASA", "speed"),
+    ("MAXHP", "maxHp"),
+    ("MAXMP", "maxMp"),
+    ("RES_FIRE", "resistFire"),
+    ("RES_ICE", "resistIce"),
+    ("RES_THUNDER", "resistThunder"),
+    ("RES_DARK", "resistDark"),
+    ("RES_STUN", "resistStun"),
+    ("RES_POISON", "resistPoison"),
+    ("CHIMEIRITSU", "critRate"),
+    ("MAHIRITSU", "paralysisRate"),
+    ("MEICHURITSU", "hitRate"),
+    ("BOUGYORITSU", "defenseRate"),
+    ("MAHITEIKOU", "paralysisResist"),
+    ("DOKUTEIKOU", "poisonResist"),
+    ("BITRITSU", "bitRate"),
+    ("EXPRITSU", "expRate"),
+    ("LUCKRITSU", "luckRate"),
+    ("HPDRAIN", "hpDrain"),
+    ("MPDRAIN", "mpDrain"),
+    ("CHOHATURITSU", "provokeRate"),
+    ("LVPOINT", "equipLevel"),
+    ("SKILLPOINT", "requiredSkill"),
+    ("HANBAI", "buyPrice"),
+    ("KAITORI", "sellPrice"),
+    ("HP", "restoreHp"),
+    ("MP", "restoreMp"),
 ];
 
 /// One database cell.
@@ -140,7 +160,10 @@ pub fn read_tables(entry: Vec<u8>) -> Result<Tables> {
         for (names_at, values_at) in TYPED_COLUMNS {
             let names = names_of(&g, cols.get(names_at).copied())?;
             if !names.is_empty() {
-                let vk = cols.get(values_at).and_then(|x| g.r#ref(x)).ok_or_else(|| Error("database values do not resolve".into()))?;
+                let vk = cols
+                    .get(values_at)
+                    .and_then(|x| g.r#ref(x))
+                    .ok_or_else(|| Error("database values do not resolve".into()))?;
                 let vals = g
                     .list_values(vk)?
                     .into_iter()
@@ -226,7 +249,10 @@ pub fn parse_items(tables: &Tables) -> Result<Vec<Item>> {
                 .filter_map(|(col, key)| row.get(*col).filter(|c| c.truthy()).map(|c| (*key, c.clone())))
                 .collect();
             let skill = if category == "weapon" {
-                row.get("SKILL").and_then(Cell::int).filter(|s| (0..SKILL_TYPES.len() as i64).contains(s)).map(|s| SKILL_TYPES[s as usize])
+                row.get("SKILL")
+                    .and_then(Cell::int)
+                    .filter(|s| (0..SKILL_TYPES.len() as i64).contains(s))
+                    .map(|s| SKILL_TYPES[s as usize])
             } else {
                 None
             };
@@ -249,7 +275,15 @@ pub fn parse_items(tables: &Tables) -> Result<Vec<Item>> {
                 // The game stores 999 as a placeholder equip level.
                 stats.retain(|(k, _)| *k != "equipLevel");
             }
-            items.push(Item { category, id: i, name: display, description: text, stats, skill_type: skill, unidentified });
+            items.push(Item {
+                category,
+                id: i,
+                name: display,
+                description: text,
+                stats,
+                skill_type: skill,
+                unidentified,
+            });
         }
     }
     Ok(items)
@@ -288,15 +322,29 @@ mod tests {
     fn reads_item_names_stats_and_skill() {
         let weapon = vec![
             row(&[
-                ("NAME", Cell::Str(Some("∈Battle Hawk α".into()))), ("TXT", Cell::Str(Some("Axe".into()))),
-                ("TSUYOSA", Cell::Int(78)), ("KASHIKOSA", Cell::Int(0)), ("SKILL", Cell::Int(0)),
-                ("SKILLPOINT", Cell::Int(1)), ("HANBAI", Cell::Int(196)), ("KAITORI", Cell::Int(49)), ("DELAY", Cell::Int(34)),
+                ("NAME", Cell::Str(Some("∈Battle Hawk α".into()))),
+                ("TXT", Cell::Str(Some("Axe".into()))),
+                ("TSUYOSA", Cell::Int(78)),
+                ("KASHIKOSA", Cell::Int(0)),
+                ("SKILL", Cell::Int(0)),
+                ("SKILLPOINT", Cell::Int(1)),
+                ("HANBAI", Cell::Int(196)),
+                ("KAITORI", Cell::Int(49)),
+                ("DELAY", Cell::Int(34)),
             ]),
-            row(&[("NAME", Cell::Str(Some("∈Long Sword α".into()))), ("TXT", Cell::Str(Some("Sword".into()))), ("TSUYOSA", Cell::Int(5)), ("SKILL", Cell::Int(1))]),
+            row(&[
+                ("NAME", Cell::Str(Some("∈Long Sword α".into()))),
+                ("TXT", Cell::Str(Some("Sword".into()))),
+                ("TSUYOSA", Cell::Int(5)),
+                ("SKILL", Cell::Int(1)),
+            ]),
         ];
         let items = parse_items(&tables(vec![("weapon", weapon)])).unwrap();
         let hawk = &items[0];
-        assert_eq!((hawk.name.as_str(), hawk.description.as_deref(), hawk.skill_type), ("Battle Hawk α", Some("Axe"), Some("Blunt")));
+        assert_eq!(
+            (hawk.name.as_str(), hawk.description.as_deref(), hawk.skill_type),
+            ("Battle Hawk α", Some("Axe"), Some("Blunt"))
+        );
         // Zeros and unconfirmed columns (DELAY) are left out.
         let stats: Vec<(&str, i64)> = hawk.stats.iter().map(|(k, v)| (*k, v.int().unwrap())).collect();
         assert_eq!(stats, [("strength", 78), ("requiredSkill", 1), ("buyPrice", 196), ("sellPrice", 49)]);
@@ -306,8 +354,10 @@ mod tests {
     #[test]
     fn names_unidentified_placeholders() {
         let armor2 = vec![row(&[
-            ("NAME", Cell::Str(Some("???????".into()))), ("TXT", Cell::Str(Some("Equip. Level ???".into()))),
-            ("LVPOINT", Cell::Int(999)), ("KAITORI", Cell::Int(100)),
+            ("NAME", Cell::Str(Some("???????".into()))),
+            ("TXT", Cell::Str(Some("Equip. Level ???".into()))),
+            ("LVPOINT", Cell::Int(999)),
+            ("KAITORI", Cell::Int(100)),
         ])];
         let item = parse_items(&tables(vec![("armor2", armor2)])).unwrap().remove(0);
         assert!(item.unidentified);

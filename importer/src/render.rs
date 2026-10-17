@@ -1,5 +1,4 @@
-//! Top-down rasteriser for stage geometry. Port of tools/ps2_export/render.py; must produce the
-//! same pixels.
+//! Top-down rasteriser for stage geometry.
 //!
 //! Floors (triangles facing up) are filled with a colour ramp, drawn lowest first so higher
 //! surfaces cover lower ones. The ramp peaks at the height where things spawn so walkable floors
@@ -37,7 +36,7 @@ pub struct Raster {
 impl Raster {
     /// Share of the image that has geometry. Near 1.0 means a flat floor with no outline.
     pub fn fill(&self) -> f64 {
-        let empty = self.rgba.chunks_exact(4).filter(|p| p[3] == 0).count();
+        let empty = self.rgba.as_chunks::<4>().0.iter().filter(|p| p[3] == 0).count();
         1.0 - empty as f64 / (self.width * self.height) as f64
     }
 
@@ -61,7 +60,7 @@ impl Raster {
 
     /// Make every pixel transparent where `keep` (one byte per pixel) is zero.
     pub fn clip(&mut self, keep: &[u8]) {
-        for (px, &k) in self.rgba.chunks_exact_mut(4).zip(keep) {
+        for (px, &k) in self.rgba.as_chunks_mut::<4>().0.iter_mut().zip(keep) {
             if k == 0 {
                 px.fill(0);
             }
@@ -73,7 +72,7 @@ impl Raster {
         let (w, h) = (self.width, self.height);
         let mut rows = vec![false; h];
         let mut cols = vec![false; w];
-        for (i, px) in self.rgba.chunks_exact(4).enumerate() {
+        for (i, px) in self.rgba.as_chunks::<4>().0.iter().enumerate() {
             if px[3] != 0 {
                 rows[i / w] = true;
                 cols[i % w] = true;

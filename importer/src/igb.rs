@@ -221,7 +221,7 @@ pub fn decode_record(b: &[u8], p: usize, dirs: &[ClassDef]) -> Option<Record> {
         let fname = if ty == 4 && name.is_none() { "_name".to_string() } else { format!("slot{ordn}") };
         if ty == 4 {
             let n = u32_at(b, q)? as usize;
-            if n % 4 != 0 || n > 8192 || q + 4 + n > b.len() {
+            if !n.is_multiple_of(4) || n > 8192 || q + 4 + n > b.len() {
                 return None;
             }
             if n > 0 && b[q + 4 + n - 1] != 0 {
@@ -245,8 +245,12 @@ pub fn decode_record(b: &[u8], p: usize, dirs: &[ClassDef]) -> Option<Record> {
             return None;
         }
         let value = match ty {
-            36 => Value::Floats((0..3).map(|i| f32_at(b, q + 4 * i).map(|x| pyfmt::round(x, 4))).collect::<Option<_>>()?),
-            38 => Value::Floats((0..4).map(|i| f32_at(b, q + 4 * i).map(|x| pyfmt::round(x, 4))).collect::<Option<_>>()?),
+            36 => {
+                Value::Floats((0..3).map(|i| f32_at(b, q + 4 * i).map(|x| pyfmt::round(x, 4))).collect::<Option<_>>()?)
+            }
+            38 => {
+                Value::Floats((0..4).map(|i| f32_at(b, q + 4 * i).map(|x| pyfmt::round(x, 4))).collect::<Option<_>>()?)
+            }
             16 => Value::Float(pyfmt::round(f32_at(b, q)?, 4)),
             40 => Value::Floats((0..16).map(|i| f32_at(b, q + 4 * i)).collect::<Option<_>>()?),
             2 | 3 | 8 | 34 => Value::Int(*b.get(q)? as i64),
@@ -303,7 +307,7 @@ pub fn find_chains(b: &[u8], dirs: &[ClassDef], lo: usize) -> Vec<Vec<Record>> {
         far = far.max(c.last().unwrap().end as i64);
         keep.push(c);
     }
-    keep.sort_by(|a, b| b.len().cmp(&a.len()));
+    keep.sort_by_key(|c| std::cmp::Reverse(c.len()));
     keep
 }
 
@@ -406,7 +410,9 @@ impl Graph {
             if entry.class != "igMemoryDirEntry" {
                 continue;
             }
-            let size = entry.field("slot7").and_then(Value::int).ok_or_else(|| Error("memory entry without a size".into()))? as usize;
+            let size =
+                entry.field("slot7").and_then(Value::int).ok_or_else(|| Error("memory entry without a size".into()))?
+                    as usize;
             block.insert(gid, cursor);
             block_size.insert(gid, size);
             cursor += (size + 3) & !3;

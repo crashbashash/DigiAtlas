@@ -21,6 +21,11 @@ flate2 = "1"
 crc32fast = "1"
 sha1_smol = "1"
 
+[dev-dependencies]
+png = "0.17"
+# Exact float parsing, so reference bounds in stages.json compare bit for bit.
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+
 [profile.dev]
 # The importer walks every byte of large archives; debug builds would be unusably slow.
 opt-level = 2

@@ -456,6 +456,21 @@ class MapChoiceTests(unittest.TestCase):
         self.assertEqual(spans, [60.0, 400.0])
         self.assertEqual(maps.terrain_triangles(s, min_span=5.0).__len__(), 4)
 
+    def test_a_grid_of_equal_flat_tiles_is_ground_not_terrain(self):
+        def quad(x, z, y=-5.0, size=200.0):
+            a, b, c, d = (x, y, z), (x + size, y, z), (x + size, y, z + size), (x, y, z + size)
+            return [(a, b, c), (a, c, d)]
+
+        tiles = [quad(200.0 * i, 0.0) for i in range(4)]
+        floor = [((0.0, 10.0, 0.0), (300.0, 10.0, 0.0), (0.0, 10.0, 300.0))] * 5
+        s = scene.Scene(0, "", [], tiles + [floor])
+        self.assertEqual(maps.ground_tiles(s.parts), {0, 1, 2, 3})
+        self.assertEqual(maps.terrain_parts(s), [floor])
+
+    def test_a_single_flat_quad_is_kept(self):
+        arena = [((0.0, 10.0, 0.0), (300.0, 10.0, 0.0), (0.0, 10.0, 300.0))]
+        self.assertEqual(maps.ground_tiles([arena, arena]), set())
+
     def test_ties_go_to_the_larger_mesh(self):
         a, b = self.tri_scene("", 900, count=300), self.tri_scene("", 900, count=900)
         self.assertIs(maps.choose_scene([a, b], [(10.0, 10.0)]), b)

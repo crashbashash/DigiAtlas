@@ -14,6 +14,7 @@ from .afs import Afs
 MIN_TRIANGLES = 200
 SKIP_PREFIXES = ("i_", "x_", "g_", "e_", "f_", "m_", "n_", "q_", "s_")  # interface, effects, models
 MARGIN = 150.0
+MIN_GROUND_TILES = 4  # flat two-triangle meshes at one height that make up a ground plane
 MIN_PART_SPAN = 60.0  # meshes narrower than this (trees, pillars, ornaments) are props, not terrain
 
 
@@ -45,9 +46,37 @@ def _span(part) -> float:
     return max(max(xs) - min(xs), max(zs) - min(zs))
 
 
+def _flat_tile_key(part) -> tuple[float, float] | None:
+    """(height, size) of a part that is one flat quad (at most two triangles), else None."""
+    if len(part) > 2:
+        return None
+    ys = [p[1] for t in part for p in t]
+    return (round(ys[0], 1), round(_span(part), 1)) if max(ys) - min(ys) < 0.5 else None
+
+
+def ground_tiles(parts) -> set[int]:
+    """Indexes of the flat quads that tile a ground or void plane under the stage.
+
+    Such a plane is a grid of equal two-triangle tiles at one height with gaps between them. It is not
+    somewhere to walk, and the gaps show as holes in the map. A lone flat quad (an arena floor) stays.
+    """
+    by_height: dict[tuple[float, float], list[int]] = {}
+    for i, part in enumerate(parts):
+        key = _flat_tile_key(part)
+        if key is not None:
+            by_height.setdefault(key, []).append(i)
+    return {i for ids in by_height.values() if len(ids) >= MIN_GROUND_TILES for i in ids}
+
+
+def terrain_parts(s: scene.Scene, min_span: float = MIN_PART_SPAN):
+    """The scene's meshes without its props and ground-plane tiles."""
+    tiles = ground_tiles(s.parts)
+    return [p for i, p in enumerate(s.parts) if i not in tiles and _span(p) >= min_span]
+
+
 def terrain_triangles(s: scene.Scene, min_span: float = MIN_PART_SPAN):
-    """The scene's triangles without its small prop meshes."""
-    return [t for part in s.parts if _span(part) >= min_span for t in part]
+    """The scene's triangles without its small prop meshes and its ground plane."""
+    return [t for part in terrain_parts(s, min_span) for t in part]
 
 
 def choose_scene(scenes: list[scene.Scene], points: list[tuple[float, float]]) -> scene.Scene | None:
@@ -120,17 +149,19 @@ def _build_empty(ndmw: Afs, packs: list[int], extra: list[tuple[float, float]]) 
     tris = terrain_triangles(s)
     if not tris:
         return None
-    # A backdrop plane spanning the whole scene would make the crop far bigger than the rooms in it.
-    parts = [pt for pt in s.parts if _span(pt) >= MIN_PART_SPAN]
+    parts = terrain_parts(s)
+    # A backdrop plane spanning the whole scene would make the crop far bigger than the rooms in it, so
+    # the crop first leaves out the biggest meshes. They come back when someone stands on one of them.
     overall = max(_span(pt) for pt in parts)
-    inner = [pt for pt in parts if _span(pt) < 0.85 * overall]
-    tris = [t for pt in (inner or parts) for t in pt]
-    x0, x1, z0, z1 = _bbox(tris)
-    ys = sorted(p[1] for t in tris for p in t)
-    x0, x1 = min([x0] + [x for x, _ in extra]), max([x1] + [x for x, _ in extra])
-    z0, z1 = min([z0] + [z for _, z in extra]), max([z1] + [z for _, z in extra])
-    x0, x1 = min([x0] + [x for x, _ in extra]), max([x1] + [x for x, _ in extra])
-    z0, z1 = min([z0] + [z for _, z in extra]), max([z1] + [z for _, z in extra])
-    roi = (x0 - MARGIN / 3, x1 + MARGIN / 3, z0 - MARGIN / 3, z1 + MARGIN / 3)
-    raster = render.render(tris, roi, focus_y=ys[len(ys) // 2])
+    inner = [pt for pt in parts if _span(pt) < 0.85 * overall] or parts
+    for chosen in (inner, parts):
+        tris = [t for pt in chosen for t in pt]
+        x0, x1, z0, z1 = _bbox(tris)
+        ys = sorted(p[1] for t in tris for p in t)
+        x0, x1 = min([x0] + [x for x, _ in extra]), max([x1] + [x for x, _ in extra])
+        z0, z1 = min([z0] + [z for _, z in extra]), max([z1] + [z for _, z in extra])
+        roi = (x0 - MARGIN / 3, x1 + MARGIN / 3, z0 - MARGIN / 3, z1 + MARGIN / 3)
+        raster = render.render(tris, roi, focus_y=ys[len(ys) // 2])
+        if all(raster.covered(x, z) for x, z in extra):
+            break
     return StageMap(pack, s.name, roi, raster, 1.0) if raster.fill >= 0.02 else None

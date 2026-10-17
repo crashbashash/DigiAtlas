@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- DigiAtlas mark. Same construction as the DW4 Asset Viewer's "D4" badge (rounded square, light
+  <!-- DigiAtlas mark. Same construction as DigiLab's flask badge (rounded square, light
        glyph, small 4 for the Digimon World 4 family) in DigiAtlas blue, with a map pin for the glyph. -->
   <rect x="2" y="2" width="60" height="60" rx="14" fill="#1b2b42" stroke="#36597f" stroke-width="1.6"/>
   <path d="M26 9.5c-8.3 0-15 6.5-15 14.6 0 10.6 15 26.4 15 26.4s15-15.8 15-26.4C41 16 34.3 9.5 26 9.5z" fill="#9cc8ff"/>

@@ -48,40 +48,66 @@ progress, your level), and scripted item pickups are not extracted yet.
 ## Running it
 
 ```sh
-./run.sh --iso "/path/to/Digimon World 4 (USA).iso"   # first run: exports the data, builds, opens the app
-./run.sh                                               # later runs: build (fast) and open
+./run.sh                                               # build (fast after the first time) and open the app
+./run.sh --iso "/path/to/Digimon World 4 (USA).iso"   # optional: import that disc image on start
 ```
 
-`run.sh` installs the JavaScript dependencies when needed, exports the data from your disc if
-`data/generated/ps2` is missing (about 5 minutes, with maps), builds the desktop app and starts it.
-Options: `--release` for an optimised build, `--reexport` to export again, `--dev` for a
-hot-reloading development window, and `--data DIR` to open a different exported folder. From the
-workspace root, `run-digiatlas.sh` does the same.
+The first time, DigiAtlas asks for your Digimon World 4 disc image (USA, PS2; an `.iso` dump of
+your own disc). It reads the disc once, which takes a minute or two, and keeps the data, so you can
+move or delete the image afterwards. "Re-import from disc" at the bottom of the home page reads it
+again; when a newer DigiAtlas reads more from the disc, it asks for the image again instead of
+showing the old data.
+
+`run.sh` installs the JavaScript dependencies when needed, builds the desktop app and starts it. It
+needs Node.js and Rust (with the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
+for your OS); no Python. Options: `--release` for an optimised build, `--dev` for a hot-reloading
+development window, `--iso PATH` to import a disc image on start (the app's own `--iso` option, also
+over existing data), and `--open "#/map/stag0101?d=hard"` to start on a view. Anything else is
+passed to the app. From the workspace root, `run-digiatlas.sh` does the same.
 
 By hand:
 
 ```sh
-cd tools && python3 -m ps2_export.export "/path/to/Digimon World 4 (USA).iso" --out ../data/generated/ps2 --maps && cd ..
-npm install && npm run desktop     # desktop app (remembers the data folder; "Change data folder" picks another)
+npm install && npm run desktop     # desktop app; asks for the disc image the first time
 npm run dev                        # or a browser at http://127.0.0.1:5175, served from data/generated/ps2
 ```
+
+The browser mode has no importer; it serves an already imported folder (`DIGIATLAS_DATA`, default
+`data/generated/ps2`), which the command-line importer writes:
+
+```sh
+cargo run --release --manifest-path importer/Cargo.toml -- "/path/to/Digimon World 4 (USA).iso" --out data/generated/ps2 --maps
+```
+
+In the browser, `?import=welcome`, `?import=stale` or `?import=failed` previews the desktop app's
+import screens with a stand-in importer.
 
 `npm test` runs the interface tests, `cargo test` (in `src-tauri`) the native ones, and
 `python3 -m unittest discover -s tests` the exporter tests. GitHub Actions runs all three, plus the format check and build, on every push and pull request.
 
 ## Data
 
-Game-derived data is never committed. DigiAtlas reads the user's own disc image and builds JSON
-under `data/generated/` (git-ignored). Each platform has its own reader that writes the same
-[schema](docs/schema.md), so platform differences stay out of the UI.
+Game-derived data is never committed. DigiAtlas reads the user's own disc image with its built-in
+importer (the `importer` crate, which writes the [schema](docs/schema.md)) and caches the result in
+the app's data folder, under `data/ps2-usa/`:
 
-```sh
-cd tools && python3 -m ps2_export.export "/path/to/Digimon World 4 (USA).iso" --out ../data/generated/ps2
-```
+| OS | Cache folder |
+|---|---|
+| Linux | `~/.local/share/io.github.crashbashash.digiatlas/data/ps2-usa` |
+| Windows | `%APPDATA%\io.github.crashbashash.digiatlas\data\ps2-usa` |
+| macOS | `~/Library/Application Support/io.github.crashbashash.digiatlas/data/ps2-usa` |
 
-The PS2 reader exports 580 enemy and object rows with names and stats, 590 items with names and
-descriptions, 98 named stages, 81 stages of spawn generators across all three difficulties (with world
-positions), 344 drop pools, loading banners, and top-down maps for 82 stages (`--maps`). See [tools/README.md](tools/README.md) for what it can and cannot read yet.
+(This is Tauri's app data directory; the name is the `identifier` in `src-tauri/tauri.conf.json`.)
+An import is written to `ps2-usa.new` next to it and swapped in only when it has finished, so a
+failed or interrupted import keeps the previous data. Deleting the folder makes the app ask for the
+disc again. The cache records the importer version (`manifest.exporter`); data from another version
+is not shown but imported again.
+
+Each platform has its own reader that writes the same schema, so platform differences stay out of
+the UI. The PS2 reader exports 580 enemy and object rows with names and stats, 590 items with names
+and descriptions, 98 named stages, 81 stages of spawn generators across all three difficulties
+(with world positions), 344 drop pools, loading banners, and top-down maps for 82 stages. See
+[tools/README.md](tools/README.md) for what it can and cannot read yet.
 
 ## License
 

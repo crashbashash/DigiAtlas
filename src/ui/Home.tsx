@@ -9,7 +9,7 @@ import { SearchBox } from './SearchBox';
 
 /** The landing page: search for anything, or start from one of the sections. */
 export function Home() {
-  const { model, changeData } = useApp();
+  const { model, reimport } = useApp();
   const recent = lastMap();
   const recentStage = recent ? model.byId.get(recent) : undefined;
   const categories = useMemo(() => itemCategories(model), [model]);
@@ -106,11 +106,11 @@ export function Home() {
       <footer class="home-footer muted">
         Data from your {m.region.toUpperCase()} {m.platform.toUpperCase()} disc
         {m.serial ? ` (${m.serial})` : ''}
-        {changeData && (
+        {reimport && (
           <>
             {' · '}
-            <button type="button" class="link" onClick={changeData}>
-              Change data folder
+            <button type="button" class="link" onClick={reimport}>
+              Re-import from disc
             </button>
           </>
         )}

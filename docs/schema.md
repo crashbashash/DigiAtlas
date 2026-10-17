@@ -1,8 +1,13 @@
 # DigiAtlas data schema (v1)
 
-Every platform reader writes the same five files into `data/generated/<platform>/`. The app only
-reads this format, so platform differences live in the readers and never in the UI. JSON Schema
-files are in [`schema/v1/`](../schema/v1).
+Every platform reader writes the same five files into one folder: the desktop app's import cache
+(`<app data>/data/ps2-usa/`, see the README) or, for the command-line importer and the browser dev
+mode, `data/generated/<platform>/`. The app only reads this format, so platform differences live in
+the readers and never in the UI. JSON Schema files are in [`schema/v1/`](../schema/v1).
+
+`manifest.exporter` names the reader and its version. The desktop app shows a cached import only
+when they are `digiatlas-importer` and the version built into the app (`IMPORTER_VERSION`, bumped
+whenever the data changes); otherwise it asks for the disc again.
 
 | File | Contents |
 |---|---|

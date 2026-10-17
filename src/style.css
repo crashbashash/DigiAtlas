@@ -17,6 +17,7 @@
   --on-accent: #07111f;
   --good: #7ed39a;
   --warn: #ffcc4d;
+  --bad: #ff8a80;
   --trader: #b98cff;
   --radius: 7px;
   --text-xs: 12px;
@@ -1041,6 +1042,53 @@ table.appraisal tr:nth-child(even) td {
 }
 .welcome p {
   color: var(--text-soft);
+}
+
+/* Disc import (first run, stale data, re-import) */
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 20px 0 12px;
+}
+.welcome .import-note,
+.welcome .import-file {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.welcome .import-file {
+  overflow-wrap: anywhere;
+}
+.import-bar {
+  height: 8px;
+  margin: 20px 0 8px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.import-bar > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease-out;
+}
+.welcome .import-step {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+}
+.import-percent {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.welcome .import-error {
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--bad);
+  border-radius: var(--radius);
+  padding: 10px 12px;
 }
 
 @media (max-width: 1200px) {

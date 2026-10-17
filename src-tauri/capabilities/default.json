@@ -1,6 +1,10 @@
 {
   "identifier": "default",
-  "description": "Main DigiAtlas window and its item popouts",
-  "windows": ["main", "popout-*"],
-  "permissions": ["core:default", "core:window:allow-close", "core:window:allow-set-focus"]
+  "description": "The main DigiAtlas window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default"
+  ]
 }

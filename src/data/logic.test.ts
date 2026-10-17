@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { dropTable, formatPercent, groupByEnemy, isUnused, itemMatchesQuery, scriptRefText, startModeText } from './logic';
+import {
+  dropTable,
+  formatPercent,
+  groupByEnemy,
+  isUnused,
+  itemMatchesQuery,
+  scriptRefText,
+  startModeText,
+} from './logic';
 import type { Enemy, Generator } from './types';
 
 describe('dropTable', () => {
@@ -21,16 +29,19 @@ describe('dropTable', () => {
   it('sums rank variants of the same item into one row', () => {
     const t = dropTable({
       totalRate: 500,
-      entries: [1, 2, 3].map((rank) => ({ category: 'insItem', id: 0, rank, rate: 100 })).concat([
-        { category: 'insItem', id: 0, rank: 4, rate: 200 },
-      ]),
+      entries: [1, 2, 3]
+        .map((rank) => ({ category: 'insItem', id: 0, rank, rate: 100 }))
+        .concat([{ category: 'insItem', id: 0, rank: 4, rate: 200 }]),
     });
     expect(t.rows).toHaveLength(1);
     expect(t.rows[0].percent).toBe(5);
   });
 
   it('never goes negative when a pool sums to more than 100 percent', () => {
-    expect(dropTable({ totalRate: 10400, entries: [{ category: 'a', id: 0, rank: 0, rate: 10400 }] }).nothingPercent).toBe(0);
+    expect(
+      dropTable({ totalRate: 10400, entries: [{ category: 'a', id: 0, rank: 0, rate: 10400 }] })
+        .nothingPercent,
+    ).toBe(0);
   });
 
   it('handles a missing pool', () => {
@@ -50,8 +61,14 @@ describe('formatPercent', () => {
 
 describe('groupByEnemy', () => {
   const gen = (row: number, count: number, points: number): Generator => ({
-    name: 'GENE', row, count, maxCount: 1, spawns: Array.from({ length: points }, () => [0, 0, 0] as [number, number, number]),
-    rotations: [], startMode: 'direct', fillMode: 'wipeout',
+    name: 'GENE',
+    row,
+    count,
+    maxCount: 1,
+    spawns: Array.from({ length: points }, () => [0, 0, 0] as [number, number, number]),
+    rotations: [],
+    startMode: 'direct',
+    fillMode: 'wipeout',
   });
   it('groups spawners by what they spawn and totals them', () => {
     const enemies = new Map<number, Enemy>();
@@ -73,27 +90,46 @@ describe('startModeText', () => {
 
 describe('script helpers', () => {
   const base: Generator = {
-    name: 'G', row: 1, count: 1, maxCount: 1, spawns: [[0, 0, 0]], rotations: [], startMode: 'direct', fillMode: 'wipeout',
+    name: 'G',
+    row: 1,
+    count: 1,
+    maxCount: 1,
+    spawns: [[0, 0, 0]],
+    rotations: [],
+    startMode: 'direct',
+    fillMode: 'wipeout',
   };
   const enemy = { kind: 'enemy' } as Enemy;
 
   it('flags only script-started spawners that nothing starts', () => {
     expect(isUnused({ ...base, script: { status: 'none' } }, enemy)).toBe(true);
     expect(isUnused({ ...base, script: { status: 'referenced' } }, enemy)).toBe(false);
-    expect(isUnused({ ...base, startMode: 'radar', script: { status: 'none' } }, enemy)).toBe(false);
-    expect(isUnused({ ...base, script: { status: 'none' } }, { kind: 'object' } as Enemy)).toBe(false);
+    expect(isUnused({ ...base, startMode: 'radar', script: { status: 'none' } }, enemy)).toBe(
+      false,
+    );
+    expect(isUnused({ ...base, script: { status: 'none' } }, { kind: 'object' } as Enemy)).toBe(
+      false,
+    );
     expect(isUnused(base, enemy)).toBe(false);
   });
 
   it('turns a script call into a sentence', () => {
-    expect(scriptRefText({ verb: 'RESTART', when: ['event 339 not done yet'] })).toBe('Restarted when event 339 not done yet');
+    expect(scriptRefText({ verb: 'RESTART', when: ['event 339 not done yet'] })).toBe(
+      'Restarted when event 339 not done yet',
+    );
     expect(scriptRefText({ verb: 'START', when: [] })).toBe('Started with no condition');
   });
 });
 
 describe('itemMatchesQuery', () => {
   it('finds the unidentified items by that word', () => {
-    const item = { category: 'weapon', id: 276, name: 'Unidentified Weapon', description: null, unidentified: true as const };
+    const item = {
+      category: 'weapon',
+      id: 276,
+      name: 'Unidentified Weapon',
+      description: null,
+      unidentified: true as const,
+    };
     expect(itemMatchesQuery(item, 'unidentified')).toBe(true);
     expect(itemMatchesQuery(item, 'unid')).toBe(true);
     expect(itemMatchesQuery(item, 'core')).toBe(false);

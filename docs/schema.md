@@ -1,8 +1,13 @@
 # DigiAtlas data schema (v1)
 
-Every platform reader writes the same five files into `data/generated/<platform>/`. The app only
-reads this format, so platform differences live in the readers and never in the UI. JSON Schema
-files are in [`schema/v1/`](../schema/v1).
+Every platform reader writes the same five files into one folder: the desktop app's import cache
+(`<app data>/data/ps2-usa/`, see the README) or, for the command-line importer and the browser dev
+mode, `data/generated/<platform>/`. The app only reads this format, so platform differences live in
+the readers and never in the UI. JSON Schema files are in [`schema/v1/`](../schema/v1).
+
+`manifest.exporter` names the reader and its version. The desktop app shows a cached import only
+when they are `digiatlas-importer` and the version built into the app (`IMPORTER_VERSION`, bumped
+whenever the data changes); otherwise it asks for the disc again.
 
 | File | Contents |
 |---|---|
@@ -43,9 +48,16 @@ Players see `name`, never the internal ids.
   (stored as a pilcrow) is written `X-Data`. The three X-Data rows share one name.
 - **Enemies** (`enemies.json`): `name` comes from a small curated table (`names/enemies.json`).
   `kind` is `enemy`, `boss`, or `object` (a destructible box, barrel or case). `model` is the engine's
-  internal name, kept only for debugging and icon lookup. Names marked `disc` in the table appear in
-  the game's own card album and are checked by the disc test; the rest follow the decompilation
-  roster (Machinedramon variants, boss forms and object names are not in the game text).
+  internal name, kept only for debugging and icon lookup. Each name in the table records its source:
+  `disc` names appear in the game's own card album and are checked by the disc test; `wiki` names
+  (the Mecha Rogue family and Mecha Rogue X's forms) follow the English Wikipedia and Wikimon, since
+  the US disc does not print them; `player` names describe something the game never names (Lucemon's
+  orbs); `decomp` names follow the decompilation roster (object names).
+- **Forms and boss parts**: optional `form` tells apart rows that share a name (Mecha Rogue X's
+  `Form 1`–`Form 3`). `role: "part"` with `partOf` marks a boss's parts and minions (Lucemon's three
+  orbs, Mecha Rogue X's summoned Mecha Rogue 04s); viewers list them with that boss rather than as
+  enemies of their own. `kind` normally follows the model prefix (`e_` enemy, `f_` boss, `g_` object);
+  the names table can override it.
 - **Enemy stats**: `hp`, `stats` (strength, defense, wisdom, spirit, speed, exp), `resist` (fire, ice,
   thunder, dark, stun, poison), `rates` (crit, paralysis) and `rarity` (crown rank). Values are as
   stored by the game; units for resistances and rates are not confirmed.
@@ -104,6 +116,10 @@ Players see `name`, never the internal ids.
 - **Triggers** (`generators[].trigger`): a radar spawner starts when a player is within `radius` units of
   `center` (the game stores the squared radius; 20 to 150 units, one arena at 450). Only radar spawners have
   one. Script-started (`direct`) spawners start when a game script says so, which is not extracted yet.
+- **Boss fights** (`generators[].bossHealthBar`): `true` when the stage's scripts bind the boss health
+  bar to this spawner's enemy model (`METERCTRL ... SETMODELHP "<model>/I<n>"`). The game has no other
+  boss flag; the app also counts a kill that always gives a key item (a dungeon boss's ID), which covers
+  the Vine Tunnel Mecha Rogue 04, the one key-item boss without a bar.
 - **Maps** (`stages[].map`, export option `--maps`): a top-down footprint of each stage's terrain mesh,
   written to `maps/<id>.png` (transparent where there is no geometry) with its world `bounds` and
   `pixelsPerUnit`, so `pixel = (world - min) * pixelsPerUnit`. Image x is world x and image y is world

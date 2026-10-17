@@ -25,6 +25,11 @@ export interface Enemy {
   row: number;
   name: string;
   kind: EnemyKind;
+  /** Tells apart rows that share a name, such as a boss's forms ("Form 1"). */
+  form?: string;
+  /** A boss's part or minion, shown with that boss (`partOf`) rather than as an enemy of its own. */
+  role?: 'part';
+  partOf?: string;
   model: string;
   hp: number;
   stats: {
@@ -35,7 +40,14 @@ export interface Enemy {
     speed: number;
     exp: number;
   };
-  resist: { fire: number; ice: number; thunder: number; dark: number; stun: number; poison: number };
+  resist: {
+    fire: number;
+    ice: number;
+    thunder: number;
+    dark: number;
+    stun: number;
+    poison: number;
+  };
   rates: { crit: number; paralysis: number };
   rarity: number;
 }
@@ -98,6 +110,8 @@ export interface Generator {
   /** One entry per player count (index 0 = one player); absent when it makes no difference. */
   players?: PlayerSlot[];
   script?: ScriptInfo;
+  /** The stage shows a boss health bar for this spawner's enemy. */
+  bossHealthBar?: true;
 }
 
 export interface StageMap {
@@ -114,7 +128,11 @@ export type StageKind = 'field' | 'dungeon' | 'boss' | 'hub' | 'system';
 
 /** A dungeon's e/h/v copies are the ones the game enters on Normal, Hard and Very Hard. */
 export type Variant = 'e' | 'h' | 'v';
-export const VARIANT_DIFFICULTY: Record<Variant, Difficulty> = { e: 'normal', h: 'hard', v: 'veryhard' };
+export const VARIANT_DIFFICULTY: Record<Variant, Difficulty> = {
+  e: 'normal',
+  h: 'hard',
+  v: 'veryhard',
+};
 
 export interface ItemRef {
   category: string;

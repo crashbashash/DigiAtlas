@@ -43,18 +43,49 @@ jobs:
           python-version: '3.12'
       - run: python3 -m unittest discover -s tests
 
-  native:
-    name: Desktop app (native tests)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
+  importer:
+    name: Importer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        working-directory: importer
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: importer
+      # Not yet run: the crate is not rustfmt-clean, and `cargo clippy --all-targets -- -D warnings`
+      # still reports lints. Once both pass, add `cargo fmt --check` (ubuntu only) and clippy here.
+      - run: cargo build --all-targets --locked
+      - run: cargo test --locked
+
+  native:
+    name: Desktop app (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # Tauri 2 Linux prerequisites (https://v2.tauri.app/start/prerequisites/#linux).
       - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -62,11 +93,10 @@ jobs:
       - run: npm ci
       # The native build embeds the built interface.
       - run: npm run build
-      - uses: actions/cache@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # src-tauri may depend on ../importer by path; its build output lands in src-tauri/target.
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: native-${{ hashFiles('src-tauri/Cargo.lock') }}
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+          workspaces: src-tauri
+      # Compiles and runs the native unit tests; no `tauri build` bundle is produced.
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml

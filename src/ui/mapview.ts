@@ -74,6 +74,8 @@ export class MapView {
     this.canvas.addEventListener('pointerleave', () => this.setHover(null));
     this.canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     this.canvas.addEventListener('dblclick', () => this.fit());
+    // The browser's own menu (back, reload, inspect) has nothing to offer on the map.
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   private legend(): HTMLElement {

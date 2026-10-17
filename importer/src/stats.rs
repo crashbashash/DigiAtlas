@@ -65,3 +65,43 @@ pub fn from_database(rows: &[Row]) -> Result<Vec<EnemyRow>> {
 pub fn anchors_match(rows: &[EnemyRow]) -> bool {
     ANCHORS.iter().all(|&(r, hp)| r < rows.len() && rows[r].hp == hp)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(hp: i64) -> Row {
+        let mut r: Row = [
+            ("TSUYOSA", 1), ("MAMORI", 2), ("KASHIKOSA", 3), ("SEISHIN", 4), ("SUBAYASA", 5), ("EXP", 6),
+            ("RES_FIRE", 7), ("RES_ICE", 8), ("RES_THUNDER", 9), ("RES_DARK", 10), ("RES_STUN", 11),
+            ("RES_POISON", 12), ("CHIMEIRITSU", 13), ("MAHIRITSU", 14), ("RARITY", 0),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), Cell::Int(v)))
+        .collect();
+        r.insert("HPMAX".into(), Cell::Int(hp));
+        r
+    }
+
+    #[test]
+    fn reads_rows_from_the_database() {
+        let rows = from_database(&[row(0), row(58)]).unwrap();
+        let r = &rows[1];
+        assert_eq!((r.row, r.hp, r.strength, r.defense, r.exp), (1, 58, 1, 2, 6));
+        assert_eq!(r.resist, vec![("fire", 7), ("ice", 8), ("thunder", 9), ("dark", 10), ("stun", 11), ("poison", 12)]);
+        assert_eq!((r.crit_rate, r.paralysis_rate), (13, 14));
+        assert!(rows[0].is_empty());
+    }
+
+    #[test]
+    fn checks_the_anchor_rows() {
+        let mut rows: Vec<Row> = (0..400).map(|_| row(0)).collect();
+        for (r, hp) in ANCHORS {
+            rows[r] = row(hp);
+        }
+        assert!(anchors_match(&from_database(&rows).unwrap()));
+        assert!(!anchors_match(&from_database(&rows[..10]).unwrap()));
+        rows[1] = row(59);
+        assert!(!anchors_match(&from_database(&rows).unwrap()));
+    }
+}

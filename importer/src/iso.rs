@@ -116,3 +116,101 @@ pub fn open_disc_file(disc: &Source, files: &HashMap<String, IsoFile>, name: &st
         None => fail!("{name} is not on this disc"),
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    /// A minimal ISO9660 image: one root directory holding `files`.
+    pub fn build_iso(files: &[(&str, &[u8])]) -> Vec<u8> {
+        fn dir_record(name: &[u8], extent: u32, size: u32, flags: u8) -> Vec<u8> {
+            let mut len = 33 + name.len();
+            len += len % 2; // records are even length
+            let mut rec = vec![0u8; len];
+            rec[0] = len as u8;
+            rec[2..6].copy_from_slice(&extent.to_le_bytes());
+            rec[10..14].copy_from_slice(&size.to_le_bytes());
+            rec[25] = flags;
+            rec[32] = name.len() as u8;
+            rec[33..33 + name.len()].copy_from_slice(name);
+            rec
+        }
+        let (root_extent, mut extent) = (18u32, 19u32);
+        let mut entries = Vec::new();
+        let mut blobs = Vec::new();
+        for (name, data) in files {
+            entries.extend(dir_record(format!("{name};1").as_bytes(), extent, data.len() as u32, 0));
+            blobs.push((extent, *data));
+            extent += (data.len() as u32).div_ceil(SECTOR as u32);
+        }
+        let mut root = dir_record(b"\0", root_extent, SECTOR as u32, 2);
+        root.extend(dir_record(b"\x01", root_extent, SECTOR as u32, 2));
+        root.extend(entries);
+        let mut image = vec![0u8; extent as usize * SECTOR as usize];
+        let pvd = &mut image[16 * SECTOR as usize..17 * SECTOR as usize];
+        pvd[0] = 1;
+        pvd[1..6].copy_from_slice(b"CD001");
+        pvd[156..190].copy_from_slice(&dir_record(b"\0", root_extent, SECTOR as u32, 2)[..34]);
+        let at = root_extent as usize * SECTOR as usize;
+        image[at..at + root.len()].copy_from_slice(&root);
+        for (ext, data) in blobs {
+            let at = ext as usize * SECTOR as usize;
+            image[at..at + data.len()].copy_from_slice(data);
+        }
+        image
+    }
+
+    pub fn build_afs(entries: &[&[u8]]) -> Vec<u8> {
+        let table_end = 8 + 8 * entries.len();
+        let offset = (table_end + 0x7FF) & !0x7FF;
+        let mut head = b"AFS\0".to_vec();
+        head.extend((entries.len() as u32).to_le_bytes());
+        let mut body = Vec::new();
+        for data in entries {
+            head.extend(((offset + body.len()) as u32).to_le_bytes());
+            head.extend((data.len() as u32).to_le_bytes());
+            body.extend_from_slice(data);
+            body.resize((body.len() + 0x7FF) & !0x7FF, 0);
+        }
+        head.resize(offset, 0);
+        head.extend(body);
+        head
+    }
+
+    /// A file in the temp directory that is removed when dropped.
+    pub struct TempFile(pub PathBuf);
+    impl TempFile {
+        pub fn new(name: &str, data: &[u8]) -> TempFile {
+            let path = std::env::temp_dir().join(format!("digiatlas-test-{}-{name}", std::process::id()));
+            std::fs::write(&path, data).unwrap();
+            TempFile(path)
+        }
+    }
+    impl Drop for TempFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    #[test]
+    fn finds_files_and_reads_afs_entries() {
+        let afs = build_afs(&[b"first", b"second entry"]);
+        let image = build_iso(&[("SYSTEM.CNF", b"BOOT2 = cdrom0:\\SLUS_208.36;1\n"), ("AREA.AFS", &afs)]);
+        let file = TempFile::new("disc.iso", &image);
+        let disc = Source::open(&file.0).unwrap();
+        let files = list_files(&disc).unwrap();
+        let mut names: Vec<&String> = files.keys().collect();
+        names.sort();
+        assert_eq!(names, ["/AREA.AFS", "/SYSTEM.CNF"]);
+        let archive = crate::afs::Afs::open(open_disc_file(&disc, &files, "area.afs").unwrap()).unwrap();
+        assert_eq!(archive.count(), 2);
+        assert_eq!(archive.entry(0).unwrap(), b"first");
+        assert_eq!(archive.entry(1).unwrap(), b"second entry");
+    }
+
+    #[test]
+    fn rejects_a_file_that_is_not_a_disc_image() {
+        let file = TempFile::new("x.iso", &vec![0u8; 20 * SECTOR as usize]);
+        assert!(list_files(&Source::open(&file.0).unwrap()).is_err());
+    }
+}

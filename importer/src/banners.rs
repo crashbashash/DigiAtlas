@@ -29,3 +29,16 @@ pub fn load(area: &Afs, names: &HashMap<String, Vec<(String, i64)>>, stage_id: &
     let tex = textures::decode_all(&graph)?.into_iter().next();
     Ok(tex.filter(|t| (t.width, t.height) == (256, 256)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn names_the_loading_pack_of_a_stage() {
+        assert_eq!(pack_name("stag0102").as_deref(), Some("ldag0102.igb"));
+        assert_eq!(pack_name("stagGF01").as_deref(), Some("ldaggf01.igb"));
+        assert_eq!(pack_name("dng101b1").as_deref(), Some("ldg101b1.igb"));
+        assert_eq!(pack_name("loading"), None);
+    }
+}

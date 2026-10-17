@@ -106,3 +106,27 @@ pub fn list_stages(ndmw: &Afs) -> Result<Vec<Stage>> {
     }
     Ok(stages)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn describes_floors_and_kinds() {
+        assert_eq!(Json::Object(describe("dng101b2")), json!({"kind": "dungeon", "floor": "B2", "variant": null}));
+        assert_eq!(describe("dng103f1")["floor"], "F1");
+        assert_eq!(Json::Object(describe("dngq4b2v")), json!({"kind": "dungeon", "floor": "B2", "variant": "v"}));
+        assert_eq!(describe("dngq6b01")["floor"], "B1");
+        assert_eq!(describe("stag0102")["kind"], "field");
+        assert_eq!(describe("stagBS04")["kind"], "boss");
+        assert_eq!(describe("stagML12")["kind"], "hub");
+        assert_eq!(describe("stagIS12")["kind"], "hub");
+        assert_eq!(describe("stagIS10")["kind"], "system");
+    }
+
+    #[test]
+    fn reads_a_stage_manifest() {
+        let (id, packs) = parse_manifest(b"\x00[0.231]\x00xx[0.230]\x00stag0102\x00junk");
+        assert_eq!((id.as_deref(), packs), (Some("stag0102"), vec![231, 230]));
+    }
+}

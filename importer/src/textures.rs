@@ -64,3 +64,23 @@ pub fn clut_of(g: &Graph, image: usize) -> Result<usize> {
 pub fn decode_all(g: &Graph) -> Result<Vec<Texture>> {
     (0..g.s2.len()).filter(|&k| g.class(k) == "igImage").map(|k| decode(g, k, clut_of(g, k)?)).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn swaps_palette_index_bits_three_and_four() {
+        assert_eq!(csm1(0x08), 0x10);
+        assert_eq!(csm1(0x10), 0x08);
+        assert_eq!(csm1(0x20), 0x20);
+    }
+
+    #[test]
+    fn writes_a_png_header() {
+        let data = crate::png::encode_rgba(1, 1, &[1, 2, 3, 4]).unwrap();
+        assert_eq!(&data[..8], b"\x89PNG\r\n\x1a\n");
+        assert_eq!(&data[16..24], &[0, 0, 0, 1, 0, 0, 0, 1]);
+        assert!(crate::png::encode_rgba(2, 2, &[0; 4]).is_err());
+    }
+}

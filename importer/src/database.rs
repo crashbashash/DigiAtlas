@@ -254,3 +254,83 @@ pub fn parse_items(tables: &Tables) -> Result<Vec<Item>> {
     }
     Ok(items)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// CP932 bytes carried as latin1 characters, the way the pack reader returns strings.
+    fn latin1(text: &str) -> String {
+        let (bytes, _, _) = encoding_rs::SHIFT_JIS.encode(text);
+        bytes.iter().map(|&b| b as char).collect()
+    }
+
+    fn row(cells: &[(&str, Cell)]) -> Row {
+        cells.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    }
+
+    fn tables(over: Vec<(&str, Vec<Row>)>) -> Tables {
+        let mut t: Tables = ITEM_DATABASES.iter().map(|c| (c.to_string(), Vec::new())).collect();
+        for (k, v) in over {
+            t.insert(k.into(), v);
+        }
+        t
+    }
+
+    #[test]
+    fn decodes_cp932_and_normalises_line_breaks() {
+        assert_eq!(decode_text(&latin1("バトルホーク\r\nα")), "バトルホーク\nα");
+        assert_eq!(decode_text(&latin1("\u{00b6} Data")), "X-Data");
+        assert_eq!(decode_cp932(&[0xA0, 0x41]), "\u{F8F0}A");
+    }
+
+    #[test]
+    fn reads_item_names_stats_and_skill() {
+        let weapon = vec![
+            row(&[
+                ("NAME", Cell::Str(Some("∈Battle Hawk α".into()))), ("TXT", Cell::Str(Some("Axe".into()))),
+                ("TSUYOSA", Cell::Int(78)), ("KASHIKOSA", Cell::Int(0)), ("SKILL", Cell::Int(0)),
+                ("SKILLPOINT", Cell::Int(1)), ("HANBAI", Cell::Int(196)), ("KAITORI", Cell::Int(49)), ("DELAY", Cell::Int(34)),
+            ]),
+            row(&[("NAME", Cell::Str(Some("∈Long Sword α".into()))), ("TXT", Cell::Str(Some("Sword".into()))), ("TSUYOSA", Cell::Int(5)), ("SKILL", Cell::Int(1))]),
+        ];
+        let items = parse_items(&tables(vec![("weapon", weapon)])).unwrap();
+        let hawk = &items[0];
+        assert_eq!((hawk.name.as_str(), hawk.description.as_deref(), hawk.skill_type), ("Battle Hawk α", Some("Axe"), Some("Blunt")));
+        // Zeros and unconfirmed columns (DELAY) are left out.
+        let stats: Vec<(&str, i64)> = hawk.stats.iter().map(|(k, v)| (*k, v.int().unwrap())).collect();
+        assert_eq!(stats, [("strength", 78), ("requiredSkill", 1), ("buyPrice", 196), ("sellPrice", 49)]);
+        assert_eq!(items[1].skill_type, Some("Slash"));
+    }
+
+    #[test]
+    fn names_unidentified_placeholders() {
+        let armor2 = vec![row(&[
+            ("NAME", Cell::Str(Some("???????".into()))), ("TXT", Cell::Str(Some("Equip. Level ???".into()))),
+            ("LVPOINT", Cell::Int(999)), ("KAITORI", Cell::Int(100)),
+        ])];
+        let item = parse_items(&tables(vec![("armor2", armor2)])).unwrap().remove(0);
+        assert!(item.unidentified);
+        assert_eq!(item.name, "Unidentified Board");
+        assert_eq!(item.stats.iter().map(|(k, _)| *k).collect::<Vec<_>>(), ["sellPrice"]);
+    }
+
+    #[test]
+    fn needs_every_item_database() {
+        let mut t = tables(vec![]);
+        t.remove("conItem");
+        assert!(parse_items(&t).is_err());
+    }
+
+    #[test]
+    fn maps_stat_rows_to_models_skipping_empty_ones() {
+        let enemy = vec![
+            row(&[("MODEL", Cell::Str(None))]),
+            row(&[("MODEL", Cell::Str(Some("e_goburi".into())))]),
+            row(&[("MODEL", Cell::Str(Some(String::new())))]),
+            row(&[("MODEL", Cell::Str(Some("e_ogre".into())))]),
+        ];
+        let models = enemy_models(&[("enemy".to_string(), enemy)].into_iter().collect()).unwrap();
+        assert_eq!(models.into_iter().collect::<Vec<_>>(), [(1, "e_goburi".to_string()), (3, "e_ogre".to_string())]);
+    }
+}

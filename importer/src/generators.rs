@@ -237,3 +237,59 @@ impl Pack {
         Ok(out)
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    pub fn generator(position: [f64; 3], positions: Vec<[f64; 3]>, is_global: bool, start_mode: &str, start_data: f64) -> Generator {
+        Generator {
+            name: "GENE-00".into(),
+            row: Value::Int(1),
+            position,
+            positions,
+            rotations: Vec::new(),
+            is_global,
+            start_mode: Value::Str(start_mode.into()),
+            start_data: Value::Float(start_data),
+            fill_mode: Value::Str(String::new()),
+            lua: Value::Str(String::new()),
+            gene_count: Some(Value::Int(1)),
+            gene_max_count: Some(Value::Int(1)),
+            pools: Vec::new(),
+            last_pools: Vec::new(),
+            slots: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_global_generator_lists_world_positions() {
+        let g = generator([5.0, 10.0, 15.0], vec![[5.0, 10.0, 15.0], [30.0, 10.0, 0.0]], true, "", 0.0);
+        assert_eq!(g.spawns(), [[5.0, 10.0, 15.0], [30.0, 10.0, 0.0]]);
+        assert_eq!(generator([1.0, 2.0, 3.0], vec![], true, "", 0.0).spawns(), [[1.0, 2.0, 3.0]]);
+    }
+
+    #[test]
+    fn a_room_generator_adds_offsets_to_its_anchor() {
+        let g = generator([-180.0, 40.0, 60.0], vec![[-20.0, 0.0, -55.0], [20.0, 0.0, -55.0]], false, "", 0.0);
+        assert_eq!(g.spawns(), [[-200.0, 40.0, 5.0], [-160.0, 40.0, 5.0]]);
+        assert_eq!(generator([7.0, 0.0, 9.0], vec![], false, "", 0.0).spawns(), [[7.0, 0.0, 9.0]]);
+    }
+
+    #[test]
+    fn a_radar_spawner_triggers_within_the_square_root_of_its_data() {
+        let g = generator([455.0, 50.0, 15.0], vec![[455.0, 50.0, 15.0]], true, "radar", 4225.0);
+        assert_eq!(g.trigger(), Some(([455.0, 50.0, 15.0], 65.0)));
+        assert_eq!(generator([0.0; 3], vec![], true, "direct", 150.0).trigger(), None);
+        assert_eq!(generator([0.0; 3], vec![], true, "radar", 0.0).trigger(), None);
+    }
+
+    #[test]
+    fn a_pool_name_gives_its_difficulty() {
+        let pool = |n: &str| DropPool { name: n.into(), entries: Vec::new() };
+        assert_eq!(pool("hZ1gobr3").difficulty(), Some("hard"));
+        assert_eq!(pool("vZ2a").difficulty(), Some("veryhard"));
+        assert_eq!(pool("comonNOTG01").difficulty(), None);
+        assert_eq!(pool("n").difficulty(), None);
+    }
+}

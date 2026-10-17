@@ -502,6 +502,91 @@ mod tests {
         assert_eq!(serial(b"nothing"), None);
     }
 
+    use crate::generators::tests::generator;
+    use crate::generators::DropEntry;
+
+    fn pool(name: &str) -> DropPool {
+        DropPool { name: name.into(), entries: Vec::new() }
+    }
+
+    #[test]
+    fn a_record_carries_the_trigger() {
+        let rec = generator_record(&generator([1.0, 2.0, 3.0], vec![[1.0, 2.0, 3.0]], true, "radar", 625.0), None);
+        assert_eq!(rec["trigger"], json!({"center": [1.0, 2.0, 3.0], "radius": 25.0}));
+        assert!(generator_record(&generator([1.0, 2.0, 3.0], vec![], true, "direct", 0.0), None).get("trigger").is_none());
+    }
+
+    fn slots(rows: &[(i64, i64, &str)]) -> Vec<PlayerSlot> {
+        rows.iter()
+            .map(|&(c, m, p)| PlayerSlot {
+                count: Field::Int(c),
+                max_count: Field::Int(m),
+                pools: if p.is_empty() { vec![] } else { vec![pool(p)] },
+                last_pools: vec![],
+            })
+            .collect()
+    }
+
+    #[test]
+    fn identical_player_entries_collapse_to_the_plain_fields() {
+        let mut g = generator([0.0; 3], vec![], true, "", 0.0);
+        g.slots = slots(&[(1, 1, "nA"); 4]);
+        assert_eq!(player_slots(&g), None);
+        assert_eq!(player_slots(&generator([0.0; 3], vec![], true, "", 0.0)), None);
+    }
+
+    #[test]
+    fn differing_player_entries_are_exported_in_order() {
+        let mut g = generator([0.0; 3], vec![], true, "", 0.0);
+        g.slots = slots(&[(2, 2, "nA"), (3, 3, "nA"), (4, 4, "nB"), (4, 4, "nB")]);
+        let out = player_slots(&g).unwrap();
+        assert_eq!(out.iter().map(|e| e["count"].as_i64().unwrap()).collect::<Vec<_>>(), [2, 3, 4, 4]);
+        assert_eq!(out[2]["drops"], json!({"normal": "nB"}));
+    }
+
+    #[test]
+    fn a_pool_record_parses_its_name_and_totals() {
+        let p = DropPool {
+            name: "hZ1gobr3".into(),
+            entries: vec![
+                DropEntry { category: "weapon".into(), id: 0, rank: 0, rate: 250 },
+                DropEntry { category: "conItem".into(), id: 1, rank: 0, rate: 1600 },
+            ],
+        };
+        let rec = pool_record(&p);
+        assert_eq!(rec["totalRate"], 1850);
+        assert_eq!((&rec["difficulty"], &rec["zone"], &rec["family"], &rec["variant"]), (&json!("hard"), &json!("Z1"), &json!("gobr"), &json!("3")));
+        assert_eq!(pool_record(&pool("comonNOTG01")), json!({"entries": [], "totalRate": 0}));
+    }
+
+    #[test]
+    fn drop_maps_are_keyed_by_difficulty() {
+        let pools = ["nZ1a1", "hZ1a1", "vZ1a1"].map(pool);
+        assert_eq!(Value::Object(drop_map(&pools)), json!({"normal": "nZ1a1", "hard": "hZ1a1", "veryhard": "vZ1a1"}));
+    }
+
+    #[test]
+    fn several_traders_of_one_digimon_are_numbered() {
+        let offer = vec![trades::Offer { give: ("weapon".into(), 1), get: ("weapon".into(), 2) }];
+        let placed = |name: &str, instance, position, facing, tables: Vec<(&'static str, Vec<trades::Offer>)>| trades::Placed {
+            name: name.into(),
+            instance,
+            position,
+            facing,
+            tables,
+        };
+        let out = trades_json(&[
+            placed("Agumon", 0, [-80.0, 10.0, 20.0], 90.0, vec![("hard", offer.clone())]),
+            placed("Agumon", 1, [240.0, 10.0, -180.0], -45.0, vec![("hard", offer.clone())]),
+            placed("Dorumon", 0, [0.0, 10.0, 0.0], 0.0, vec![]),
+        ]);
+        let numbered: Vec<(&str, Value)> = out.as_array().unwrap().iter().map(|x| (x["trader"].as_str().unwrap(), x["number"].clone())).collect();
+        assert_eq!(numbered, [("Agumon", json!(1)), ("Agumon", json!(2)), ("Dorumon", Value::Null)]);
+        assert_eq!(out[0]["position"], json!({"x": -80.0, "y": 10.0, "z": 20.0}));
+        assert_eq!(out[0]["facing"], 90.0);
+        assert_eq!(out[0]["tables"]["hard"][0], json!({"give": {"category": "weapon", "id": 1}, "get": {"category": "weapon", "id": 2}}));
+    }
+
     #[test]
     fn names_enemies_with_kind_overrides_and_parts() {
         let orb = enemy_naming("f_luce2").unwrap();

@@ -70,3 +70,40 @@ pub fn build(tables: &Tables) -> Value {
         .collect();
     json!({"cost": COST, "tiers": tiers})
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(id: i64, rate: i64) -> Row {
+        [("ID", Cell::Int(id)), ("RATE", Cell::Int(rate)), ("RANK", Cell::Int(0))].into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+    }
+
+    #[test]
+    fn tiers_follow_the_level_bounds() {
+        assert_eq!(
+            tier_levels(),
+            [(1, 0, Some(40)), (2, 41, Some(100)), (3, 101, Some(200)), (4, 201, Some(300)), (5, 301, Some(400)), (6, 401, None)]
+        );
+    }
+
+    #[test]
+    fn a_tier_row_counts_its_results() {
+        let mut rows: Vec<Row> = (0..100).map(|_| row(0, 0)).collect();
+        rows.extend([row(2, 0), row(7, 6000), row(9, 4000), row(5, 1)]); // the last is past the count
+        let ids: Vec<(Option<i64>, Option<i64>)> = results(&rows, 1).iter().map(|(i, r)| (i.int(), r.int())).collect();
+        assert_eq!(ids, [(Some(7), Some(6000)), (Some(9), Some(4000))]);
+        assert!(results(&rows, 2).is_empty());
+    }
+
+    #[test]
+    fn lists_every_kind_per_tier() {
+        let mut one: Vec<Row> = (0..100).map(|_| row(0, 0)).collect();
+        one.extend([row(1, 0), row(3, 10000)]);
+        let tables: Tables = ["coweapon", "coarmor1", "coarmor2"].iter().map(|n| (n.to_string(), one.clone())).collect();
+        let out = build(&tables);
+        assert_eq!(out["cost"], 300);
+        assert_eq!(out["tiers"][0]["results"]["armor1"], serde_json::json!([{"category": "armor1", "id": 3, "rate": 10000}]));
+        assert_eq!(out["tiers"][5]["results"]["weapon"], serde_json::json!([]));
+    }
+}

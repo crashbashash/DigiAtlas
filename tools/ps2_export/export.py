@@ -164,6 +164,21 @@ def _player_slots(g: generators.Generator) -> list[dict] | None:
     return out
 
 
+def enemy_naming(model: str) -> dict:
+    """Display name, kind and the optional form and boss-part fields for an enemy model.
+
+    The kind comes from the model prefix (e_ enemy, f_ boss, g_ object) unless the names table
+    overrides it; `form` tells apart models that share a name, and `role: part` with `partOf` marks a
+    boss's parts and minions.
+    """
+    entry = ENEMY_NAMES[model]
+    out = {"name": entry["name"], "kind": entry.get("kind", KINDS[model[0]])}
+    for key in ("form", "role", "partOf"):
+        if key in entry:
+            out[key] = entry[key]
+    return out
+
+
 def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
     files = iso.list_files(iso_path)
     for needed in ("/SYSTEM.CNF", "/AREA.AFS", "/NDMW.AFS", "/NDMW.IGB", "/SLUS_208.36"):
@@ -193,8 +208,7 @@ def export(iso_path: str, out_dir: Path, with_maps: bool = False) -> dict:
         "rows": [
             {
                 "row": r.row,
-                "name": ENEMY_NAMES[models[r.row]]["name"],
-                "kind": KINDS[models[r.row][0]],
+                **enemy_naming(models[r.row]),
                 "model": models[r.row],
                 "hp": r.hp,
                 "stats": {

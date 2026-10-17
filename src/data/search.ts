@@ -77,17 +77,20 @@ export function search(model: Model, query: string, category: string | null = nu
 
   const enemies: Hit[] = [];
   if (q) {
-    const species = new Map<string, { kind: string; variants: number }>();
+    const species = new Map<string, { kind: string; variants: number; partOf?: string }>();
     for (const e of model.enemies.values()) {
       if (e.kind === 'object') continue;
       const s = species.get(e.name);
       if (s) s.variants += 1;
       else species.set(e.name, { kind: e.kind, variants: 1 });
     }
+    // Names that are only a boss's parts say whose (Lucemon's orb: part of Lucemon).
+    for (const [name, s] of species)
+      if (model.isPartOnly(name)) s.partOf = model.speciesRows(name)[0].partOf;
     for (const [name, s] of species) {
       const rank = matchRank(normalize(name), q);
       if (rank === null) continue;
-      const kind = s.kind === 'boss' ? 'Boss' : 'Enemy';
+      const kind = s.partOf ? `Part of ${s.partOf}` : s.kind === 'boss' ? 'Boss' : 'Enemy';
       enemies.push({
         kind: 'enemy',
         id: name,

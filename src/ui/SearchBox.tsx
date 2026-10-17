@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'preact/hooks';
-import { lastMap } from '../app/navigation';
 import { formatHash, routes, type Route } from '../app/route';
 import { search, type Hit } from '../data/search';
 import { useApp } from './context';
@@ -11,11 +10,11 @@ const GROUPS: { key: 'items' | 'enemies' | 'rooms'; title: string }[] = [
 ];
 const PER_GROUP = 6;
 
-/** Where a search result leads. Enemies open on the map, on the stage you were last looking at. */
+/** Where a search result leads: the item or enemy page, or the room's map. */
 export function hitRoute(hit: Hit): Route {
   if (hit.kind === 'item') return routes.item(hit.id);
   if (hit.kind === 'room') return routes.map(hit.id);
-  return routes.map(lastMap(), { kind: 'species', name: hit.id });
+  return routes.enemy(hit.id);
 }
 
 let nextId = 0;

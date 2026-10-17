@@ -15,6 +15,12 @@ describe('routes', () => {
       routes.map('stag0102', { kind: 'spawner', name: 'gen_01' }),
       routes.map('stag0102', { kind: 'group', row: 12 }),
       routes.map('stag0102', { kind: 'species', name: 'Goburimon' }),
+      routes.enemy('Goburimon'),
+      routes.enemy('Devil-family boss (v3)', 'drops'),
+      routes.items(),
+      routes.items('weapon', 'axe', { column: 'strength', desc: true }),
+      routes.enemies(),
+      routes.enemies('boss', 'mon', { column: 'hp', desc: false }, 'resist'),
     ];
     for (const r of pages) expect(roundTrip(r)).toEqual(r);
   });
@@ -53,5 +59,19 @@ describe('routes', () => {
     expect(parseHash('').route).toEqual(routes.home());
     expect(parseHash('#/').route).toEqual(routes.home());
     expect(parseHash('#/what/is/this').route).toEqual(routes.home());
+  });
+});
+
+describe('tables', () => {
+  it('sends old category searches to the item table', () => {
+    expect(parseHash('#/search?cat=weapon').route).toEqual(routes.items('weapon'));
+    expect(parseHash('#/search?q=axe&cat=weapon').route).toEqual(routes.search('axe', 'weapon'));
+  });
+
+  it('keeps the sort in the address only when one is chosen', () => {
+    expect(formatHash(routes.items('armor1'), DEFAULT_SETTINGS)).toBe('#/items?d=hard&cat=armor1');
+    expect(
+      formatHash(routes.enemies('all', '', { column: 'exp', desc: true }), DEFAULT_SETTINGS),
+    ).toBe('#/enemies?d=hard&sort=exp&dir=desc');
   });
 });

@@ -11,6 +11,9 @@ import { ItemPage } from './ItemPage';
 import { MapPage } from './map/MapPage';
 import { SearchBox } from './SearchBox';
 import { SearchPage } from './SearchPage';
+import { EnemyPage } from './EnemyPage';
+import { ItemsTable } from './ItemsTable';
+import { EnemiesTable } from './EnemiesTable';
 
 function pageTitle(model: Model, route: Route): string {
   switch (route.page) {
@@ -20,6 +23,12 @@ function pageTitle(model: Model, route: Route): string {
       return 'Search · DigiAtlas';
     case 'item':
       return `${model.items.has(route.key) ? model.itemLabel(route.key) : 'Item'} · DigiAtlas`;
+    case 'enemy':
+      return `${route.name} · DigiAtlas`;
+    case 'items':
+      return 'Items · DigiAtlas';
+    case 'enemies':
+      return `${route.kind === 'boss' ? 'Bosses' : 'Enemies'} · DigiAtlas`;
     case 'map': {
       const stage = route.stageId ? model.byId.get(route.stageId) : undefined;
       return `${stage ? model.stageTitle(stage) : 'Maps'} · DigiAtlas`;
@@ -105,7 +114,13 @@ export function App({
   }, []);
 
   const route = loc.route;
-  const section = route.page === 'item' || route.page === 'search' ? 'browse' : route.page;
+  // Which header link the page belongs under.
+  const section =
+    route.page === 'item' || route.page === 'items'
+      ? 'items'
+      : route.page === 'enemy' || route.page === 'enemies'
+        ? 'enemies'
+        : route.page;
   return (
     <AppContext.Provider value={services}>
       <div class="shell">
@@ -121,11 +136,11 @@ export function App({
             <Link to={routes.map(null)} aria-current={section === 'map' ? 'page' : undefined}>
               Maps
             </Link>
-            <Link
-              to={routes.search('', 'weapon')}
-              aria-current={section === 'browse' ? 'page' : undefined}
-            >
+            <Link to={routes.items()} aria-current={section === 'items' ? 'page' : undefined}>
               Items
+            </Link>
+            <Link to={routes.enemies()} aria-current={section === 'enemies' ? 'page' : undefined}>
+              Enemies
             </Link>
           </nav>
           <button type="button" class="search-trigger" onClick={() => setSearching(true)}>
@@ -137,6 +152,13 @@ export function App({
           {route.page === 'home' && <Home />}
           {route.page === 'search' && <SearchPage q={route.q} category={route.category} />}
           {route.page === 'item' && <ItemPage itemKey={route.key} tab={route.tab} />}
+          {route.page === 'enemy' && <EnemyPage name={route.name} tab={route.tab} />}
+          {route.page === 'items' && (
+            <ItemsTable category={route.category} q={route.q} sort={route.sort} />
+          )}
+          {route.page === 'enemies' && (
+            <EnemiesTable kind={route.kind} q={route.q} sort={route.sort} view={route.view} />
+          )}
           {route.page === 'map' && (
             <MapPage stageId={route.stageId} selection={route.selection} zoom={route.zoom} />
           )}

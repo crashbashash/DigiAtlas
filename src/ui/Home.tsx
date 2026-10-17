@@ -16,7 +16,11 @@ export function Home() {
   const bosses = useMemo(
     () =>
       [
-        ...new Set([...model.enemies.values()].filter((e) => e.kind === 'boss').map((e) => e.name)),
+        ...new Set(
+          [...model.enemies.values()]
+            .filter((e) => e.kind === 'boss' && e.role !== 'part')
+            .map((e) => e.name),
+        ),
       ].sort(),
     [model],
   );
@@ -64,11 +68,14 @@ export function Home() {
           <ul class="link-list">
             {categories.map((c) => (
               <li>
-                <Link to={routes.search('', c.category)}>{c.label}</Link>
+                <Link to={routes.items(c.category)}>{c.label}</Link>
                 <span class="muted">{c.count}</span>
               </li>
             ))}
           </ul>
+          <p class="card-more">
+            <Link to={routes.items()}>Every item, sortable by stats and drop chance →</Link>
+          </p>
         </section>
 
         <section class="section-card">
@@ -79,10 +86,13 @@ export function Home() {
           <ul class="link-list">
             {bosses.map((name) => (
               <li>
-                <Link to={routes.map(recent, { kind: 'species', name })}>{name}</Link>
+                <Link to={routes.enemy(name)}>{name}</Link>
               </li>
             ))}
           </ul>
+          <p class="card-more">
+            <Link to={routes.enemies()}>Every enemy, sortable by stats →</Link>
+          </p>
         </section>
 
         <section class="section-card planned">

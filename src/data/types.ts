@@ -25,6 +25,11 @@ export interface Enemy {
   row: number;
   name: string;
   kind: EnemyKind;
+  /** Tells apart rows that share a name, such as a boss's forms ("Form 1"). */
+  form?: string;
+  /** A boss's part or minion, shown with that boss (`partOf`) rather than as an enemy of its own. */
+  role?: 'part';
+  partOf?: string;
   model: string;
   hp: number;
   stats: {

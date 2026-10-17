@@ -105,6 +105,35 @@ export const DEFAULT_SCOPE: Scope = { players: 1, hideUnused: true };
 /** Clamp a player count to the game's 1 to 4. */
 export const clampPlayers = (n: number): number => Math.min(4, Math.max(1, Math.round(n) || 1));
 
+/** Where one enemy (by name) spawns in a stage, for a difficulty and scope. */
+export interface SpeciesSpawn {
+  stage: Stage;
+  /** Spawners that place it. */
+  spawners: number;
+  /** How many it places in total (sum of the spawners' counts). */
+  total: number;
+  /** Stat rows used there (crown ranks, area tiers). */
+  rows: number[];
+}
+
+/** A boss's part or minion and how many of it the boss's fight has. */
+export interface BossPart {
+  name: string;
+  /** Its stat rows used in the fight, weakest first. */
+  rows: Enemy[];
+  /** How many the fight's spawners place in total (minions may come back once all are beaten). */
+  count: number;
+}
+
+/** Something an enemy (by name) can drop: the best chance per kill and the rooms it applies in. */
+export interface SpeciesDrop {
+  key: string;
+  category: string;
+  percent: number;
+  /** Rooms with that drop, best chance first. */
+  stages: { stage: Stage; percent: number }[];
+}
+
 export interface World {
   area: string;
   rooms: Room[];
@@ -457,6 +486,107 @@ export class Model {
       s.variant ? DIFFICULTY_LABEL[VARIANT_DIFFICULTY[s.variant]] : null,
     ].filter(Boolean);
     return parts.length ? parts.join(' ') : `Map ${room.stages.indexOf(s) + 1}`;
+  }
+
+  /** Every stat row with this name (an enemy's crown ranks and area tiers share it). */
+  speciesRows(name: string): Enemy[] {
+    return [...this.enemies.values()].filter((e) => e.name === name);
+  }
+
+  /** Where an enemy spawns on a difficulty, most placed first. */
+  spawnsOf(name: string, d: Difficulty, scope: Scope = DEFAULT_SCOPE): SpeciesSpawn[] {
+    const rows = new Set(this.speciesRows(name).map((e) => e.row));
+    const out: SpeciesSpawn[] = [];
+    for (const stage of this.stages) {
+      const hidden = this.hidden(stage, d, scope);
+      const gens = this.generators(stage, d, scope).filter(
+        (g, i) => rows.has(g.row) && !hidden.has(i),
+      );
+      if (!gens.length) continue;
+      out.push({
+        stage,
+        spawners: gens.length,
+        total: gens.reduce((n, g) => n + (g.count ?? 0), 0),
+        rows: [...new Set(gens.map((g) => g.row))],
+      });
+    }
+    return out.sort(
+      (a, b) => b.total - a.total || naturalKey(a.stage.id).localeCompare(naturalKey(b.stage.id)),
+    );
+  }
+
+  /**
+   * The stat rows an enemy uses on a difficulty, weakest first. When it spawns nowhere on that
+   * difficulty, all of its rows, so its stats can still be looked up.
+   */
+  variantsOn(name: string, d: Difficulty, scope: Scope = DEFAULT_SCOPE): Enemy[] {
+    const used = new Set(this.spawnsOf(name, d, scope).flatMap((s) => s.rows));
+    const rows = this.speciesRows(name);
+    const list = used.size ? rows.filter((e) => used.has(e.row)) : rows;
+    return list.sort((a, b) => a.hp - b.hp || a.rarity - b.rarity || a.row - b.row);
+  }
+
+  /** Whether every row of this name is some boss's part or minion (Lucemon's orbs). */
+  isPartOnly(name: string): boolean {
+    const rows = this.speciesRows(name);
+    return rows.length > 0 && rows.every((e) => e.role === 'part');
+  }
+
+  /**
+   * A boss's parts and minions on a difficulty, counted in the rooms where the boss spawns. When the
+   * boss spawns nowhere on it, every part row, with a count of 0.
+   */
+  partsOf(boss: string, d: Difficulty, scope: Scope = DEFAULT_SCOPE): BossPart[] {
+    const partRows = new Map<number, Enemy>();
+    for (const e of this.enemies.values())
+      if (e.role === 'part' && e.partOf === boss) partRows.set(e.row, e);
+    if (!partRows.size) return [];
+    const byName = new Map<string, BossPart>();
+    const add = (e: Enemy, count: number) => {
+      let part = byName.get(e.name);
+      if (!part) {
+        part = { name: e.name, rows: [], count: 0 };
+        byName.set(e.name, part);
+      }
+      if (!part.rows.includes(e)) part.rows.push(e);
+      part.count += count;
+    };
+    const rooms = this.spawnsOf(boss, d, scope);
+    for (const { stage } of rooms)
+      for (const g of this.generators(stage, d, scope)) {
+        const e = partRows.get(g.row);
+        if (e) add(e, g.count ?? 0);
+      }
+    if (!rooms.length) for (const e of partRows.values()) add(e, 0);
+    const out = [...byName.values()];
+    for (const p of out) p.rows.sort((a, b) => a.hp - b.hp);
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Everything an enemy can drop per kill on a difficulty, best chance first. */
+  dropsOf(name: string, d: Difficulty, scope: Scope = DEFAULT_SCOPE): SpeciesDrop[] {
+    const rows = new Set(this.speciesRows(name).map((e) => e.row));
+    const byKey = new Map<string, SpeciesDrop>();
+    for (const stage of this.stages) {
+      const hidden = this.hidden(stage, d, scope);
+      this.generators(stage, d, scope).forEach((g, i) => {
+        if (!rows.has(g.row) || hidden.has(i)) return;
+        for (const r of this.tableFor(g, d).rows) {
+          let drop = byKey.get(r.key);
+          if (!drop) {
+            drop = { key: r.key, category: r.category, percent: 0, stages: [] };
+            byKey.set(r.key, drop);
+          }
+          drop.percent = Math.max(drop.percent, r.percent);
+          const here = drop.stages.find((x) => x.stage.id === stage.id);
+          if (here) here.percent = Math.max(here.percent, r.percent);
+          else drop.stages.push({ stage, percent: r.percent });
+        }
+      });
+    }
+    const out = [...byKey.values()];
+    for (const drop of out) drop.stages.sort((a, b) => b.percent - a.percent);
+    return out.sort((a, b) => b.percent - a.percent || a.key.localeCompare(b.key));
   }
 
   stageTitle(s: Stage): string {

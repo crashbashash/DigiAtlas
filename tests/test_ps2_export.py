@@ -173,7 +173,36 @@ class DatabaseTests(unittest.TestCase):
                 continue
             self.assertIn(model[0], export.KINDS, model)
             self.assertTrue(entry["name"], model)
-            self.assertIn(entry["source"], ("disc", "decomp"), model)
+            self.assertIn(entry["source"], ("disc", "wiki", "player", "decomp"), model)
+            self.assertLessEqual(set(entry), {"name", "source", "form", "kind", "role", "partOf"}, model)
+            if "kind" in entry:
+                self.assertIn(entry["kind"], export.KINDS.values(), model)
+            # A part names its boss, and that boss exists in the table.
+            self.assertEqual("role" in entry, "partOf" in entry, model)
+            if "role" in entry:
+                self.assertEqual(entry["role"], "part", model)
+                bosses = {e["name"] for m, e in export.ENEMY_NAMES.items() if not m.startswith("_")}
+                self.assertIn(entry["partOf"], bosses, model)
+
+    def test_models_sharing_a_name_are_told_apart(self):
+        # Rows of one name either all differ by form, or are one enemy's tiers (no forms at all),
+        # apart from parts, which carry their own form.
+        by_name = {}
+        for model, entry in export.ENEMY_NAMES.items():
+            if not model.startswith("_") and "role" not in entry:
+                by_name.setdefault(entry["name"], []).append(entry.get("form"))
+        for name, forms in by_name.items():
+            if any(forms):
+                self.assertEqual(len(set(forms)), len(forms), name)
+                self.assertTrue(all(forms), name)
+
+    def test_enemy_naming_applies_kind_overrides_and_parts(self):
+        self.assertEqual(export.enemy_naming("e_goburi"), {"name": "Goburimon", "kind": "enemy"})
+        self.assertEqual(
+            export.enemy_naming("f_devl3"), {"name": "Mecha Rogue X", "kind": "boss", "form": "Form 3"}
+        )
+        orb = export.enemy_naming("f_luce2")
+        self.assertEqual((orb["role"], orb["partOf"], orb["kind"]), ("part", "Lucemon", "boss"))
 
 
 class StageTests(unittest.TestCase):

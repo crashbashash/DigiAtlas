@@ -137,6 +137,20 @@
               }
             },
             "description": "Resistances as stored by the game (units unconfirmed)."
+          },
+          "form": {
+            "type": "string",
+            "description": "Tells apart stat rows that share a name, such as a boss's forms (\"Form 1\")."
+          },
+          "role": {
+            "enum": [
+              "part"
+            ],
+            "description": "\"part\": a boss's part or minion (destroy-first orbs, summoned helpers), shown with that boss."
+          },
+          "partOf": {
+            "type": "string",
+            "description": "For a part: the display name of its boss."
           }
         }
       }

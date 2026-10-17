@@ -45,7 +45,7 @@ export function ItemPage({ itemKey, tab }: { itemKey: string; tab: ItemTab }) {
     <div class="page item-page">
       <header class="page-head">
         <nav class="crumbs" aria-label="Breadcrumb">
-          <Link to={routes.search('', item.category)}>{categoryLabel(item.category)}</Link>
+          <Link to={routes.items(item.category)}>{categoryLabel(item.category)}</Link>
         </nav>
         <div class="title-row">
           <h1>

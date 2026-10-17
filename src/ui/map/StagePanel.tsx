@@ -20,7 +20,7 @@ import {
 import { Empty, KindDot, Link, settingsText } from '../common';
 import { useApp } from '../context';
 import { KIND_LABEL } from '../mapview';
-import { DropTableView, EnemyStats, ItemLink } from '../pieces';
+import { DropTableView, EnemyStats, ItemLink, variantLabel } from '../pieces';
 
 const fmt = (n: number): string => n.toLocaleString('en-US');
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -82,11 +82,18 @@ function Back({
 function Title({ enemy, fallback }: { enemy: Enemy | undefined; fallback: string }) {
   const kind = enemy?.kind ?? 'enemy';
   return (
-    <h2>
-      <KindDot kind={kind} />
-      {enemy?.name ?? fallback}
-      <small>{KIND_LABEL[kind]}</small>
-    </h2>
+    <>
+      <h2>
+        <KindDot kind={kind} />
+        {enemy?.name ?? fallback}
+        <small>{KIND_LABEL[kind]}</small>
+      </h2>
+      {enemy && kind !== 'object' && (
+        <p class="to-page">
+          <Link to={routes.enemy(enemy.name)}>Enemy page: every room, all drops →</Link>
+        </p>
+      )}
+    </>
   );
 }
 
@@ -192,10 +199,10 @@ function bySpecies(groups: EnemyGroup[]): Species[] {
 
 function groupDetail(g: EnemyGroup): string {
   if (g.enemy?.kind === 'object') return `${g.spawners} placed`;
-  const hp = g.enemy
-    ? `HP ${fmt(g.enemy.hp)}${g.enemy.rarity ? ` · crown ${g.enemy.rarity}` : ''} · `
-    : '';
-  return `${hp}${plural(g.spawners, 'spawner')} · ${g.total} total`;
+  const label = g.enemy?.form ?? (g.enemy?.rarity ? `crown ${g.enemy.rarity}` : '');
+  const hp = g.enemy ? `HP ${fmt(g.enemy.hp)}${label ? ` · ${label}` : ''} · ` : '';
+  const part = g.enemy?.role === 'part' ? `Part of ${g.enemy.partOf} · ` : '';
+  return `${part}${hp}${plural(g.spawners, 'spawner')} · ${g.total} total`;
 }
 
 function SpeciesRow({ s, select }: { s: Species; select: PanelProps['select'] }) {
@@ -239,7 +246,7 @@ function SpeciesRow({ s, select }: { s: Species; select: PanelProps['select'] })
         <div class="variants">
           {s.groups.map((g) => (
             <button type="button" class="row" onClick={() => select({ kind: 'group', row: g.row })}>
-              <span class="grow">{g.enemy?.rarity ? `Crown ${g.enemy.rarity}` : 'Base'}</span>
+              <span class="grow">{g.enemy ? variantLabel(g.enemy) : 'Base'}</span>
               <span class="detail muted">{groupDetail(g)}</span>
             </button>
           ))}
@@ -512,6 +519,9 @@ function SpeciesView({ difficulty: d, name, select }: PanelProps & { name: strin
         {name}
         <small>{KIND_LABEL[kind]}</small>
       </h2>
+      <p class="to-page">
+        <Link to={routes.enemy(name)}>Enemy page: every room, all drops →</Link>
+      </p>
       {variants.length > 0 && (
         <>
           <h3 class="sub">Stats ({DIFFICULTY_LABEL[d]})</h3>
@@ -529,7 +539,7 @@ function SpeciesView({ difficulty: d, name, select }: PanelProps & { name: strin
                 {variants.map((e) => (
                   <tr>
                     <td class="l">
-                      {e.rarity ? `Crown ${e.rarity}` : 'Base'}
+                      {variantLabel(e)}
                       <span class="muted"> ×{used.get(e.row)}</span>
                     </td>
                     {[

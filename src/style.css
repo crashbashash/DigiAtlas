@@ -1054,3 +1054,110 @@ table.appraisal tr:nth-child(even) td {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Tables (item and enemy browsing, enemy page)
+--------------------------------------------------------------------------------------------- */
+.page.wide {
+  max-width: 1400px;
+}
+.table-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 4px 0;
+}
+.table-tools .page-search {
+  width: 320px;
+  max-width: 100%;
+}
+.chip-count {
+  opacity: 0.7;
+  margin-left: 2px;
+}
+table.browse {
+  font-size: var(--text-sm);
+  margin: 4px 0 16px;
+}
+table.browse caption.sub {
+  text-align: left;
+  caption-side: top;
+}
+table.browse th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line-strong);
+  padding: 6px 8px;
+}
+table.browse tbody th {
+  position: static;
+  color: var(--text);
+  background: none;
+  border-bottom: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+table.browse th.n,
+table.browse td.n {
+  text-align: right;
+}
+table.browse th button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+}
+table.browse th button:hover {
+  color: var(--text);
+}
+table.browse th[aria-sort] {
+  color: var(--text);
+}
+.sort-mark {
+  display: inline-block;
+  width: 1em;
+  font-size: 10px;
+  margin-left: 3px;
+}
+table.browse td {
+  padding: 6px 8px;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+table.browse tbody tr:hover td,
+table.browse tbody tr:hover th {
+  background: var(--panel);
+}
+table.browse td.rooms {
+  white-space: normal;
+}
+.name-cell {
+  display: inline-flex;
+  align-items: center;
+}
+.card-more {
+  margin: 10px 0 0;
+  font-size: var(--text-sm);
+}
+.to-page {
+  margin: -4px 0 8px;
+  font-size: var(--text-sm);
+}
+.drop-map .count {
+  color: var(--text);
+}
+.more {
+  font-size: var(--text-sm);
+}
+/* On the table pages the page scrolls, so the column headers can stay pinned while you read down. */
+.page.wide .table-scroll {
+  overflow: visible;
+}

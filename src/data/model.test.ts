@@ -433,3 +433,69 @@ describe('Model', () => {
     );
   });
 });
+
+describe('species', () => {
+  it('lists the rooms an enemy spawns in, most placed first', () => {
+    const spawns = model().spawnsOf('Goburimon', 'hard');
+    expect(spawns.map((s) => [s.stage.id, s.spawners, s.total])).toEqual([
+      ['stag0102', 2, 4],
+      ['dng101b1', 1, 2],
+    ]);
+    expect(spawns[0].rows).toEqual([1]);
+    expect(model().spawnsOf('Nobody', 'hard')).toEqual([]);
+  });
+
+  it('gives the stat rows used on a difficulty, or all of them when it spawns nowhere', () => {
+    const m = model();
+    expect(m.variantsOn('Goburimon', 'hard').map((e) => e.row)).toEqual([1]);
+    m.raw.stages.stages[0].difficulties = {};
+    m.raw.stages.stages[1].difficulties = {};
+    expect(m.variantsOn('Goburimon', 'hard').map((e) => e.row)).toEqual([1]);
+    expect(m.spawnsOf('Goburimon', 'hard')).toEqual([]);
+  });
+
+  it('merges what an enemy drops across rooms, best chance first', () => {
+    const drops = model().dropsOf('Goburimon', 'normal');
+    expect(drops.map((x) => [x.key, x.percent])).toEqual([
+      ['conItem:0', 10],
+      ['weapon:0', 3],
+    ]);
+    expect(drops[0].stages.map((x) => x.stage.id).sort()).toEqual(['dng101b1', 'stag0102']);
+    expect(model().dropsOf('Ogremon', 'hard')).toEqual([]);
+  });
+});
+
+describe('boss parts', () => {
+  const withBoss = () => {
+    const m = model();
+    const boss = { ...enemy(20, 'Lucemon', 'boss') };
+    const orb = { ...enemy(21, "Lucemon's orb", 'boss'), role: 'part' as const, partOf: 'Lucemon' };
+    m.enemies.set(20, boss);
+    m.enemies.set(21, orb);
+    const room = stage('stagBS03', 'Venom Jungle', 'Hades Obelisk', 'boss', [
+      gen('B', 20, undefined),
+      gen('O1', 21, undefined),
+      gen('O2', 21, undefined),
+      gen('O3', 21, undefined),
+    ]);
+    for (const g of room.difficulties.hard!.generators) g.count = 1;
+    m.stages.push(room);
+    m.byId.set(room.id, room);
+    return m;
+  };
+
+  it('knows which names are only parts', () => {
+    const m = withBoss();
+    expect(m.isPartOnly("Lucemon's orb")).toBe(true);
+    expect(m.isPartOnly('Lucemon')).toBe(false);
+    expect(m.isPartOnly('Nobody')).toBe(false);
+  });
+
+  it("counts a boss's parts in the rooms it fights in", () => {
+    const parts = withBoss().partsOf('Lucemon', 'hard');
+    expect(parts.map((p) => [p.name, p.count, p.rows.map((r) => r.row)])).toEqual([
+      ["Lucemon's orb", 3, [21]],
+    ]);
+    expect(withBoss().partsOf('Goburimon', 'hard')).toEqual([]);
+  });
+});

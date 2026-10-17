@@ -106,3 +106,15 @@ export function DropTableView({ table, caption }: { table: DropTable; caption: s
     </div>
   );
 }
+
+/** "Form 2", "Crown 3" or "Base": how an enemy's stat rows are told apart. */
+export const variantLabel = (e: Enemy): string =>
+  e.form ?? (e.rarity ? `Crown ${e.rarity}` : 'Base');
+
+/** "649" or "649–3,400" for a stat that differs across an enemy's variants. */
+export function range(values: number[]): string {
+  if (!values.length) return '–';
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  return lo === hi ? fmt(lo) : `${fmt(lo)}–${fmt(hi)}`;
+}

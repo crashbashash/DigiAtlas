@@ -43,9 +43,16 @@ Players see `name`, never the internal ids.
   (stored as a pilcrow) is written `X-Data`. The three X-Data rows share one name.
 - **Enemies** (`enemies.json`): `name` comes from a small curated table (`names/enemies.json`).
   `kind` is `enemy`, `boss`, or `object` (a destructible box, barrel or case). `model` is the engine's
-  internal name, kept only for debugging and icon lookup. Names marked `disc` in the table appear in
-  the game's own card album and are checked by the disc test; the rest follow the decompilation
-  roster (Machinedramon variants, boss forms and object names are not in the game text).
+  internal name, kept only for debugging and icon lookup. Each name in the table records its source:
+  `disc` names appear in the game's own card album and are checked by the disc test; `wiki` names
+  (the Mecha Rogue family and Mecha Rogue X's forms) follow the English Wikipedia and Wikimon, since
+  the US disc does not print them; `player` names describe something the game never names (Lucemon's
+  orbs); `decomp` names follow the decompilation roster (object names).
+- **Forms and boss parts**: optional `form` tells apart rows that share a name (Mecha Rogue X's
+  `Form 1`–`Form 3`). `role: "part"` with `partOf` marks a boss's parts and minions (Lucemon's three
+  orbs, Mecha Rogue X's summoned Mecha Rogue 04s); viewers list them with that boss rather than as
+  enemies of their own. `kind` normally follows the model prefix (`e_` enemy, `f_` boss, `g_` object);
+  the names table can override it.
 - **Enemy stats**: `hp`, `stats` (strength, defense, wisdom, spirit, speed, exp), `resist` (fire, ice,
   thunder, dark, stun, poison), `rates` (crit, paralysis) and `rarity` (crown rank). Values are as
   stored by the game; units for resistances and rates are not confirmed.

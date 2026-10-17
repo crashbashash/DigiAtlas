@@ -23,7 +23,14 @@ drops in (best chance first) and its trades; picking a map opens it with the dro
   you move between rooms, with a banner saying whether it drops here and where it drops best if not.
   Enemies with several stat variants (crown ranks) are one row that expands. Long drop tables fold the
   rare drops away. Hover or select a radar spawner to see how close you must get for it to start.
-- **Search** (`#/search?q=sword`, or a whole category: `#/search?cat=weapon`).
+- **Enemy pages** (`#/enemy/Goburimon`): stats and resistances for each variant (area tiers and crown
+  ranks) on the chosen difficulty; **Where it spawns**, rooms ranked by how many it places, each opening
+  the map with it highlighted; **Drops**, everything it can drop with the best chance and the best rooms.
+- **Tables** you can filter and sort by any column, with the sort kept in the address:
+  `#/items?cat=weapon&sort=strength&dir=desc` shows each category's own stats, prices and the best
+  drop chance; `#/enemies?kind=boss&view=resist` shows every enemy's stats or resistances as ranges
+  across its variants, and how many rooms it spawns in.
+- **Search** (`#/search?q=sword`): every match, by items, enemies and rooms.
 - Difficulty (Normal, Hard, Very Hard), players (1 to 4) and unused spawners change the spawns, stats
   and drop chances together. They are kept in the address, so links reproduce what you saw, and the
   last ones chosen are remembered.

@@ -1,17 +1,16 @@
 import { useMemo } from 'preact/hooks';
 import { routes } from '../app/route';
 import { categoryLabel } from '../data/logic';
-import { itemCategories, search, type Hit } from '../data/search';
+import { search, type Hit } from '../data/search';
 import { Empty, Link } from './common';
 import { useApp } from './context';
 import { hitRoute } from './SearchBox';
 
-/** Every result for a search, or every item in a category. */
+/** Every result for a search. Browsing a whole category is the item table's job. */
 export function SearchPage({ q, category }: { q: string; category: string | null }) {
   const { model, go } = useApp();
-  const categories = useMemo(() => itemCategories(model), [model]);
   const results = useMemo(
-    () => (q.trim() || category ? search(model, q, category) : null),
+    () => (q.trim() ? search(model, q, category) : null),
     [model, q, category],
   );
   const set = (next: { q?: string; category?: string | null }) =>
@@ -37,42 +36,31 @@ export function SearchPage({ q, category }: { q: string; category: string | null
   return (
     <div class="page search-page">
       <header class="page-head">
-        <h1>{category && !q ? categoryLabel(category) : 'Search'}</h1>
+        <h1>Search</h1>
         <input
           type="search"
           class="page-search"
           aria-label="Search"
-          placeholder={
-            category
-              ? `Filter ${categoryLabel(category).toLowerCase()}`
-              : 'Search items, enemies and rooms'
-          }
+          placeholder="Search items, enemies and rooms"
           value={q}
           autoFocus
           onInput={(e) => set({ q: (e.target as HTMLInputElement).value })}
         />
-        <div class="chips" role="group" aria-label="Item category">
-          <button
-            type="button"
-            class="chip"
-            aria-pressed={!category}
-            onClick={() => set({ category: null })}
-          >
-            Everything
-          </button>
-          {categories.map((c) => (
-            <button
-              type="button"
-              class="chip"
-              aria-pressed={category === c.category}
-              onClick={() => set({ category: c.category })}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
+        <p class="note">
+          {category && (
+            <>
+              Only {categoryLabel(category).toLowerCase()}.{' '}
+              <button type="button" class="link" onClick={() => set({ category: null })}>
+                Search everything
+              </button>
+              {' · '}
+            </>
+          )}
+          Or browse <Link to={routes.items()}>every item</Link> and{' '}
+          <Link to={routes.enemies()}>every enemy</Link> as sortable tables.
+        </p>
       </header>
-      {!results && <Empty>Type at least two letters, or pick a category.</Empty>}
+      {!results && <Empty>Type a name to search.</Empty>}
       {results && !results.items.length && !results.enemies.length && !results.rooms.length && (
         <Empty>No matches for “{q.trim()}”.</Empty>
       )}

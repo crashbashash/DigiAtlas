@@ -499,3 +499,36 @@ describe('boss parts', () => {
     expect(withBoss().partsOf('Goburimon', 'hard')).toEqual([]);
   });
 });
+
+describe('boss fights', () => {
+  it('counts a kill that always gives a key item as a boss fight', () => {
+    const m = model();
+    m.raw.drops.pools.nID = pool(['impItem', 0, 10000]);
+    m.raw.drops.pools.nKey = pool(['impItem', 1, 500]);
+    const boss = { ...gen('G9', 2, undefined), lastDrops: { normal: 'nID' } };
+    const lucky = gen('G8', 1, { normal: 'nKey' });
+    const crate = { ...gen('B2', 9, undefined), lastDrops: { normal: 'nID' } };
+    m.raw.stages.stages[0].difficulties.normal!.generators.push(boss, lucky, crate);
+    expect(m.isBossFight(boss)).toBe(true);
+    expect(m.isBossFight(lucky)).toBe(false); // a key item by chance is not a boss
+    expect(m.isBossFight(crate)).toBe(false); // objects are never bosses
+    expect(m.isBossFight(gen('G3', 2, { normal: 'nB' }))).toBe(false); // Ogremon's other spawner
+    expect(m.speciesKind('Ogremon')).toBe('boss');
+    expect(m.speciesKind('Goburimon')).toBe('enemy');
+    expect(m.speciesKind('Box')).toBe('object');
+  });
+
+  it('reads per-player drop tables too', () => {
+    const m = model();
+    m.raw.drops.pools.nID = pool(['impItem', 0, 10000]);
+    const g = {
+      ...gen('G9', 1, undefined),
+      players: [{ count: 1, maxCount: 1, lastDrops: { normal: 'nID' } }],
+    };
+    expect(m.isBossFight(g)).toBe(true);
+  });
+
+  it('counts a spawner with a boss health bar', () => {
+    expect(model().isBossFight({ ...gen('G9', 1, undefined), bossHealthBar: true })).toBe(true);
+  });
+});

@@ -113,6 +113,10 @@
                         "lua": {
                           "type": "string"
                         },
+                        "bossHealthBar": {
+                          "description": "The stage shows a boss health bar for this spawner's enemy.",
+                          "const": true
+                        },
                         "drops": {
                           "type": "object",
                           "additionalProperties": {
@@ -310,6 +314,10 @@
                         "lua": {
                           "type": "string"
                         },
+                        "bossHealthBar": {
+                          "description": "The stage shows a boss health bar for this spawner's enemy.",
+                          "const": true
+                        },
                         "drops": {
                           "type": "object",
                           "additionalProperties": {
@@ -506,6 +514,10 @@
                         },
                         "lua": {
                           "type": "string"
+                        },
+                        "bossHealthBar": {
+                          "description": "The stage shows a boss health bar for this spawner's enemy.",
+                          "const": true
                         },
                         "drops": {
                           "type": "object",

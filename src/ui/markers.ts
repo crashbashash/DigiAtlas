@@ -32,11 +32,12 @@ export function makeMarkers(
   generators: Generator[],
   enemies: Map<number, Enemy>,
   hideUnused = false,
+  isBossFight: (g: Generator) => boolean = (g) => enemies.get(g.row)?.kind === 'boss',
 ): Marker[] {
   const out: Marker[] = [];
   generators.forEach((g, gi) => {
     const e = enemies.get(g.row);
-    const kind: EnemyKind = e?.kind ?? 'enemy';
+    const kind: EnemyKind = isBossFight(g) ? 'boss' : (e?.kind ?? 'enemy');
     const label = e?.name ?? `Row ${g.row}`;
     const spots = g.spawns;
     const count = g.count;

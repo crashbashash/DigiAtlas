@@ -56,7 +56,8 @@ export function EnemiesTable(props: {
     const names = new Map<string, EnemyKind>();
     // A boss's parts (Lucemon's orbs) are listed on its page, not as enemies of their own.
     for (const e of model.enemies.values())
-      if (e.kind !== 'object' && !model.isPartOnly(e.name)) names.set(e.name, e.kind);
+      if (e.kind !== 'object' && !model.isPartOnly(e.name))
+        names.set(e.name, model.speciesKind(e.name));
     const out: Row[] = [];
     for (const [name, k] of names) {
       if (kind !== 'all' && k !== kind) continue;

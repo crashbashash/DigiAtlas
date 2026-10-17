@@ -1,5 +1,6 @@
-import type { Model } from './model';
+import type { Model, Scope } from './model';
 import { categoryLabel } from './logic';
+import { DIFFICULTIES, type EnemyKind } from './types';
 
 export type HitKind = 'item' | 'enemy' | 'room';
 
@@ -82,7 +83,7 @@ export function search(model: Model, query: string, category: string | null = nu
       if (e.kind === 'object') continue;
       const s = species.get(e.name);
       if (s) s.variants += 1;
-      else species.set(e.name, { kind: e.kind, variants: 1 });
+      else species.set(e.name, { kind: model.speciesKind(e.name), variants: 1 });
     }
     // Names that are only a boss's parts say whose (Lucemon's orb: part of Lucemon).
     for (const [name, s] of species)
@@ -118,6 +119,45 @@ export function search(model: Model, query: string, category: string | null = nu
 }
 
 /** Item categories with how many items each has, in the game's order. */
+export interface FeaturedEnemy {
+  name: string;
+  kind: 'boss' | 'enemy';
+  /** The area where it is placed most, on the first difficulty it appears on. */
+  area: string | null;
+}
+
+/**
+ * A few bosses, then a few regular enemies, picked at random from the ones that spawn somewhere,
+ * for the home page. Objects and boss parts (Lucemon's orbs) are left out.
+ */
+export function featuredEnemies(
+  model: Model,
+  perKind: number,
+  scope: Scope,
+  random: () => number = Math.random,
+): FeaturedEnemy[] {
+  const kinds = new Map<string, EnemyKind>();
+  for (const e of model.enemies.values())
+    if (e.kind !== 'object' && !model.isPartOnly(e.name))
+      kinds.set(e.name, model.speciesKind(e.name));
+  const pools: Record<'boss' | 'enemy', FeaturedEnemy[]> = { boss: [], enemy: [] };
+  for (const [name, kind] of kinds) {
+    if (kind !== 'boss' && kind !== 'enemy') continue;
+    const spawns = DIFFICULTIES.map((d) => model.spawnsOf(name, d, scope)).find((s) => s.length);
+    if (spawns) pools[kind].push({ name, kind, area: spawns[0].stage.area });
+  }
+  const pick = (list: FeaturedEnemy[]) => {
+    const out = [...list];
+    // Fisher-Yates, then the first few.
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out.slice(0, perKind);
+  };
+  return [...pick(pools.boss), ...pick(pools.enemy)];
+}
+
 export function itemCategories(model: Model): { category: string; label: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const i of model.items.values()) counts.set(i.category, (counts.get(i.category) ?? 0) + 1);

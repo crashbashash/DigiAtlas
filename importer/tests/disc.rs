@@ -531,3 +531,19 @@ fn output_matches_the_published_schema() {
         assert!(errors.is_empty(), "{name}.json: {errors:#?}");
     }
 }
+
+#[test]
+fn boss_health_bars_mark_the_boss_fights() {
+    needs_disc!();
+    let all = stages();
+    let bar = |id: &str, gene: &str| generators(&all[id], "normal")[gene].get("bossHealthBar") == Some(&json!(true));
+    // The Goblin Fortress guard before Leomon, a dungeon boss and an overworld boss.
+    assert!(bar("stagGF03", "GENE-00"));
+    assert!(bar("dng101b2", "GENE-08"));
+    assert!(bar("stag0202", "GENE-s01"));
+    // Regular spawners in the same rooms have none.
+    assert!(!bar("dng101b2", "GENE-01"));
+    let mut count = 0;
+    every_generator(&mut |_, g| count += g.get("bossHealthBar").is_some() as usize);
+    assert!(count > 40, "{count}");
+}

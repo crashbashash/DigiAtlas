@@ -214,6 +214,44 @@ export class Model {
     return this.raw.drops.pools;
   }
 
+  /**
+   * Whether a spawner is a boss fight: a boss, an enemy the stage shows a boss health bar for, or
+   * one whose kill always gives a key item (each dungeon boss drops its own ID, such as Blosso ID;
+   * the Vine Tunnel Mecha Rogue 04 has no bar). Species like Mecha Rogue 04 are a boss in one room
+   * and a regular enemy in others.
+   */
+  isBossFight(g: Generator): boolean {
+    const kind = this.enemies.get(g.row)?.kind;
+    if (kind === 'boss' || g.bossHealthBar) return true;
+    if (kind === 'object') return false;
+    const tables = [g, ...(g.players ?? [])].flatMap((e) => [
+      ...Object.values(e.drops ?? {}),
+      ...Object.values(e.lastDrops ?? {}),
+    ]);
+    return tables.some((name) =>
+      this.pools[name]?.entries.some((x) => x.category === 'impItem' && x.rate >= 10000),
+    );
+  }
+
+  private bossNames?: Set<string>;
+
+  /** An enemy's kind by name: a boss when any of its spawners anywhere is a boss fight. */
+  speciesKind(name: string): EnemyKind {
+    if (!this.bossNames) {
+      this.bossNames = new Set();
+      for (const e of this.enemies.values()) if (e.kind === 'boss') this.bossNames.add(e.name);
+      for (const s of this.raw.stages.stages)
+        for (const d of DIFFICULTIES)
+          for (const g of s.difficulties[d]?.generators ?? []) {
+            const e = this.enemies.get(g.row);
+            if (e && this.isBossFight(g)) this.bossNames.add(e.name);
+          }
+    }
+    if (this.bossNames.has(name)) return 'boss';
+    const rows = this.speciesRows(name);
+    return rows.some((e) => e.kind === 'enemy') || !rows.length ? 'enemy' : rows[0].kind;
+  }
+
   private buildWorlds(): World[] {
     const rooms = new Map<string, Room>();
     const sorted = [...this.stages].sort(

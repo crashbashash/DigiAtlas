@@ -25,7 +25,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
 pub const STACK_SIZE: usize = 64 << 20;
 
-pub const IMPORTER_VERSION: &str = "1.0.0";
+pub const IMPORTER_VERSION: &str = "1.1.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
     "enemies[].name: Mecha Rogue names follow Wikipedia and Wikimon; object names are not in the game text",
@@ -165,7 +165,8 @@ fn script_info(name: &str, stage_scripts: Option<&scripts::StageScripts>) -> Opt
     Some(Value::Object(info))
 }
 
-fn generator_record(g: &Generator, stage_scripts: Option<&scripts::StageScripts>) -> Value {
+/// `boss_bar`: the stage shows a boss health bar for this spawner's enemy.
+fn generator_record(g: &Generator, stage_scripts: Option<&scripts::StageScripts>, boss_bar: bool) -> Value {
     let round3 = |p: &[f64; 3]| Value::Array(p.iter().map(|v| float(pyfmt::round(*v, 3))).collect());
     let mut rec = Map::new();
     rec.insert("name".into(), json!(g.name));
@@ -193,6 +194,9 @@ fn generator_record(g: &Generator, stage_scripts: Option<&scripts::StageScripts>
     }
     if let Some(info) = script_info(&g.name, stage_scripts) {
         rec.insert("script".into(), info);
+    }
+    if boss_bar {
+        rec.insert("bossHealthBar".into(), json!(true));
     }
     Value::Object(rec)
 }
@@ -398,7 +402,19 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
                     }
                 }
             }
-            let records: Vec<Value> = gens.iter().map(|g| generator_record(g, stage_scripts.as_ref())).collect();
+            let records: Vec<Value> = gens
+                .iter()
+                .map(|g| {
+                    let boss_bar = match (
+                        &stage_scripts,
+                        g.row.int().and_then(|r| usize::try_from(r).ok()).and_then(|r| models.get(&r)),
+                    ) {
+                        (Some(ss), Some(model)) => ss.boss_models.contains(model),
+                        _ => false,
+                    };
+                    generator_record(g, stage_scripts.as_ref(), boss_bar)
+                })
+                .collect();
             difficulties.insert(difficulty.into(), json!({"generators": records}));
         }
         rec.insert("difficulties".into(), Value::Object(difficulties));
@@ -542,9 +558,10 @@ mod tests {
 
     #[test]
     fn a_record_carries_the_trigger() {
-        let rec = generator_record(&generator([1.0, 2.0, 3.0], vec![[1.0, 2.0, 3.0]], true, "radar", 625.0), None);
+        let rec =
+            generator_record(&generator([1.0, 2.0, 3.0], vec![[1.0, 2.0, 3.0]], true, "radar", 625.0), None, false);
         assert_eq!(rec["trigger"], json!({"center": [1.0, 2.0, 3.0], "radius": 25.0}));
-        assert!(generator_record(&generator([1.0, 2.0, 3.0], vec![], true, "direct", 0.0), None)
+        assert!(generator_record(&generator([1.0, 2.0, 3.0], vec![], true, "direct", 0.0), None, false)
             .get("trigger")
             .is_none());
     }

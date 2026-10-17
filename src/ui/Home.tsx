@@ -1,7 +1,7 @@
 import { useMemo } from 'preact/hooks';
 import { lastMap } from '../app/navigation';
 import { routes } from '../app/route';
-import { itemCategories } from '../data/search';
+import { featuredEnemies, itemCategories } from '../data/search';
 import { Link } from './common';
 import { useApp } from './context';
 import logoUrl from './logo.svg';
@@ -9,21 +9,11 @@ import { SearchBox } from './SearchBox';
 
 /** The landing page: search for anything, or start from one of the sections. */
 export function Home() {
-  const { model, reimport } = useApp();
+  const { model, scope, reimport } = useApp();
   const recent = lastMap();
   const recentStage = recent ? model.byId.get(recent) : undefined;
   const categories = useMemo(() => itemCategories(model), [model]);
-  const bosses = useMemo(
-    () =>
-      [
-        ...new Set(
-          [...model.enemies.values()]
-            .filter((e) => e.kind === 'boss' && e.role !== 'part')
-            .map((e) => e.name),
-        ),
-      ].sort(),
-    [model],
-  );
+  const enemies = useMemo(() => featuredEnemies(model, 4, scope), [model, scope]);
   const m = model.raw.manifest;
 
   return (
@@ -79,14 +69,15 @@ export function Home() {
         </section>
 
         <section class="section-card">
-          <h2>Bosses</h2>
+          <h2>Enemies</h2>
           <p class="muted">
             Stats, resistances and where each one appears. Search any enemy by name.
           </p>
           <ul class="link-list">
-            {bosses.map((name) => (
-              <li>
-                <Link to={routes.enemy(name)}>{name}</Link>
+            {enemies.map((e) => (
+              <li key={e.name}>
+                <Link to={routes.enemy(e.name)}>{e.name}</Link>
+                <span class="muted">{e.kind === 'boss' ? 'Boss' : e.area}</span>
               </li>
             ))}
           </ul>

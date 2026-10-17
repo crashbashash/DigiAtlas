@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Model } from './model';
-import { matchRank, normalize, search } from './search';
+import { featuredEnemies, matchRank, normalize, search } from './search';
+import { DEFAULT_SCOPE } from './model';
 import type { RawData, Stage } from './types';
 
 const stage = (id: string, area: string, room: string): Stage => ({
@@ -121,5 +122,23 @@ describe('search', () => {
     expect(r.items.map((h) => h.label)).toEqual(['Long Sword α', 'Sword', 'War Sword β']);
     expect(r.enemies).toEqual([]);
     expect(search(model(), 'war', 'weapon').items.map((h) => h.label)).toEqual(['War Sword β']);
+  });
+});
+
+describe('featuredEnemies', () => {
+  it('lists bosses first, then enemies, only those that spawn somewhere', () => {
+    const m = model();
+    // Ogremon (a boss) spawns nowhere in the fixture and the barrel is an object.
+    expect(featuredEnemies(m, 4, DEFAULT_SCOPE)).toEqual([
+      { name: 'Goburimon', kind: 'enemy', area: 'Death Valley' },
+    ]);
+    const boss = m.raw.stages.stages[0].difficulties.hard!.generators;
+    boss.push({ ...boss[0], name: 'B', row: 3 });
+    const fresh = new Model(m.raw);
+    expect(featuredEnemies(fresh, 1, DEFAULT_SCOPE).map((e) => [e.name, e.kind])).toEqual([
+      ['Ogremon', 'boss'],
+      ['Goburimon', 'enemy'],
+    ]);
+    expect(featuredEnemies(fresh, 0, DEFAULT_SCOPE)).toEqual([]);
   });
 });

@@ -116,6 +116,10 @@ Players see `name`, never the internal ids.
 - **Triggers** (`generators[].trigger`): a radar spawner starts when a player is within `radius` units of
   `center` (the game stores the squared radius; 20 to 150 units, one arena at 450). Only radar spawners have
   one. Script-started (`direct`) spawners start when a game script says so, which is not extracted yet.
+- **Boss fights** (`generators[].bossHealthBar`): `true` when the stage's scripts bind the boss health
+  bar to this spawner's enemy model (`METERCTRL ... SETMODELHP "<model>/I<n>"`). The game has no other
+  boss flag; the app also counts a kill that always gives a key item (a dungeon boss's ID), which covers
+  the Vine Tunnel Mecha Rogue 04, the one key-item boss without a bar.
 - **Maps** (`stages[].map`, export option `--maps`): a top-down footprint of each stage's terrain mesh,
   written to `maps/<id>.png` (transparent where there is no geometry) with its world `bounds` and
   `pixelsPerUnit`, so `pixel = (world - min) * pixelsPerUnit`. Image x is world x and image y is world

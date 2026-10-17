@@ -29,7 +29,7 @@ export function EnemyPage({ name, tab }: { name: string; tab: EnemyTab }) {
       </div>
     );
   }
-  const kind = rows[0].kind;
+  const kind = model.speciesKind(name);
   // A name that is only a boss's part (Lucemon's orb) belongs under that boss.
   const partOf = model.isPartOnly(name) ? (rows[0].partOf ?? null) : null;
   const tabs: { id: EnemyTab; label: string }[] = [

@@ -110,6 +110,8 @@ export interface Generator {
   /** One entry per player count (index 0 = one player); absent when it makes no difference. */
   players?: PlayerSlot[];
   script?: ScriptInfo;
+  /** The stage shows a boss health bar for this spawner's enemy. */
+  bossHealthBar?: true;
 }
 
 export interface StageMap {

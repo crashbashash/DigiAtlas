@@ -6,7 +6,7 @@
 //! Spawner names built in code (`"GENE-" .. n`) cannot be tied to one spawner and are reported as
 //! prefixes. The text work runs on decompiled source, so it can be checked without the decompiler.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::OnceLock;
 
 use regex::Regex;
@@ -26,6 +26,9 @@ macro_rules! pattern {
 }
 
 pattern!(call_re, r#"^be:(?:sd|DMsetSD)\("GENERATER",\s*[^,]+,\s*(-?\d+),\s*"(\w+)"(?:,\s*(.*))?\)\s*$"#);
+// `be:DMsetSD("METERCTRL", "bshp18", 0, "SETMODELHP", "e_mecha4/I<0>", 180)`: the boss health
+// bar follows that model.
+pattern!(boss_bar_re, r#""METERCTRL",\s*"[^"]*",\s*-?\d+,\s*"SETMODELHP",\s*"(\w+)/"#);
 pattern!(block_re, r"^(if|elseif|while)\s+(.*)\s+(then|do)$");
 pattern!(flag_re, r"^(?:be:FLGisOn\((\d+)\)\s*(==|~=)\s*(\d+))$");
 pattern!(ninzu_re, r"^(?:be:SYSgetPlayerNinzu\(\)\s*(==|~=|<=|>=|<|>)\s*(\d+))$");
@@ -305,6 +308,8 @@ pub struct StageScripts {
     by_name: HashMap<String, Vec<Ref>>,
     /// Name prefix -> the calls that build names, in first-seen order (the first matching prefix wins).
     dynamic: Vec<(String, Vec<Ref>)>,
+    /// Enemy models the stage shows a boss health bar for.
+    pub boss_models: BTreeSet<String>,
 }
 
 impl StageScripts {
@@ -347,6 +352,7 @@ pub fn analyse_sources<'a>(
     let mut out = StageScripts::default();
     for source in sources {
         out.add(references(source, digimon, meanings));
+        out.boss_models.extend(boss_bar_re().captures_iter(source).map(|c| c[1].to_string()));
     }
     out
 }
@@ -361,6 +367,16 @@ pub fn analyse(packs: &[Vec<u8>], digimon: &HashMap<String, String>, meanings: &
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_the_models_a_boss_health_bar_follows() {
+        let src = r#"be:DMsetSD("MODELCTRL", "i_bosshp18", 0, "GENERATE", "V<0,205,0>/SQ_OPEN", 180)
+be:DMsetSD("METERCTRL", "bshp18", 0, "SETMODELHP", "e_mecha4/I<0>", 180)
+be:sd("METERCTRL", "bshp04", 0, "SETMODELHP", "f_devl1/I<0>")
+be:sd("METERCTRL", "bshp04", 0, "CLOSE", "e_goburi/I<0>")"#;
+        let ss = analyse_sources([src], &HashMap::new(), &HashMap::new());
+        assert_eq!(ss.boss_models.iter().map(String::as_str).collect::<Vec<_>>(), ["e_mecha4", "f_devl1"]);
+    }
 
     fn none() -> HashMap<String, String> {
         HashMap::new()

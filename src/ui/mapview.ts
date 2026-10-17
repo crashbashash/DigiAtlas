@@ -119,6 +119,7 @@ export class MapView {
       this.model.generators(stage, d, scope),
       this.model.enemies,
       scope.hideUnused,
+      (g) => this.model.isBossFight(g),
     );
     this.pins = this.model.tradersAt(stage, d).map((t, index) => ({
       index,

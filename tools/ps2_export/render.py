@@ -36,6 +36,35 @@ class Raster:
         return 0 <= px < self.width and 0 <= py < self.height and self.rgba[(py * self.width + px) * 4 + 3] > 0
 
 
+    def clip(self, keep: bytearray) -> None:
+        """Make every pixel transparent where ``keep`` (one byte per pixel) is zero."""
+        for i in range(self.width * self.height):
+            if not keep[i]:
+                self.rgba[i * 4 : i * 4 + 4] = b"\x00\x00\x00\x00"
+
+    def trim(self, pad_units: float) -> None:
+        """Crop to the drawn pixels plus a margin, moving the origin to match."""
+        w, h = self.width, self.height
+        alpha = self.rgba[3::4]
+        rows = [y for y in range(h) if any(alpha[y * w : (y + 1) * w])]
+        if not rows:
+            return
+        cols = [x for x in range(w) if any(alpha[x::w])]
+        pad = round(pad_units * self.pixels_per_unit)
+        x0, x1 = max(0, cols[0] - pad), min(w - 1, cols[-1] + pad)
+        y0, y1 = max(0, rows[0] - pad), min(h - 1, rows[-1] + pad)
+        out = bytearray()
+        for y in range(y0, y1 + 1):
+            out += self.rgba[(y * w + x0) * 4 : (y * w + x1 + 1) * 4]
+        self.rgba, self.width, self.height = out, x1 - x0 + 1, y1 - y0 + 1
+        self.min_x += x0 / self.pixels_per_unit
+        self.min_z += y0 / self.pixels_per_unit
+
+    def kept(self, keep: bytearray, x: float, z: float) -> bool:
+        px, py = int((x - self.min_x) * self.pixels_per_unit), int((z - self.min_z) * self.pixels_per_unit)
+        return 0 <= px < self.width and 0 <= py < self.height and keep[py * self.width + px] > 0
+
+
 def _normal_y(t: Triangle) -> float:
     (ax, ay, az), (bx, by, bz), (cx, cy, cz) = t
     ux, uy, uz, vx, vy, vz = bx - ax, by - ay, bz - az, cx - ax, cy - ay, cz - az
@@ -99,7 +128,7 @@ def render(
     return Raster(width, height, ppu, rgba, min_x, min_z)
 
 
-def _fill(img: bytearray, w: int, h: int, pts: list[tuple[float, float]], color: bytes) -> None:
+def _fill(img: bytearray, w: int, h: int, pts: list[tuple[float, float]], color: bytes, bpp: int = 4) -> None:
     (x0, y0), (x1, y1), (x2, y2) = sorted(pts, key=lambda p: p[1])
     top, bottom = max(0, int(y0 + 0.5)), min(h - 1, int(y2 - 0.5))
     for y in range(top, bottom + 1):
@@ -114,8 +143,8 @@ def _fill(img: bytearray, w: int, h: int, pts: list[tuple[float, float]], color:
         left, right = (xa, xb) if xa <= xb else (xb, xa)
         left, right = max(0, int(left + 0.5)), min(w - 1, int(right - 0.5))
         if right >= left:
-            o = (y * w + left) * 4
-            img[o : o + (right - left + 1) * 4] = color * (right - left + 1)
+            o = (y * w + left) * bpp
+            img[o : o + (right - left + 1) * bpp] = color * (right - left + 1)
 
 
 def _line(img: bytearray, w: int, h: int, a: tuple[float, float], b: tuple[float, float]) -> None:
@@ -126,3 +155,28 @@ def _line(img: bytearray, w: int, h: int, a: tuple[float, float], b: tuple[float
         if 0 <= x < w and 0 <= y < h:
             o = (y * w + x) * 4
             img[o : o + 4] = bytes(WALL)
+
+
+def floor_mask(triangles: list[Triangle], like: Raster, grow: float) -> bytearray:
+    """One byte per pixel of ``like``: 1 where a floor triangle lies, widened by ``grow`` world units."""
+    w, h, ppu = like.width, like.height, like.pixels_per_unit
+    mask = bytearray(w * h)
+    r = max(1, round(grow * ppu))
+    stamp = [(dy, int((r * r - dy * dy) ** 0.5)) for dy in range(-r, r + 1)]
+    for t in triangles:
+        if abs(_normal_y(t)) < WALL_NORMAL_Y:
+            continue
+        q = [((p[0] - like.min_x) * ppu, (p[2] - like.min_z) * ppu) for p in t]
+        _fill(mask, w, h, q, b"\x01", 1)
+        for a, b in ((0, 1), (1, 2), (2, 0)):
+            steps = int(max(abs(q[b][0] - q[a][0]), abs(q[b][1] - q[a][1]))) + 1
+            for i in range(steps + 1):
+                x = int(q[a][0] + (q[b][0] - q[a][0]) * i / steps)
+                y = int(q[a][1] + (q[b][1] - q[a][1]) * i / steps)
+                for dy, half in stamp:
+                    yy = y + dy
+                    if 0 <= yy < h:
+                        lo, hi = max(0, x - half), min(w - 1, x + half)
+                        if hi >= lo:
+                            mask[yy * w + lo : yy * w + hi + 1] = b"\x01" * (hi - lo + 1)
+    return mask

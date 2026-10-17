@@ -439,6 +439,19 @@ class MapChoiceTests(unittest.TestCase):
         t = ((0.0, 0.0, 0.0), (size, 0.0, 0.0), (0.0, 0.0, size))
         return scene.Scene(0, name, [t] * count)
 
+    @staticmethod
+    def ground(lo, hi, step):
+        """Flat floor made of small squares (a single huge triangle would count as a backdrop plane)."""
+        out, x = [], lo
+        while x < hi:
+            z = lo
+            while z < hi:
+                a, b, c, d = (x, 0.0, z), (x + step, 0.0, z), (x + step, 0.0, z + step), (x, 0.0, z + step)
+                out += [(a, b, c), (a, c, d)]
+                z += step
+            x += step
+        return out
+
     def test_prefers_the_scene_covering_the_spawn_points(self):
         small, big = self.tri_scene("", 50), self.tri_scene("", 500)
         self.assertIs(maps.choose_scene([small, big], [(100.0, 100.0)]), big)
@@ -470,6 +483,30 @@ class MapChoiceTests(unittest.TestCase):
     def test_a_single_flat_quad_is_kept(self):
         arena = [((0.0, 10.0, 0.0), (300.0, 10.0, 0.0), (0.0, 10.0, 300.0))]
         self.assertEqual(maps.ground_tiles([arena, arena]), set())
+
+    def test_collision_scene_is_the_small_unnamed_one(self):
+        terrain, collision = self.tri_scene("", 900, count=4000), self.tri_scene("", 900, count=300)
+        named = self.tri_scene("x_fx", 900, count=300)
+        self.assertIs(maps.collision_scene([terrain, collision, named], terrain), collision)
+        self.assertIsNone(maps.collision_scene([terrain, self.tri_scene("", 900, count=3000)], terrain))
+        self.assertIsNone(maps.collision_scene([terrain], terrain))
+
+    def test_map_keeps_only_walkable_floor_and_crops_to_it(self):
+        floor = [((0.0, 0.0, 0.0), (100.0, 0.0, 0.0), (0.0, 0.0, 100.0))]
+        visible = self.ground(-300.0, 300.0, 100.0)
+        raster = render.render(visible, (-300.0, 300.0, -300.0, 300.0), max_ppu=1.0)
+        coll = scene.Scene(0, "", floor)
+        self.assertTrue(maps.walkable_only(raster, coll, [(10.0, 10.0)]))
+        self.assertTrue(raster.covered(10.0, 10.0))
+        self.assertFalse(raster.covered(-250.0, -250.0))
+        self.assertLess(raster.width, 200)
+
+    def test_collision_that_misses_the_points_is_ignored(self):
+        floor = [((0.0, 0.0, 0.0), (100.0, 0.0, 0.0), (0.0, 0.0, 100.0))]
+        visible = self.ground(-300.0, 300.0, 100.0)
+        raster = render.render(visible, (-300.0, 300.0, -300.0, 300.0), max_ppu=1.0)
+        self.assertFalse(maps.walkable_only(raster, scene.Scene(0, "", floor), [(-250.0, -250.0)]))
+        self.assertTrue(raster.covered(-250.0, -250.0))
 
     def test_ties_go_to_the_larger_mesh(self):
         a, b = self.tri_scene("", 900, count=300), self.tri_scene("", 900, count=900)

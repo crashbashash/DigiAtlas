@@ -14,6 +14,11 @@ from .afs import Afs
 MIN_TRIANGLES = 200
 SKIP_PREFIXES = ("i_", "x_", "g_", "e_", "f_", "m_", "n_", "q_", "s_")  # interface, effects, models
 MARGIN = 150.0
+TRIM_MARGIN = 20.0  # world units kept around the playable area when the picture is cropped to it
+MIN_COLLISION_TRIANGLES = 150
+COLLISION_RATIO = 8  # the collision mesh has under 1/8 of the visible terrain's triangles
+WALKABLE_GROW = 6.0  # world units the walkable area is widened by, so cliff edges are not cut
+MIN_WALKABLE_SHARE = 0.97  # share of points that must lie on collision floor for it to be used
 MIN_GROUND_TILES = 4  # flat two-triangle meshes at one height that make up a ground plane
 MIN_PART_SPAN = 60.0  # meshes narrower than this (trees, pillars, ornaments) are props, not terrain
 
@@ -93,6 +98,42 @@ def choose_scene(scenes: list[scene.Scene], points: list[tuple[float, float]]) -
     return best
 
 
+def _bounds(r: render.Raster) -> tuple[float, float, float, float]:
+    """The world rectangle the raster covers."""
+    return r.min_x, r.min_x + r.width / r.pixels_per_unit, r.min_z, r.min_z + r.height / r.pixels_per_unit
+
+
+def collision_scene(scenes: list[scene.Scene], terrain: scene.Scene) -> scene.Scene | None:
+    """The stage's collision mesh: an unnamed scene in the same pack, much smaller than the visible terrain.
+
+    It holds only the floors a character can stand on (and the walls around them), so it says which parts of
+    the terrain are playable. Most stages carry one; some (arenas) do not.
+    """
+    best = None
+    for s in scenes:
+        if s is terrain or s.name or not MIN_COLLISION_TRIANGLES <= len(s.triangles) * COLLISION_RATIO <= len(terrain.triangles):
+            continue
+        if best is None or len(s.triangles) > len(best.triangles):
+            best = s
+    return best
+
+
+def walkable_only(raster: render.Raster, collision: scene.Scene | None, points: list[tuple[float, float]]) -> bool:
+    """Clear the parts of the map that are not floor in the collision mesh; False when it does not fit.
+
+    The mesh is used only when it lies under nearly every point of interest, so a stage whose collision data
+    is partial keeps its full picture rather than losing places people stand.
+    """
+    if collision is None or not points:
+        return False
+    keep = render.floor_mask(collision.triangles, raster, WALKABLE_GROW)
+    if sum(raster.kept(keep, x, z) for x, z in points) < MIN_WALKABLE_SHARE * len(points):
+        return False
+    raster.clip(keep)
+    raster.trim(TRIM_MARGIN)
+    return True
+
+
 def build(
     ndmw: Afs, packs: list[int], spawns: list[tuple[float, float, float]], extra: list[tuple[float, float]] | None = None
 ) -> StageMap | None:
@@ -105,7 +146,7 @@ def build(
         return _build_empty(ndmw, packs, extra or [])
     points = [(x, z) for x, _y, z in spawns]
     ys = sorted(y for _x, y, _z in spawns)
-    best: tuple[tuple, int, scene.Scene] | None = None
+    best: tuple[tuple, int, scene.Scene, list[scene.Scene]] | None = None
     for pack in packs:
         data = ndmw.entry(pack)
         try:
@@ -118,21 +159,22 @@ def build(
         box = _bbox(s.triangles)
         key = (round(sum(_inside(box, x, z) for x, z in points) / len(points), 2), len(s.triangles))
         if best is None or key > best[0]:
-            best = (key, pack, s)
+            best = (key, pack, s, scenes)
     if best is None or best[0][0] < 0.5:
         return None
-    _key, pack, s = best
+    _key, pack, s, scenes = best
     xs, zs = [x for x, _ in points], [z for _, z in points]
     pad = max(MARGIN, 0.25 * max(max(xs) - min(xs), max(zs) - min(zs)))
     roi = (min(xs) - pad, max(xs) + pad, min(zs) - pad, max(zs) + pad)
     raster = render.render(terrain_triangles(s), roi, focus_y=ys[len(ys) // 2])
     coverage = sum(raster.covered(x, z) for x, z in points) / len(points)
-    return StageMap(pack, s.name, roi, raster, coverage)
+    walkable_only(raster, collision_scene(scenes, s), points)
+    return StageMap(pack, s.name, _bounds(raster), raster, coverage)
 
 
 def _build_empty(ndmw: Afs, packs: list[int], extra: list[tuple[float, float]]) -> StageMap | None:
     """Map of the biggest terrain scene in a stage that has nothing spawning in it."""
-    best: tuple[int, int, scene.Scene] | None = None
+    best: tuple[int, int, scene.Scene, list[scene.Scene]] | None = None
     for pack in packs:
         try:
             scenes = scene.scenes(igbpack.Graph(ndmw.entry(pack)))
@@ -142,10 +184,10 @@ def _build_empty(ndmw: Afs, packs: list[int], extra: list[tuple[float, float]]) 
             if len(s.triangles) < MIN_TRIANGLES or s.name.startswith(SKIP_PREFIXES):
                 continue
             if best is None or len(s.triangles) > best[0]:
-                best = (len(s.triangles), pack, s)
+                best = (len(s.triangles), pack, s, scenes)
     if best is None:
         return None
-    _n, pack, s = best
+    _n, pack, s, scenes = best
     tris = terrain_triangles(s)
     if not tris:
         return None
@@ -164,4 +206,5 @@ def _build_empty(ndmw: Afs, packs: list[int], extra: list[tuple[float, float]]) 
         raster = render.render(tris, roi, focus_y=ys[len(ys) // 2])
         if all(raster.covered(x, z) for x, z in extra):
             break
-    return StageMap(pack, s.name, roi, raster, 1.0) if raster.fill >= 0.02 else None
+    walkable_only(raster, collision_scene(scenes, s), extra)
+    return StageMap(pack, s.name, _bounds(raster), raster, 1.0) if raster.fill >= 0.02 else None

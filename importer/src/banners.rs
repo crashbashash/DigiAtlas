@@ -17,6 +17,15 @@ pub fn pack_name(stage_id: &str) -> Option<String> {
     stage_id.strip_prefix("dng").map(|rest| format!("ldg{rest}.igb"))
 }
 
+/// The area and room text of a banner (x0, y0, x1, y1), without the "Loading" sprite.
+const NAME_BAND: (usize, usize, usize, usize) = (0, 188, 168, 256);
+
+/// Fingerprint of a banner's name text, recorded next to each transcribed stage name.
+pub fn fingerprint(tex: &Texture) -> String {
+    let (x0, y0, x1, y1) = NAME_BAND;
+    textures::region_sha1(tex, x0, y0, x1, y1)
+}
+
 /// A stage's banner, or None when it has no loading-pack entry or only a small placeholder.
 pub fn load(area: &Afs, names: &HashMap<String, Vec<(String, i64)>>, stage_id: &str) -> Result<Option<Texture>> {
     let Some(entries) = pack_name(stage_id).and_then(|n| names.get(&n)) else {

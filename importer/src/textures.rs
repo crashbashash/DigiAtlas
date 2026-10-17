@@ -65,6 +65,15 @@ pub fn decode_all(g: &Graph) -> Result<Vec<Texture>> {
     (0..g.s2.len()).filter(|&k| g.class(k) == "igImage").map(|k| decode(g, k, clut_of(g, k)?)).collect()
 }
 
+/// SHA-1 of a rectangle of RGBA pixels; pins a name transcription to the image it was read from.
+pub fn region_sha1(texture: &Texture, x0: usize, y0: usize, x1: usize, y1: usize) -> String {
+    let mut h = sha1_smol::Sha1::new();
+    for y in y0..y1 {
+        h.update(&texture.rgba[(y * texture.width + x0) * 4..(y * texture.width + x1) * 4]);
+    }
+    h.digest().to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

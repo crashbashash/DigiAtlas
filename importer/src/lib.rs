@@ -24,6 +24,7 @@ pub mod attack_profiles;
 pub mod crown_signature;
 pub mod luadec;
 pub mod maps;
+pub mod mp_techs;
 pub mod power_spells;
 pub mod regions;
 pub mod render;

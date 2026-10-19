@@ -10,6 +10,8 @@ import { WeaponEquipmentEditor } from './WeaponEquipmentEditor';
 
 export type CharacterValues = ReturnType<typeof characterStats> & {
   force: number;
+  blast: number;
+  heal: number;
   skill: number;
   equipment: ReturnType<typeof emptyEquipment>;
 };
@@ -17,10 +19,12 @@ export type CharacterValues = ReturnType<typeof characterStats> & {
 export function CharacterSetup({
   attack = false,
   force = false,
+  mpSkill,
   onChange,
 }: {
   attack?: boolean;
   force?: boolean;
+  mpSkill?: 'blast' | 'heal' | 'force';
   onChange: (value: CharacterValues) => void;
 }) {
   const { model } = useApp();
@@ -49,7 +53,14 @@ export function CharacterSetup({
     form && stats ? characterStats(form, level, power, equipment, model.items, stats) : null;
   useEffect(() => {
     if (values)
-      onChange({ ...values, force: skills[8], skill: skills[values.weaponSkill], equipment });
+      onChange({
+        ...values,
+        force: skills[8],
+        blast: skills[6],
+        heal: skills[7],
+        skill: skills[values.weaponSkill],
+        equipment,
+      });
   }, [model, species, level, power, equipment, skills]);
 
   function chooseForm(value: number, list = boxes, id = box) {
@@ -204,17 +215,33 @@ export function CharacterSetup({
           ))}
         </div>
       </details>
-      {(attack || force) && (
+      {(attack || force || mpSkill) && (
         <label class="power-field">
-          {attack ? `${WEAPON_SKILLS[values.weaponSkill]} skill` : 'Force skill'}
+          {attack
+            ? `${WEAPON_SKILLS[values.weaponSkill]} skill`
+            : mpSkill === 'blast'
+              ? 'Blast skill'
+              : mpSkill === 'heal'
+                ? 'Heal skill'
+                : 'Force skill'}
           <input
             type="number"
             min="0"
             max="9999"
             step="1"
-            value={skills[attack ? values.weaponSkill : 8]}
+            value={
+              skills[
+                attack ? values.weaponSkill : mpSkill === 'blast' ? 6 : mpSkill === 'heal' ? 7 : 8
+              ]
+            }
             onInput={(e) => {
-              const index = attack ? values.weaponSkill : 8;
+              const index = attack
+                ? values.weaponSkill
+                : mpSkill === 'blast'
+                  ? 6
+                  : mpSkill === 'heal'
+                    ? 7
+                    : 8;
               setSkills(skills.map((s, i) => (i === index ? e.currentTarget.valueAsNumber : s)));
             }}
           />

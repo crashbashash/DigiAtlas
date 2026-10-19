@@ -1428,6 +1428,26 @@ a.calculator-tile:hover {
 .formula-bands td {
   padding: 8px;
 }
+.formula-example {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+.formula-example h3 {
+  margin: 0 0 12px;
+  font-size: var(--text-md);
+}
+.formula-example .formula-bands {
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+.formula-footer {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
 
 .brand-text {
   display: flex;
@@ -1856,9 +1876,180 @@ a.calculator-tile:hover {
 }
 .target-stat-summary dd {
   margin: 4px 0 0;
+  font-size: 1.2rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
-.target-stat-summary .active-resistance {
+.target-stat-summary .active-resistance,
+.target-stat-summary .active-stat {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.power-chance {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 18px;
+}
+.power-chance-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.power-chance h3 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+.power-chance-value {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.power-chance-track {
+  height: 8px;
+  margin: 14px 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--panel2);
+}
+.power-chance-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.power-chance > p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* MP Techs share character and target controls with the attack calculator. */
+.mp-tech-config {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(130px, 1fr) minmax(180px, 1fr);
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.mp-tech-config > .power-field {
+  margin: 0;
+}
+.mp-tech-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-top: 20px;
+}
+.mp-tech-category {
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.mp-tech-cost {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+  padding-left: 18px;
+  white-space: nowrap;
+}
+.mp-tech-cost strong {
+  font-size: 16px;
+  font-weight: 500;
+}
+.mp-tech-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.mp-tech-workspace > .mp-tech-results {
+  grid-column: 1 / -1;
+}
+.mp-tech-friendly > .mp-tech-results {
+  grid-column: 2;
+  grid-row: 1;
+}
+.mp-tech-results > h2 {
+  margin: 0 0 16px;
+}
+.mp-tech-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 14px;
+}
+.mp-tech-metric h3,
+.mp-tech-effects h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+.mp-tech-value {
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin: 12px 0 4px;
+}
+.mp-tech-value small {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--muted);
+}
+.mp-tech-effects {
+  margin-top: 16px;
+}
+.mp-tech-effect-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.mp-tech-stat-effects {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.mp-tech-stat-effects th,
+.mp-tech-stat-effects td {
+  padding: 10px 0;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+}
+.mp-tech-stat-effects thead th {
+  color: var(--muted);
+}
+.mp-tech-stat-effects td,
+.mp-tech-stat-effects thead th:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mp-tech-target .settings {
+  margin-top: 16px;
+}
+.mp-tech-metric .power-chance-track {
+  margin: 14px 0 10px;
+}
+@media (max-width: 760px) {
+  .mp-tech-config {
+    grid-template-columns: 1fr 1fr;
+  }
+  .mp-tech-meta {
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+  .mp-tech-workspace {
+    grid-template-columns: 1fr;
+  }
+  .mp-tech-friendly > .mp-tech-results {
+    grid-column: 1;
+    grid-row: auto;
+  }
 }

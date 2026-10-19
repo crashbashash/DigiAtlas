@@ -441,6 +441,164 @@
           }
         }
       }
+    },
+    "mpTechs": {
+      "type": "array",
+      "minItems": 100,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "grade",
+          "row",
+          "skill",
+          "element",
+          "mpCost",
+          "power",
+          "baseFrames",
+          "criticalRate",
+          "boosts"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "fire",
+              "ice",
+              "bolt",
+              "dark",
+              "venom",
+              "impact",
+              "cutter",
+              "bomb",
+              "heal-light",
+              "heal-aura",
+              "raise",
+              "cure-light",
+              "cure-aura",
+              "speed",
+              "freeze",
+              "resist",
+              "power-up",
+              "power-down",
+              "sleep",
+              "bind"
+            ]
+          },
+          "grade": {
+            "enum": [
+              "Petty",
+              "Mega",
+              "Giga",
+              "Terra",
+              "Infinity"
+            ]
+          },
+          "row": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 99
+          },
+          "skill": {
+            "enum": [
+              "blast",
+              "heal",
+              "force"
+            ]
+          },
+          "element": {
+            "enum": [
+              "none",
+              "fire",
+              "ice",
+              "thunder",
+              "dark",
+              "poison"
+            ]
+          },
+          "mpCost": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "power": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "baseFrames": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "criticalRate": {
+            "type": "integer"
+          },
+          "boosts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "maxHp",
+              "strength",
+              "defense"
+            ],
+            "properties": {
+              "maxHp": {
+                "type": "integer"
+              },
+              "strength": {
+                "type": "integer"
+              },
+              "defense": {
+                "type": "integer"
+              },
+              "speed": {
+                "type": "integer"
+              },
+              "hitRate": {
+                "type": "integer"
+              },
+              "evasion": {
+                "type": "integer"
+              },
+              "fire": {
+                "type": "integer"
+              },
+              "ice": {
+                "type": "integer"
+              },
+              "thunder": {
+                "type": "integer"
+              },
+              "dark": {
+                "type": "integer"
+              }
+            }
+          },
+          "healBase": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "revive": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hp",
+              "experiencePercent"
+            ],
+            "properties": {
+              "hp": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 99999
+              },
+              "experiencePercent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

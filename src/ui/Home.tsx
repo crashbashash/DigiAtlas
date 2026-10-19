@@ -97,12 +97,8 @@ export function Home() {
               <span class="muted">Damage range</span>
             </li>
             <li>
-              <Link to={routes.calculator('power-up')}>Power Up</Link>
-              <span class="muted">Duration</span>
-            </li>
-            <li>
-              <Link to={routes.calculator('power-down')}>Power Down</Link>
-              <span class="muted">Duration &amp; chance</span>
+              <Link to={routes.calculator('mp-tech')}>MP Tech calculator</Link>
+              <span class="muted">Damage, healing &amp; effects</span>
             </li>
           </ul>
           <p class="card-more">

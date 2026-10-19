@@ -25,7 +25,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
 pub const STACK_SIZE: usize = 64 << 20;
 
-pub const IMPORTER_VERSION: &str = "1.8.0";
+pub const IMPORTER_VERSION: &str = "1.10.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
     "enemies[].name: Mecha Rogue names follow Wikipedia and Wikimon; object names are not in the game text",
@@ -297,6 +297,7 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     progress(Progress { done: 0, total: 1, message: "Reading the game's databases".into() });
     let tables = database::read_tables(area.entry(database::DATABASE_ENTRY)?)?;
     let power_spells = crate::power_spells::extract(&tables)?;
+    let mp_techs = crate::mp_techs::extract(&tables, &executable, gamecube)?;
     let save_stats = crate::power_spells::save_stats(&tables)?;
     let models = database::enemy_models(&tables)?;
     let flag_names = scripts::load_flag_names();
@@ -543,6 +544,7 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     let mut items_doc = Map::new();
     items_doc.insert("items".into(), Value::Array(items));
     items_doc.insert("powerSpells".into(), power_spells);
+    items_doc.insert("mpTechs".into(), mp_techs);
     items_doc.insert("saveStats".into(), save_stats);
     if let Some(a) = appraisal_block {
         items_doc.insert("appraisal".into(), a);

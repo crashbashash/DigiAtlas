@@ -2,10 +2,7 @@ import { routes } from '../app/route';
 import { Link } from './common';
 
 const planned = [
-  { title: 'Technique damage', description: 'Calculate technique damage and elemental effects.' },
-  { title: 'Healing', description: 'Calculate how much HP a healing technique restores.' },
-  { title: 'Status effects', description: 'Explore other buffs, debuffs and their durations.' },
-  { title: 'Character stats', description: 'Compare stats across Digimon, levels and equipment.' },
+  { title: 'Build planner', description: 'Plan a Digimon’s level, equipment, chips and XData.' },
 ];
 
 export function Calculators() {
@@ -21,14 +18,9 @@ export function Calculators() {
           <p>Compare normal, critical and elemental damage against enemies.</p>
           <span class="calculator-open">Open calculator →</span>
         </Link>
-        <Link to={routes.calculator('power-up')} class="section-card calculator-tile">
-          <h2>Power Up</h2>
-          <p>See how long each spell grade lasts with your Wisdom.</p>
-          <span class="calculator-open">Open calculator →</span>
-        </Link>
-        <Link to={routes.calculator('power-down')} class="section-card calculator-tile">
-          <h2>Power Down</h2>
-          <p>Calculate duration and your chance to apply it to an enemy.</p>
+        <Link to={routes.calculator('mp-tech')} class="section-card calculator-tile">
+          <h2>MP Tech calculator</h2>
+          <p>Calculate MP Tech damage, healing, buffs and status effects.</p>
           <span class="calculator-open">Open calculator →</span>
         </Link>
         {planned.map((c) => (

@@ -82,7 +82,7 @@ async function boot(): Promise<void> {
 function showPreview(kind: string): void {
   const steps = ['Reading the game’s databases', 'Abyss of Grief · Guard Room', 'Writing the data'];
   const fake: DiscImporter = {
-    choose: () => Promise.resolve('/home/you/Games/Digimon World 4 (USA).iso'),
+    choose: () => Promise.resolve('/path/to/Digimon World 4 (USA).iso'),
     run: (_path, onProgress) =>
       new Promise((resolve, reject) => {
         let done = 0;

@@ -210,6 +210,7 @@ export interface RawData {
     items: Item[];
     appraisal?: Appraisal;
     powerSpells?: PowerSpell[];
+    mpTechs?: MpTech[];
     saveStats?: SaveStats;
   };
   drops: { pools: Record<string, DropPool> };
@@ -221,6 +222,53 @@ export interface PowerSpell {
   grade: string;
   row: number;
   baseFrames: number;
+}
+
+export type MpTechKind =
+  | 'fire'
+  | 'ice'
+  | 'bolt'
+  | 'dark'
+  | 'venom'
+  | 'impact'
+  | 'cutter'
+  | 'bomb'
+  | 'heal-light'
+  | 'heal-aura'
+  | 'raise'
+  | 'cure-light'
+  | 'cure-aura'
+  | 'speed'
+  | 'freeze'
+  | 'resist'
+  | 'power-up'
+  | 'power-down'
+  | 'sleep'
+  | 'bind';
+export interface MpTech {
+  kind: MpTechKind;
+  grade: string;
+  row: number;
+  skill: 'blast' | 'heal' | 'force';
+  element: AttackElement | 'poison';
+  mpCost: number;
+  power: number;
+  baseFrames: number;
+  criticalRate: number;
+  healBase?: number;
+  revive?: { hp: number; experiencePercent: number };
+  boosts: {
+    maxHp: number;
+    strength: number;
+    defense: number;
+    speed?: number;
+    hitRate?: number;
+    evasion?: number;
+    fire?: number;
+    ice?: number;
+    thunder?: number;
+    dark?: number;
+  };
 }
 
 export interface SaveStats {

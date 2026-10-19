@@ -197,6 +197,12 @@ two platforms can be compared by loading both.
 Importer 1.2.0 adds two blocks to `items.json`:
 
 - `powerSpells`: ten `{kind, grade, row, baseFrames}` records from `pcTech` rows 80–89.
+- `mpTechs`: one hundred records for all twenty MP Tech families, five grades each.
+  Each has `kind`, `grade`, `row`, `skill` (`force`/`blast`/`heal`), `element`, `mpCost`,
+  positive damage `power`, `healBase`, `baseFrames`, `criticalRate`, and `boosts`
+  (`maxHp`, `strength`, `defense`, `speed`, `hitRate`, `evasion` and the four elements).
+  Raise also includes `revive` (`hp`, `experiencePercent`) read from executable tables. Values are read from the disc's `pcTech` table; negative boosts are
+  enemy stat reductions. `powerSpells` is retained for existing data consumers.
   `kind` is `up` or `down`; `baseFrames` comes from `TIME`. Convert frames using
 `manifest.framesPerSecond`: 50 for European PS2 discs, 60 for USA and Japan.
 - `saveStats`: sixteen `shinka` forms with `{species, name, model, wisdomInitial, wisdomGrowth}`,

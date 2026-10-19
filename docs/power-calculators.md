@@ -1,46 +1,103 @@
-# Power Up and Power Down
+# MP Tech calculator
 
-`#/calculators` lists available calculators as clickable tiles, with planned calculators marked
-Coming soon. Power Up (`#/calculators/power-up`) shows durations; Power Down
-(`#/calculators/power-down`) shows durations and application chance. Both use the shared
-character setup: Digimon, level, equipment and XData power determine Wisdom; learned Force
-skill is editable. Load a local, read-only PS2 save or choose from the last three opened
-saves. Extracted saves are 81,920 bytes (version 4). Memory cards support flat/ECC-less and
-ECC-included layouts, with FAT chains followed for fragmented files. The Save character
-picker lists used slots from USA, European and Japanese saves. Choosing a form populates its
-saved level, skills and XData upgrades. Emulator savestates are not accepted. Equipment is
-shared across saved forms; temporary effects are not saved. Character and equipment edits
-allow comparison of casting loadouts.
+`#/calculators/mp-tech` contains all twenty retail MP Tech families and all five grades. The old
+`#/calculators/power-up` and `#/calculators/power-down` links open the corresponding
+technique in the unified calculator. Character setup stays mounted when switching
+techniques or grade: Digimon, level, equipment, XData and all learned skill slots
+remain intact. Force uses save skill slot 8, Blast uses slot 6, and Heal uses slot 7. Enemy stats come
+only from the existing difficulty and enemy-variant selectors.
 
-The importer reads spell base frames from `pcTech`; no game table is bundled. For nonnegative
-ordinary stat/skill inputs (0–9999):
+The importer reads all five grades of all twenty families from the loaded
+disc's `pcTech` table into `items.mpTechs`. No spell tables are bundled. Importer
+1.10.0 requires disc data to be reloaded so those fields are available. Both PS2
+regions and GameCube releases use the same data schema. MP costs and effect
+amounts come from the actual disc, including modified tables.
 
-- Power Up frames = base frames + Wisdom.
-- Power Down frames = base frames + floor(Wisdom / 2).
-- Seconds = frames / imported frame rate: 50 for Europe, 60 for USA and Japan.
-  The formula, explanatory text and base/Wisdom breakdown use the same rate.
-- Power Down application uses Force skill F and positive enemy Spirit S:
-  A = 550 + floor(F / 4) through 1000;
-  A = 800 + floor((F - 1000) / 5) through 2000;
-  otherwise A = 1000 + floor((F - 2000) / 10).
-  Chance percent = clamp(floor(100 * A / S) / 10, 0, 100).
+Friendly techniques have no target panel; results appear beside character setup.
+Enemy-targeting techniques show the shared difficulty buttons, enemy picker, variant
+picker and relevant read-only stats. The selected technique is named only in its picker. Each result has a formula popover with input
+definitions, grade data, rounding/cap rules, function definitions and a live
+Current example. Duration calculations use the imported 50/60 FPS value. Help
+states only "The loaded game is 50 fps." or "The loaded game is 60 fps."
 
-The application roll is independent of Wisdom and spell grade. Enemy selection uses the chosen
-difficulty's stat variants with the same fallback as the enemy page. The row, crown/form, HP and
-Spirit distinguish variants. Spirit always comes from the selected enemy. Application is conditional on the
-hit and any immunity/script gates; it does not promise every boss accepts the effect.
+## Calculation contracts
 
-The formulas and stored-duration behavior are recovered statically from USA PS2 retail code;
-live spell timing and board-swap validation remain open. This feature calculates duration and
-the application roll, not the buffs' effect magnitudes.
+For ordinary nonnegative Wisdom/skill values (0–9999):
 
-Evidence: the decomp's `docs/systems/combat-damage.md`, `port/docs/player-stats.md`,
-`port/docs/save-image.md` and original instructions for GAMERAM `0x003fca10`, status setters
-`0x00445d10` and timer update `0x00443bd0`. A standalone Power Up/Down mechanics reference
-and worked spreadsheet live in the development workspace's duration-calculator outputs.
+- Pwr Up frames = grade base frames + Wisdom. Each flat stat bonus is its grade
+  base + floor(Force / 5). Max HP, Strength and Defense are separate parameters;
+  target stat caps can limit their final displayed increase.
+- Pwr Down frames = grade base frames + floor(Wisdom / 2). Application uses
+  Force-derived A: 550 + floor(F / 4) through 1000, 800 + floor((F − 1000) / 5)
+  through 2000, then 1000 + floor((F − 2000) / 10).
+  Threshold = floor(100 × A / enemy Spirit); nominal chance is the threshold
+  divided by 10%, limited to 0–100%. Each positive stat reduction is the smaller
+  of (negative grade change with its sign reversed + floor(Force / 20)) and
+  truncate(80 × original enemy stat / 100). Strength and Defense are calculated
+  independently. No other temporary enemy effects are assumed.
+- Venom poison uses Blast-derived A: 750 + floor(S / 4) through 1000,
+  1000 + floor((S − 1000) / 5) through 2000, then
+  1200 + floor((S − 2000) / 10). Threshold = truncate(A × (1000 − poison
+  resistance) / 1000); chance = threshold / 10%, limited to 0–100%.
+  Poison frames = grade base + floor(Wisdom / 2). Poison tick damage =
+  truncate(positive technique power / 5), separate from the initial hit.
+  Tick cadence and total poison damage are not calculated.
+- A damaging Blast technique first computes
+  Base = clamp(truncate((20 × power + 10 × Wisdom + 5 × Blast) / enemy Spirit),
+  0, 99999), then D = clamp(truncate(Base × (1000 − resistance) / 1000),
+  0, 99999). The first cap is **before** resistance. Signed 32-bit elemental
+  multiplication and the EE zero-divisor result are retained.
+- For an elemental technique, critical chance uses the grade critical rate C, not weapon/chip
+  critical stats: K = truncate(10000 / (truncate(12 × resistance / 10) + 50));
+  threshold = truncate((C + 100) × K / 100). Chance = threshold / 10%, limited
+  to 0–100%. This is separate from the poison application roll.
+- Critical damage uses the existing three skill bands (Blast for MP Techs),
+  followed by the same retail random spread and final 99,999 cap as weapon
+  damage. Direct damage describes one landed hit, not a whole cast or all
+  projectiles. MP Techs bypass the weapon accuracy roll; collision and enemy
+  script/immunity gates are outside the calculation.
 
-Validation: formula boundary/worked-example tests, save checksums and equipment tests, and
-opt-in real-disc assertions for all ten base durations, species data and JSON Schema compliance.
+- Non-elemental Impact and Cutter use their technique critical rate directly as a
+  percentage, with a 0–99 strict-less-than roll. No resistance scaling applies.
+- Heal Lt and Aura restore grade base HP + caster Wisdom + caster Heal skill,
+  up to each affected Digimon's missing HP. Aura applies the same computed amount
+  to each nearby ally and the caster.
+- Speed's duration is base frames + Wisdom. Its Speed bonus is the grade Speed
+  value + floor(Force / 5); critical, hit and evasion rate changes are grade values.
+- Freeze, Sleep and Bind use the same Force-versus-Spirit application bands and
+  half-Wisdom duration rule as Pwr Down. Freeze's Speed reduction is the grade
+  reduction + floor(Force / 20), limited to truncate(80% of original enemy Speed).
+  Its other rate reductions are the grade values directly.
+- Resist uses its base duration **without** Wisdom, and its four resistance
+  bonuses directly from the selected grade. Force adds no extra bonus.
+- Cure Lt and Cure remove poison using roll 0–9 <= (grade index + 5 − poison
+  strength). Chance = clamp((grade index + 6 − poison strength) × 10, 0, 100).
+  The UI shows all poison strengths 0–9 and the 10+ zero-chance category instead
+  of inventing a live poison state that is absent from saves.
+- Raise's HP and recovered EXP percentage come from adjacent arrays in the
+  executable, not the unused pcTech HP values. The importer identifies the
+  recovery arrays and uses the correct PS2 alignment / GameCube byte order.
+  `beNDMWMdlPlayer2::vfunc_47`, `0x003d5438..0x003d5750`, reads the flat HP
+  amount and adds truncate(Backup Chip EXP × recovery percent / 100) to current
+  EXP. Both arrays are validated on all five supported discs. Wisdom and Heal
+  skill do not change these selected-grade entries.
+
+The application/critical rolls compare an integer in 0–999 **strictly below**
+the threshold. All displayed Current examples use current inputs and the same
+result functions as the cards. Invalid inputs show guidance rather than NaN.
+
+Evidence: retail USA PS2 GAMERAM `0x003fca10` / FightCom cases 1, 2, 5, 15,
+19 and 20; original instructions for P2EPOISONTIME `0x003ffef0..0x004003a0`;
+`src/lua/combat.c`'s matched poison helper; status setters at `0x00445d10` and
+stored-duration updater at `0x00443bd0`. The decomp's
+`docs/systems/combat-damage.md` describes the direct technique branch;
+`docs/systems/combat-lua-api.md` records the status helper guards. These are
+static recovery contracts; no new live spell measurement is claimed.
+
+Validation covers all skill-band boundaries, distinct poison rolls/damage/duration,
+critical/resistance calculations, damage caps, invalid inputs and Pwr Down's
+80% limit. The optional real-disc region test imports all supported discs,
+checks all 100 technique records and validates the complete JSON schemas.
 
 ## Wisdom plugs and save persistence
 

@@ -13,7 +13,7 @@ import { DIFFICULTIES, type Difficulty } from '../data/types';
  *   #/enemies?kind=boss&view=resist     the enemy table
  */
 
-export type Calculator = 'power-up' | 'power-down' | 'attack-damage';
+export type Calculator = 'power-up' | 'power-down' | 'attack-damage' | 'mp-tech';
 
 export type ItemTab = 'overview' | 'drops' | 'trades';
 export const ITEM_TABS: ItemTab[] = ['overview', 'drops', 'trades'];
@@ -107,7 +107,12 @@ export function parseHash(hash: string): Location {
   if (first === 'calculators') {
     if (second === 'weapon-damage')
       return { route: { page: 'calculator', calculator: 'attack-damage' }, settings };
-    if (second === 'power-up' || second === 'power-down' || second === 'attack-damage')
+    if (
+      second === 'power-up' ||
+      second === 'power-down' ||
+      second === 'attack-damage' ||
+      second === 'mp-tech'
+    )
       return { route: { page: 'calculator', calculator: second }, settings };
     return { route: { page: 'calculators' }, settings };
   }

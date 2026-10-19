@@ -13,7 +13,7 @@ DigiAtlas reads the information from your own game disc image.
 - **Explore maps:** browse areas, rooms and floors, with enemy and object spawn locations.
 - **Find items:** see drop chances, the best places to farm, trades and appraisal results.
 - **Look up enemies:** compare stats, elemental resistances and spawn locations across difficulties.
-- **Plan your character:** calculate attack damage, hit and critical chances, elemental bonuses, and Power Up/Down durations.
+- **Plan your character:** calculate attack damage, hit and critical chances, and elemental bonuses. Try MP Tech damage, healing, buffs and status effects in one calculator.
 - **Load your save:** bring your Digimon, level, equipment and XData power into the calculators, then try changes.
 
 ## Download and install
@@ -56,8 +56,9 @@ Use **Re-import from disc** on the home page to switch to another image.
 ## Using the calculators
 
 Choose your Digimon and level, add equipment and XData power, then select the enemy and variant
-you want to compare against. The totals update as you change your setup. Use the **?** buttons
-beside the results to see how each calculation works.
+you want to compare against when the technique targets an enemy. The totals update as you change
+your setup. Use the **?** buttons beside the results for formulas and worked examples using your
+current setup.
 
 To start from a save, open **Load a save** and choose a file or one of your last three opened saves.
 

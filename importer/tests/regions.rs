@@ -7,6 +7,7 @@ use serde_json::Value;
 
 #[test]
 fn imports_supported_disc_regions() {
+    let with_maps = std::env::var("DIGIATLAS_REGION_MAPS").as_deref() != Ok("0");
     for release in RELEASES.into_iter().chain(GAMECUBE_RELEASES) {
         let variable = format!("DIGIATLAS_{}_{}_ISO", release.platform.to_uppercase(), release.region.to_uppercase());
         let Some(path) = std::env::var_os(&variable) else { continue };
@@ -20,7 +21,7 @@ fn imports_supported_disc_regions() {
         let worker_out = out.clone();
         let manifest = std::thread::Builder::new()
             .stack_size(importer::STACK_SIZE)
-            .spawn(move || importer::export(Path::new(&path), &worker_out, true, &mut |_| {}))
+            .spawn(move || importer::export(Path::new(&path), &worker_out, with_maps, &mut |_| {}))
             .unwrap()
             .join()
             .unwrap()
@@ -31,10 +32,26 @@ fn imports_supported_disc_regions() {
         assert_eq!(manifest["framesPerSecond"], release.frames_per_second);
         assert_eq!(manifest["counts"]["enemyRows"], 580);
         assert_eq!(manifest["counts"]["items"], 590);
-        assert!(manifest["counts"]["stageMaps"].as_u64().unwrap() > 0);
+        if with_maps {
+            assert!(manifest["counts"]["stageMaps"].as_u64().unwrap() > 0);
+        }
         let load = |name| serde_json::from_slice::<Value>(&std::fs::read(out.join(name)).unwrap()).unwrap();
         let items = load("items.json");
         assert_eq!(items["powerSpells"].as_array().unwrap().len(), 10);
+        assert_eq!(items["mpTechs"].as_array().unwrap().len(), 100);
+        for tech in items["mpTechs"].as_array().unwrap() {
+            assert!(tech["mpCost"].as_i64().unwrap() > 0);
+            if tech["kind"] == "venom" || tech["kind"] == "fire" {
+                assert!(tech["power"].as_i64().unwrap() > 0);
+                assert_eq!(tech["skill"], "blast");
+            }
+        }
+        let techs = items["mpTechs"].as_array().unwrap();
+        assert_eq!(techs[50]["revive"]["hp"], 100);
+        assert_eq!(techs[54]["revive"]["hp"], 6400);
+        assert_eq!(techs[50]["revive"]["experiencePercent"], 59);
+        assert_eq!(techs[54]["revive"]["experiencePercent"], 95);
+        assert_eq!(techs[40]["healBase"], 300);
         assert_eq!(items["saveStats"]["forms"].as_array().unwrap().len(), 16);
         assert!(items["items"]
             .as_array()

@@ -9,6 +9,7 @@ describe('routes', () => {
       routes.home(),
       routes.calculators(),
       routes.calculator('attack-damage'),
+      routes.calculator('mp-tech'),
       routes.calculator('power-up'),
       routes.calculator('power-down'),
       routes.search('long sword', 'weapon'),

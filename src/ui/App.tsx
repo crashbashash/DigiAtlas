@@ -7,7 +7,7 @@ import { Link } from './common';
 import logoUrl from './logo.svg';
 import { AppContext, type AppServices } from './context';
 import { Calculators } from './Calculators';
-import { PowerCalculator } from './PowerCalculator';
+import { MpTechCalculator } from './MpTechCalculator';
 import { WeaponDamageCalculator } from './WeaponDamageCalculator';
 import { Home } from './Home';
 import { UpdateCenter } from './UpdateCenter';
@@ -24,7 +24,7 @@ function pageTitle(model: Model, route: Route): string {
     case 'home':
       return 'DigiAtlas';
     case 'calculator':
-      return `${route.calculator === 'attack-damage' ? 'Attack damage' : route.calculator === 'power-up' ? 'Power Up' : 'Power Down'} · DigiAtlas`;
+      return `${route.calculator === 'attack-damage' ? 'Attack damage' : 'MP Tech calculator'} · DigiAtlas`;
     case 'calculators':
       return 'Calculators · DigiAtlas';
     case 'search':
@@ -193,9 +193,8 @@ export function App({
             (route.calculator === 'attack-damage' ? (
               <WeaponDamageCalculator />
             ) : (
-              <PowerCalculator
-                key={route.calculator}
-                kind={route.calculator === 'power-up' ? 'up' : 'down'}
+              <MpTechCalculator
+                initialTechnique={route.calculator === 'power-up' ? 'power-up' : 'power-down'}
               />
             ))}
           {route.page === 'search' && <SearchPage q={route.q} category={route.category} />}

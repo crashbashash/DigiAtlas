@@ -20,6 +20,7 @@ encoding_rs = "0.8"
 flate2 = "1"
 crc32fast = "1"
 sha1_smol = "1"
+nod = "=1.4.4"
 
 [dev-dependencies]
 jsonschema = { version = "0.30", default-features = false }

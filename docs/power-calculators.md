@@ -2,22 +2,23 @@
 
 `#/calculators` lists available calculators as clickable tiles, with planned calculators marked
 Coming soon. Power Up (`#/calculators/power-up`) shows durations; Power Down
-(`#/calculators/power-down`) shows durations and application chance. Both support manual stats
-or a local, read-only USA PS2 save or memory-card image. Extracted saves are 81,920 bytes
-(version 4). Memory cards support flat/ECC-less and ECC-included page layouts, with FAT chains
-followed for fragmented files. The Save box dropdown lists used character slots from the card’s
-USA DW4 saves. Choosing a box lists only that character’s unlocked Digimon. Emulator savestates
-are not accepted. Saved equipment
-is shared across forms. The calculator recomputes Wisdom using level growth, species X-Data
-upgrades, equipped item bonuses and the matching board revision. Temporary effects are not saved.
-Manual edits let the player account for a different casting loadout.
+(`#/calculators/power-down`) shows durations and application chance. Both use the shared
+character setup: Digimon, level, equipment and XData power determine Wisdom; learned Force
+skill is editable. Load a local, read-only PS2 save or choose from the last three opened
+saves. Extracted saves are 81,920 bytes (version 4). Memory cards support flat/ECC-less and
+ECC-included layouts, with FAT chains followed for fragmented files. The Save character
+picker lists used slots from USA, European and Japanese saves. Choosing a form populates its
+saved level, skills and XData upgrades. Emulator savestates are not accepted. Equipment is
+shared across saved forms; temporary effects are not saved. Character and equipment edits
+allow comparison of casting loadouts.
 
 The importer reads spell base frames from `pcTech`; no game table is bundled. For nonnegative
 ordinary stat/skill inputs (0–9999):
 
 - Power Up frames = base frames + Wisdom.
 - Power Down frames = base frames + floor(Wisdom / 2).
-- Seconds = frames / 60.
+- Seconds = frames / imported frame rate: 50 for Europe, 60 for USA and Japan.
+  The formula, explanatory text and base/Wisdom breakdown use the same rate.
 - Power Down application uses Force skill F and positive enemy Spirit S:
   A = 550 + floor(F / 4) through 1000;
   A = 800 + floor((F - 1000) / 5) through 2000;
@@ -26,7 +27,7 @@ ordinary stat/skill inputs (0–9999):
 
 The application roll is independent of Wisdom and spell grade. Enemy selection uses the chosen
 difficulty's stat variants with the same fallback as the enemy page. The row, crown/form, HP and
-Spirit distinguish variants. Manual Spirit is also available. Application is conditional on the
+Spirit distinguish variants. Spirit always comes from the selected enemy. Application is conditional on the
 hit and any immunity/script gates; it does not promise every boss accepts the effect.
 
 The formulas and stored-duration behavior are recovered statically from USA PS2 retail code;
@@ -66,3 +67,14 @@ conclusion comes from retail instructions and disc data, not a new live pickup m
 
 `DIGIATLAS_PS2_CARD` enables the optional real-card test; `DIGIATLAS_TEST_ITEMS` can additionally
 point at imported `items.json` to verify box selection and stat derivation with that card.
+
+Regional save/card support recognizes `BASLUS-20836`, `BESLES-53405` and
+`BISLPS-25453` directories. Each uses the same 80 KB version-4 mirrored save
+layout; checksums, equipment references and stat ranges are still validated.
+
+GameCube saves: GCI files contain an 0x40-byte directory entry and 0x2000-byte
+banner/icon block before the 80 KB save. The same four-character layout is read
+with big-endian words and UTF-16, and both version-4 mirror checksums are validated.
+Complete raw GameCube cards validate header, directory and allocation checksums,
+follow fragmented chains, and reject cycles and shared blocks. A single damaged
+metadata copy can recover from its valid mirror. Disc support covers USA and Japan.

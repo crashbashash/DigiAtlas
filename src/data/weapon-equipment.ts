@@ -83,8 +83,8 @@ export function equipmentRarity(revision: number) {
   );
 }
 
-/** Only offer chips that affect this calculator and can occupy this socket. */
-export function canEquipAttackChip(
+/** Offer every identified chip that can occupy this socket, regardless of its stats. */
+export function canEquipChip(
   item: Item,
   slot: 'weapon' | 'board',
   equipment: WeaponEquipment,
@@ -93,20 +93,12 @@ export function canEquipAttackChip(
 ): boolean {
   if (item.category !== 'abChip' || item.unidentified || item.name === 'Sold Out') return false;
   const description = item.description ?? '';
-  if (slot === 'board')
-    return (
-      !item.element && !description.includes('Equip with WU only') && (item.stats?.speed ?? 0) > 0
-    );
+  if (slot === 'board') return !item.element && !description.includes('Equip with WU only');
   if (description.includes('Equip with AB only')) return false;
   if (
     item.element &&
     equipment.weaponChips.some((chip, i) => i !== index && chip && items.get(chip.key)?.element)
   )
     return false;
-  return (
-    (item.stats?.speed ?? 0) > 0 ||
-    (item.stats?.strength ?? 0) > 0 ||
-    (item.stats?.critRate ?? 0) > 0 ||
-    !!item.element
-  );
+  return true;
 }

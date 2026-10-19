@@ -7,7 +7,7 @@ type Phase =
   | { kind: 'importing'; file: string; progress: ImportProgress | null }
   | { kind: 'failed'; file: string | null; message: string };
 
-const LOAD_LABEL = 'Load your Digimon World 4 disc image (USA, PS2)';
+const LOAD_LABEL = 'Load your Digimon World 4 disc image (PS2 or GameCube)';
 
 /** An error as a sentence (the importer's messages start in lower case). */
 export function errorText(e: unknown): string {

@@ -36,7 +36,7 @@ fn main() -> ExitCode {
             println!("{}", serde_json::to_string_pretty(&manifest["counts"]).unwrap_or_default());
             eprintln!("done in {:.1}s", started.elapsed().as_secs_f64());
             if manifest["source"]["statTableVerified"] != true {
-                eprintln!("warning: stat table anchors did not match; the disc may be modified or not vanilla USA");
+                eprintln!("warning: stat table anchors did not match; the disc may be modified or different from the vanilla USA reference");
             }
             ExitCode::SUCCESS
         }

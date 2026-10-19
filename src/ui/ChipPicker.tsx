@@ -1,7 +1,7 @@
 import { useApp } from './context';
 import { ItemName } from './ItemName';
 import { SearchPicker } from './SearchPicker';
-import { canEquipAttackChip, type WeaponEquipment } from '../data/weapon-equipment';
+import { canEquipChip, type WeaponEquipment } from '../data/weapon-equipment';
 
 export function ChipPicker({
   label,
@@ -22,8 +22,7 @@ export function ChipPicker({
   const chips = [...model.items.entries()]
     .filter(([, i]) => i.category === 'abChip' && !i.unidentified && i.name !== 'Sold Out')
     .filter(
-      ([key, item]) =>
-        key === value || canEquipAttackChip(item, slot, equipment, index, model.items),
+      ([key, item]) => key === value || canEquipChip(item, slot, equipment, index, model.items),
     )
     .sort(([a], [b]) => model.itemLabel(a).localeCompare(model.itemLabel(b)));
   return (

@@ -11,7 +11,7 @@ whenever the data changes); otherwise it asks for the disc again.
 
 | File | Contents |
 |---|---|
-| `manifest.json` | Platform, region, serial, source fingerprint, counts, and `knownGaps` |
+| `manifest.json` | Platform, region, serial, frame rate, source fingerprint, counts, and `knownGaps` |
 | `enemies.json` | Live rows of the platform's enemy stat table |
 | `stages.json` | Stages and, per difficulty, their spawn generators |
 | `drops.json` | Drop pools keyed by name |
@@ -197,7 +197,8 @@ two platforms can be compared by loading both.
 Importer 1.2.0 adds two blocks to `items.json`:
 
 - `powerSpells`: ten `{kind, grade, row, baseFrames}` records from `pcTech` rows 80–89.
-  `kind` is `up` or `down`; `baseFrames` comes from `TIME`, at 60 frames per second.
+  `kind` is `up` or `down`; `baseFrames` comes from `TIME`. Convert frames using
+`manifest.framesPerSecond`: 50 for European PS2 discs, 60 for USA and Japan.
 - `saveStats`: sixteen `shinka` forms with `{species, name, model, wisdomInitial, wisdomGrowth}`,
   plus `wisdomBoards` (armor2 ids whose `SHUSEINOURYOKU` is `KASHIKOSA`). Together with item
   stats these allow a loaded save's Wisdom to be recalculated without shipping game data.
@@ -208,7 +209,7 @@ re-import notice in the duration calculator.
 ## Crown Mod identification
 
 Importer 1.3.0 reads the Crown Mod format-1 metadata footer before importing game data.
-`manifest.mod` is the checksummed metadata object for a recognized USA PS2 image, or null
+`manifest.mod` is the checksummed metadata object for a recognized PS2 or GameCube image, or null
 when no marker is present. It includes `id`, `formatVersion`, `version`, `platform`, `release`
 and `options`. Unknown/corrupt signature formats are reported rather than guessed.
 An unsigned modified image is still read normally; its failed vanilla anchors do not
@@ -235,3 +236,13 @@ verified number of ordinary damage-bearing phases per normal attack input,
 resolved from the weapon's sequence mapping and agreeing across all 16 character
 models. It is omitted for unverified/projectile profiles. It never multiplies
 the item's base stats or the calculator's individual normal/critical hit ranges.
+
+PS2 release metadata is detected from `SYSTEM.CNF` and its matching executable:
+`SLUS-20836` → `usa` / 60 fps; `SLES-53405` → `europe` / 50 fps;
+`SLPS-25453` → `japan` / 60 fps. `framesPerSecond` is optional for older exports;
+the viewer falls back to the region when it is absent.
+
+GameCube manifests use platform `gc`, serial/game ID `GDJEB2` (USA) or `GDJJB2`
+(Japan), and 60 frames per second. `source.executableSha1` fingerprints the boot DOL.
+The desktop app adds `exporter.appVersion` after a successful import and requires
+that version to match the installed app before opening cached data.

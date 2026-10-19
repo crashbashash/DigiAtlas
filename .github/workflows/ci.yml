@@ -14,8 +14,12 @@ concurrency:
 # fixtures; the importer's disc checks are skipped without DIGIATLAS_PS2_ISO.
 jobs:
   interface:
-    name: Interface (format, types, build, tests)
-    runs-on: ubuntu-24.04
+    name: Interface (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +63,7 @@ jobs:
   native:
     name: Desktop app (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -89,8 +93,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      # Compiles and runs the native unit tests; no `tauri build` bundle is produced.
+      # Check the backend and build the actual desktop executable on each platform.
       - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
         if: runner.os == 'Linux'
       - run: cargo clippy --all-targets --locked --manifest-path src-tauri/Cargo.toml -- -D warnings
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - name: Build desktop executable
+        run: npm run tauri -- build --ci --no-bundle
+      - name: Upload desktop executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: digiatlas-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            src-tauri/target/release/digiatlas
+            src-tauri/target/release/digiatlas.exe
+            src-tauri/target/release/bundle/macos/DigiAtlas.app
+          if-no-files-found: error
+          retention-days: 14

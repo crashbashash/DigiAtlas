@@ -35,8 +35,14 @@ pub fn load(area: &Afs, names: &HashMap<String, Vec<(String, i64)>>, stage_id: &
         return Ok(None);
     };
     let graph = Graph::new(area.entry(entry as usize)?)?;
-    let tex = textures::decode_all(&graph)?.into_iter().next();
-    Ok(tex.filter(|t| (t.width, t.height) == (256, 256)))
+    let Some(image) = (0..graph.s2.len()).find(|&i| graph.class(i) == "igImage") else { return Ok(None) };
+    // System-scene placeholders can be unpaletted GameCube textures. They are
+    // not loading banners; inspect their dimensions before attempting CI8 decode.
+    let dimensions = graph.vals(image);
+    if dimensions.first().and_then(|v| v.int()) != Some(256) || dimensions.get(1).and_then(|v| v.int()) != Some(256) {
+        return Ok(None);
+    }
+    Ok(Some(textures::decode(&graph, image, textures::clut_of(&graph, image)?)?))
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 # Importer
 
-Reads a Digimon World 4 (USA) PS2 disc image and writes DigiAtlas data ([schema](../docs/schema.md)).
+Reads a Digimon World 4 disc image (PS2: USA, Europe or Japan; GameCube: USA or Japan) and writes DigiAtlas data ([schema](../docs/schema.md)).
 The desktop app runs it when you choose a disc image; the command line is for development:
 
 ```sh
@@ -19,7 +19,7 @@ git (`data/generated/` is ignored). Pure Rust, so it builds the same on Linux, W
 | `database.rs`                         | The game's databases from `AREA.AFS` entry 9 (English): named columns for items and enemies                              |
 | `stats.rs`                            | Enemy stat rows built from the `enemy` database                                                                          |
 | `appraisal.rs`                        | What the Central appraiser turns unidentified items into                                                                 |
-| `manifest.rs`                         | Archive entry names from `NDMW.IGB` (finds each stage's USA banner pack)                                                 |
+| `manifest.rs`                         | Archive entry names from `NDMW.IGB` (finds each stage's banner pack)                                                 |
 | `textures.rs`, `banners.rs`, `png.rs` | 8-bit paletted texture decode, loading banners, PNG writer                                                               |
 | `scene.rs`                            | Scene graphs: transforms, `igGeometry` nodes, vertex and primitive streams to triangles                                  |
 | `luadec.rs`, `scripts.rs`             | Lua 4.0.1 decompiler and the analysis of spawner START/RESTART/STOP calls with their conditions                          |
@@ -54,3 +54,17 @@ To check that a change leaves the output alone, import before and after it and c
 ```sh
 cargo run --release --example compare_exports -- before/ after/
 ```
+
+Release detection follows `SYSTEM.CNF` and its actual boot executable. The manifest
+records `region`, `serial` and `framesPerSecond` (50 for Europe, 60 for USA/Japan).
+Optional regional integration tests import complete maps and validate all JSON schemas:
+
+```sh
+DIGIATLAS_PS2_EUROPE_ISO="/path/to/europe.iso" DIGIATLAS_PS2_JAPAN_ISO="/path/to/japan.iso" cargo test --test regions
+```
+
+GameCube imports use the disc header, FST and boot DOL. ISO/GCM and NKit ISO are
+read directly; RVZ, WIA, GCZ and CISO are streamed through [nod](https://docs.rs/nod/1.4.4/nod/)
+without a whole-disc temporary extraction. Authored AFS/IGB/Lua data is decoded by
+the same importer as PS2. Set `DIGIATLAS_GC_USA_ISO` and/or
+`DIGIATLAS_GC_JAPAN_ISO` to run the regional map/schema tests against those discs.

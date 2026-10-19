@@ -19,7 +19,7 @@ it('maps exact saved equipment bonuses to retail rarity colour bands', () => {
   }
 });
 
-import { canEquipAttackChip, emptyEquipment, equipmentStats } from './weapon-equipment';
+import { canEquipChip, emptyEquipment, equipmentStats } from './weapon-equipment';
 import type { Item } from './types';
 
 const chip = (id: number, element?: Item['element']): Item => ({
@@ -40,13 +40,13 @@ it('allows one PWR element per weapon, including replacement in the existing soc
     ['abChip:2', critical],
   ]);
   const gear = emptyEquipment();
-  expect(canEquipAttackChip(fire, 'weapon', gear, 0, items)).toBe(true);
+  expect(canEquipChip(fire, 'weapon', gear, 0, items)).toBe(true);
   gear.weaponChips[0] = { key: 'abChip:0', revision: 0 };
-  expect(canEquipAttackChip(ice, 'weapon', gear, 1, items)).toBe(false);
-  expect(canEquipAttackChip(fire, 'weapon', gear, 1, items)).toBe(false);
-  expect(canEquipAttackChip(ice, 'weapon', gear, 0, items)).toBe(true);
-  expect(canEquipAttackChip(critical, 'weapon', gear, 1, items)).toBe(true);
-  expect(canEquipAttackChip(fire, 'board', gear, 0, items)).toBe(false);
+  expect(canEquipChip(ice, 'weapon', gear, 1, items)).toBe(false);
+  expect(canEquipChip(fire, 'weapon', gear, 1, items)).toBe(false);
+  expect(canEquipChip(ice, 'weapon', gear, 0, items)).toBe(true);
+  expect(canEquipChip(critical, 'weapon', gear, 1, items)).toBe(true);
+  expect(canEquipChip(fire, 'board', gear, 0, items)).toBe(false);
 });
 it('rejects armour-only chips in weapon pockets even if they have attack-related bonuses', () => {
   const resist: Item = {
@@ -58,8 +58,8 @@ it('rejects armour-only chips in weapon pockets even if they have attack-related
   };
   const gear = emptyEquipment(),
     items = new Map([['abChip:3', resist]]);
-  expect(canEquipAttackChip(resist, 'weapon', gear, 0, items)).toBe(false);
-  expect(canEquipAttackChip(resist, 'board', gear, 0, items)).toBe(true);
+  expect(canEquipChip(resist, 'weapon', gear, 0, items)).toBe(false);
+  expect(canEquipChip(resist, 'board', gear, 0, items)).toBe(true);
 });
 it('derives critical chance and element only from the current equipped weapon and its chips', () => {
   const weapon: Item = {
@@ -100,4 +100,34 @@ it('derives critical chance and element only from the current equipped weapon an
     critChance: 2.5,
     element: 'none',
   });
+});
+
+it('offers compatible chips even when they do not affect calculator stats', () => {
+  const gear = emptyEquipment();
+  const utilityStats: Record<string, number>[] = [
+    { maxHp: 100 },
+    { maxMp: 30 },
+    { defense: 20 },
+    { spirit: 15 },
+    { resistFire: 30 },
+    {},
+  ];
+  for (const stats of utilityStats) {
+    const item: Item = {
+      category: 'abChip',
+      id: 9,
+      name: 'Utility chip',
+      description: null,
+      stats,
+    };
+    const items = new Map([['abChip:9', item]]);
+    expect(canEquipChip(item, 'weapon', gear, 0, items)).toBe(true);
+    expect(canEquipChip(item, 'board', gear, 0, items)).toBe(true);
+    expect(
+      canEquipChip({ ...item, description: 'Equip with AB only' }, 'weapon', gear, 0, items),
+    ).toBe(false);
+    expect(
+      canEquipChip({ ...item, description: 'Equip with WU only' }, 'board', gear, 0, items),
+    ).toBe(false);
+  }
 });

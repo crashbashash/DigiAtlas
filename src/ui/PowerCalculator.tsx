@@ -1,7 +1,13 @@
 import { SearchPicker } from './SearchPicker';
 import { useMemo, useState } from 'preact/hooks';
-import { durationText, powerDownChance, powerDuration, validPowerStat } from '../data/power';
-import { readPowerBoxes, type SaveBox } from '../data/power-save-file';
+import {
+  durationText,
+  gameFrameRate,
+  powerDownChance,
+  powerDuration,
+  validPowerStat,
+} from '../data/power';
+import { CharacterSetup, type CharacterValues } from './CharacterSetup';
 import { Link, SettingsBar } from './common';
 import { routes } from '../app/route';
 import { useApp } from './context';
@@ -13,16 +19,10 @@ export function PowerCalculator({ kind }: { kind: 'up' | 'down' }) {
   const isDown = kind === 'down';
   const title = isDown ? 'Power Down' : 'Power Up';
   const { model, settings, scope, reimport } = useApp();
-  const [wisdom, setWisdom] = useState('1000');
-  const [force, setForce] = useState('1000');
-  const [spirit, setSpirit] = useState('500');
-  const [name, setName] = useState('');
+  const fps = gameFrameRate(model.raw.manifest);
+  const [character, setCharacter] = useState<CharacterValues | null>(null);
+  const [selectedName, setName] = useState('');
   const [row, setRow] = useState(-1);
-  const [boxes, setBoxes] = useState<SaveBox[]>([]);
-  const [box, setBox] = useState('');
-  const saved = boxes.find((b) => b.id === box)?.digimon ?? [];
-  const [character, setCharacter] = useState('');
-  const [error, setError] = useState('');
   const spells = model.raw.items.powerSpells;
   const names = useMemo(
     () =>
@@ -33,40 +33,13 @@ export function PowerCalculator({ kind }: { kind: 'up' | 'down' }) {
       ].sort(),
     [model],
   );
+  const name = selectedName || names[0] || '';
   const variants = name ? model.variantsOn(name, settings.difficulty, scope) : [];
   const target = variants.find((e) => e.row === row) ?? variants[0];
-  const targetSpirit = name ? (target?.stats.spirit ?? NaN) : spirit.trim() ? Number(spirit) : NaN;
-  const w = wisdom.trim() ? Number(wisdom) : NaN;
-  const f = force.trim() ? Number(force) : NaN;
+  const targetSpirit = target?.stats.spirit ?? NaN;
+  const w = character?.wisdom ?? NaN;
+  const f = character?.force ?? NaN;
   const chance = powerDownChance(f, targetSpirit);
-  function chooseSaved(index: string) {
-    setCharacter(index);
-    if (index === '') return;
-    const selected = saved[Number(index)];
-    setWisdom(String(selected.wisdom));
-    setForce(String(selected.force));
-  }
-  function chooseBox(id: string, choices = boxes) {
-    const selected = choices.find((b) => b.id === id);
-    if (!selected) return;
-    setBox(id);
-    setCharacter('0');
-    setWisdom(String(selected.digimon[0].wisdom));
-    setForce(String(selected.digimon[0].force));
-  }
-  async function loadSave(file: File | undefined) {
-    if (!file) return;
-    setError('');
-    try {
-      const stats = model.raw.items.saveStats;
-      if (!stats) throw new Error('Re-import your disc to load character stats.');
-      const loaded = readPowerBoxes(await file.arrayBuffer(), stats, model.items);
-      setBoxes(loaded);
-      chooseBox(loaded[0].id, loaded);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
   return (
     <div class="page power-page">
       <header class="page-head">
@@ -83,80 +56,9 @@ export function PowerCalculator({ kind }: { kind: 'up' | 'down' }) {
       <div class="power-grid">
         <section class="section-card">
           <h2>Your character</h2>
-          <p>Enter your stats, or load a save.</p>
-          <label class="power-field">
-            Load a save
-            <input
-              type="file"
-              onChange={(e) => {
-                void loadSave(e.currentTarget.files?.[0]);
-                e.currentTarget.value = '';
-              }}
-            />
-          </label>
-          {error && <p role="alert">{error}</p>}
-          {boxes.length > 0 && (
-            <SearchPicker
-              label="Save box"
-              value={box}
-              searchLabel={boxes.length > 8 ? 'Search saves' : undefined}
-              onChange={chooseBox}
-              options={boxes.map((b) => ({ value: b.id, label: b.label }))}
-            />
-          )}
-          {saved.length > 0 && (
-            <SearchPicker
-              label="Digimon"
-              value={character}
-              searchLabel="Search Digimon"
-              onChange={chooseSaved}
-              options={[
-                { value: '', label: 'Manual stats' },
-                ...saved.map((d, i) => ({ value: String(i), label: `${d.name} · Lv ${d.level}` })),
-              ]}
-            />
-          )}
-          <div class="power-inputs">
-            <label class="power-field">
-              Wisdom
-              <input
-                type="number"
-                min="0"
-                max="9999"
-                step="1"
-                value={wisdom}
-                onInput={(e) => {
-                  setWisdom(e.currentTarget.value);
-                  setCharacter('');
-                }}
-              />
-            </label>
-            {isDown && (
-              <label class="power-field">
-                Force skill
-                <input
-                  type="number"
-                  min="0"
-                  max="9999"
-                  step="1"
-                  value={force}
-                  onInput={(e) => {
-                    setForce(e.currentTarget.value);
-                    setCharacter('');
-                  }}
-                />
-              </label>
-            )}
-          </div>
+          <CharacterSetup force={isDown} onChange={setCharacter} />
           {(!validPowerStat(w) || (isDown && !validPowerStat(f))) && (
             <p role="alert">Enter whole-number stats from 0 to 9999.</p>
-          )}
-          {character !== '' && (
-            <p class="muted">
-              Wisdom includes saved equipment and X-Data upgrades. The same saved equipment is used
-              for each selected form; temporary effects are not stored in the save. You can edit
-              either stat.
-            </p>
           )}
         </section>
         {isDown && (
@@ -206,12 +108,9 @@ export function PowerCalculator({ kind }: { kind: 'up' | 'down' }) {
                 setName(value);
                 setRow(-1);
               }}
-              options={[
-                { value: '', label: 'Enter Spirit manually' },
-                ...names.map((n) => ({ value: n, label: n })),
-              ]}
+              options={names.map((n) => ({ value: n, label: n }))}
             />
-            {name ? (
+            {name && (
               <>
                 <SearchPicker
                   label="Enemy variant"
@@ -230,24 +129,16 @@ export function PowerCalculator({ kind }: { kind: 'up' | 'down' }) {
                   )}
                 </div>
               </>
-            ) : (
-              <label class="power-field">
-                Enemy Spirit
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={spirit}
-                  onInput={(e) => setSpirit(e.currentTarget.value)}
-                />
-              </label>
             )}
+            <p class="muted">
+              Enemy Spirit: {Number.isFinite(targetSpirit) ? targetSpirit.toLocaleString() : '—'}
+            </p>
             <p class="power-result" aria-live="polite">
               {chance === null ? '—' : `${chance.toFixed(1)}%`}
             </p>
             <p>Force improves your chance. Wisdom increases duration.</p>
             {(!Number.isInteger(targetSpirit) || targetSpirit <= 0) && (
-              <p role="alert">Enemy Spirit must be a positive whole number.</p>
+              <p role="alert">Choose an available enemy variant with positive Spirit.</p>
             )}
           </section>
         )}
@@ -263,15 +154,15 @@ export function PowerCalculator({ kind }: { kind: 'up' | 'down' }) {
             </p>
             <p class="formula-equation">
               {isDown
-                ? 'Duration (seconds) = (B + floor(W / 2)) / 60'
-                : 'Duration (seconds) = (B + W) / 60'}
+                ? `Duration (seconds) = (B + floor(W / 2)) / ${fps}`
+                : `Duration (seconds) = (B + W) / ${fps}`}
             </p>
             <p>
               {isDown
-                ? 'Half your Wisdom is rounded down before it is added to the base duration. Every 120 Wisdom adds one second.'
-                : 'Every 60 Wisdom adds one second.'}
+                ? `Half your Wisdom is rounded down before it is added to the base duration. Every ${fps * 2} Wisdom adds one second.`
+                : `Every ${fps} Wisdom adds one second.`}
             </p>
-            <p class="muted">The game uses 60 frames per second.</p>
+            <p class="muted">The game uses {fps} frames per second.</p>
           </FormulaHelp>
         </div>
         {!spells?.length ? (
@@ -306,11 +197,11 @@ export function PowerCalculator({ kind }: { kind: 'up' | 'down' }) {
                             '—'
                           ) : (
                             <>
-                              <strong>{durationText(frames)}</strong>
+                              <strong>{durationText(frames, fps)}</strong>
                               <small>
-                                {Number((spell.baseFrames / 60).toFixed(2))} seconds base +{' '}
-                                {Number(((frames - spell.baseFrames) / 60).toFixed(2))} seconds from
-                                Wisdom
+                                {Number((spell.baseFrames / fps).toFixed(2))} seconds base +{' '}
+                                {Number(((frames - spell.baseFrames) / fps).toFixed(2))} seconds
+                                from Wisdom
                               </small>
                             </>
                           )}

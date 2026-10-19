@@ -1,4 +1,4 @@
-//! Build DigiAtlas JSON from a Digimon World 4 USA PS2 disc image.
+//! Build DigiAtlas JSON from a Digimon World 4 PS2 or GameCube disc image.
 //!
 //! Writes manifest.json, enemies.json, stages.json, drops.json and items.json (schema v1, see
 //! docs/schema.md), plus banners/ and maps/ images.
@@ -25,7 +25,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
 pub const STACK_SIZE: usize = 64 << 20;
 
-pub const IMPORTER_VERSION: &str = "1.6.0";
+pub const IMPORTER_VERSION: &str = "1.8.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
     "enemies[].name: Mecha Rogue names follow Wikipedia and Wikimon; object names are not in the game text",
@@ -34,7 +34,7 @@ const KNOWN_GAPS: [&str; 5] = [
     "maps: top-down footprints only (floors and walls from the terrain mesh); no room names or icons",
     "trigger-placed item spawns (scripted pickups) are not extracted yet",
 ];
-const REQUIRED_FILES: [&str; 5] = ["/SYSTEM.CNF", "/AREA.AFS", "/NDMW.AFS", "/NDMW.IGB", "/SLUS_208.36"];
+const REQUIRED_FILES: [&str; 3] = ["/AREA.AFS", "/NDMW.AFS", "/NDMW.IGB"];
 
 /// Import progress, for a progress bar: `done` of `total` steps, and what is happening now.
 #[derive(Debug, Clone)]
@@ -50,15 +50,6 @@ fn kinds(prefix: char) -> &'static str {
         'f' => "boss",
         _ => "object",
     }
-}
-
-/// The disc serial from SYSTEM.CNF (`SLUS-20836`).
-fn serial(system_cnf: &[u8]) -> Option<String> {
-    static RE: OnceLock<regex::bytes::Regex> = OnceLock::new();
-    let re =
-        RE.get_or_init(|| regex::bytes::Regex::new(r"(?-u)BOOT2\s*=\s*cdrom0:\\?([A-Z]{4}_\d{3}\.\d{2})").unwrap());
-    let raw = String::from_utf8_lossy(&re.captures(system_cnf)?[1]).into_owned();
-    Some(format!("{}-{}{}", &raw[..4], &raw[5..8], &raw[9..]))
 }
 
 fn float(x: f64) -> Value {
@@ -279,13 +270,26 @@ fn write_json(path: &Path, value: &Value) -> Result<()> {
 pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut dyn FnMut(Progress)) -> Result<Value> {
     let disc = Source::open(iso_path)?;
     let crown_mod = crate::crown_signature::read(&disc)?;
-    let files = iso::list_files(&disc)?;
+    let gamecube = crate::gamecube::is_gamecube(&disc)?;
+    let files = if gamecube { crate::gamecube::list_files(&disc)? } else { iso::list_files(&disc)? };
     for needed in REQUIRED_FILES {
         if !files.contains_key(needed) {
-            fail!("this does not look like the Digimon World 4 USA PS2 disc (missing {})", &needed[1..]);
+            fail!("this does not look like a Digimon World 4 disc (missing {})", &needed[1..]);
         }
     }
     let src = |name: &str| iso::open_disc_file(&disc, &files, name);
+    let release = if gamecube {
+        crate::regions::from_gamecube_header(&disc.read(0, 6)?)?
+    } else {
+        crate::regions::from_system_cnf(&src("SYSTEM.CNF")?.read_all()?)?
+    };
+    if let Some(signature) = &crown_mod {
+        let signature_release = if gamecube { &release.serial[..4] } else { release.executable };
+        if signature["platform"] != release.platform || signature["release"] != signature_release {
+            fail!("Crown Mod signature does not match this disc");
+        }
+    }
+    let executable = src(release.executable)?.read_all()?;
     let area = Afs::open(src("AREA.AFS")?)?;
     let ndmw = Afs::open(src("NDMW.AFS")?)?;
 
@@ -495,8 +499,6 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         items.push(Value::Object(rec));
     }
 
-    let system_cnf = src("SYSTEM.CNF")?.read_all()?;
-    let executable = src("SLUS_208.36")?.read_all()?;
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let count_generators: usize = stage_records
         .iter()
@@ -509,9 +511,10 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         .sum();
     let manifest = json!({
         "schemaVersion": SCHEMA_VERSION,
-        "platform": "ps2",
-        "region": "usa",
-        "serial": serial(&system_cnf),
+        "platform": release.platform,
+        "region": release.region,
+        "serial": release.serial,
+        "framesPerSecond": release.frames_per_second,
         "mod": crown_mod,
         "source": {
             "kind": "iso",
@@ -565,12 +568,6 @@ mod tests {
         assert_eq!(utc_timestamp(0), "1970-01-01T00:00:00+00:00");
         assert_eq!(utc_timestamp(1_792_253_100), "2026-10-17T16:05:00+00:00");
         assert_eq!(utc_timestamp(951_782_400), "2000-02-29T00:00:00+00:00");
-    }
-
-    #[test]
-    fn reads_the_serial() {
-        assert_eq!(serial(b"BOOT2 = cdrom0:\\SLUS_208.36;1\nVER = 1.00"), Some("SLUS-20836".into()));
-        assert_eq!(serial(b"nothing"), None);
     }
 
     use crate::generators::tests::generator;

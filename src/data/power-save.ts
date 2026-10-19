@@ -1,3 +1,4 @@
+import type { XDataPower } from './character-stats';
 import type { AttackElement, Item, SaveStats } from './types';
 import { emptyEquipment, equipmentStats, type WeaponEquipment } from './weapon-equipment';
 
@@ -8,6 +9,7 @@ export interface SavedDigimon {
   name: string;
   level: number;
   force: number;
+  xdata: XDataPower;
   wisdom: number;
   strength?: number;
   baseStrength?: number;
@@ -22,7 +24,7 @@ export interface SavedDigimon {
   element: AttackElement;
 }
 
-// USA PS2 deliver structure: four character records, two mirrored checksum blocks.
+// PS2 and GameCube deliver structure: four character records, two mirrored checksum blocks.
 // See the decomp's port/docs/save-image.md and port/src/playerstats.c.
 export function readPowerSave(
   buffer: ArrayBuffer,
@@ -30,13 +32,15 @@ export function readPowerSave(
   items: Map<string, Item>,
 ): SavedDigimon[] {
   if (buffer.byteLength !== 81920) {
-    throw new Error('The save data must be an 80 KB USA PS2 Digimon World 4 save.');
+    throw new Error('The save data must be an 80 KB Digimon World 4 save data.');
   }
   const data = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
-  const word = (offset: number) => data.getInt32(offset, true);
+  const littleEndian = data.getUint32(4, true) === 4;
+  const word = (offset: number) => data.getInt32(offset, littleEndian);
   for (const block of [0, 0xa000]) {
-    if (word(block + 4) !== 4) throw new Error('Unsupported save version. Choose a USA PS2 save.');
+    if (word(block + 4) !== 4)
+      throw new Error('Unsupported save version. Choose a Digimon World 4 PS2 or GameCube save.');
     let sum = 0;
     for (let o = block + 4; o < block + 0xa000; o += 4) sum = (sum + word(o)) | 0;
     if (sum !== word(block)) throw new Error('The save checksum is invalid.');
@@ -54,9 +58,9 @@ export function readPowerSave(
     const b = slot * 0x2000;
     if (!bytes[b + 8]) continue;
     let player = '';
-    if (data.getUint16(b + 0x30, true) === 0xffff) {
+    if (data.getUint16(b + 0x30, littleEndian) === 0xffff) {
       for (let o = 0x32; o < 0x42; o += 2) {
-        const c = data.getUint16(b + o, true);
+        const c = data.getUint16(b + o, littleEndian);
         if (!c || c === 0xffff) break;
         player += String.fromCharCode(c);
       }
@@ -84,7 +88,7 @@ export function readPowerSave(
         const ref = word(b + offset + i * 4);
         if (ref === -1) continue;
         if (ref < 0 || ref >= 36) throw new Error('Invalid equipment reference in the save.');
-        const id = data.getUint32(b + 0x6c + ref * 4, true);
+        const id = data.getUint32(b + 0x6c + ref * 4, littleEndian);
         const category = ['weapon', 'armor1', 'armor2', 'abChip'][kind];
         if (((id >>> 12) & 15) !== kind) throw new Error('Invalid equipped item type in the save.');
         const item = items.get(`${category}:${id & 1023}`);
@@ -157,6 +161,11 @@ export function readPowerSave(
         species,
         name: form.name,
         level,
+        xdata: {
+          strength: word(b + 0xa3c + (species * 11 + 2) * 4),
+          speed: word(b + 0xa3c + (species * 11 + 6) * 4),
+          wisdom: upgrades,
+        },
         force: word(b + 0x7fc + (species * 9 + 8) * 4),
         wisdom: Math.max(1, Math.min(9999, (base + equipment) | 0)),
         strength,

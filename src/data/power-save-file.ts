@@ -1,3 +1,4 @@
+import { isGamecubeGci, isGamecubeCard, readGamecubeGci, readGamecubeCard } from './gamecube-save';
 import { readMemoryCard } from './memory-card';
 import { readPowerSave, type SavedDigimon } from './power-save';
 import type { Item, SaveStats } from './types';
@@ -13,8 +14,19 @@ export function readPowerBoxes(
   stats: SaveStats,
   items: Map<string, Item>,
 ): SaveBox[] {
+  const ps2Card = new TextDecoder()
+    .decode(new Uint8Array(buffer, 0, Math.min(buffer.byteLength, 28)))
+    .startsWith('Sony PS2 Memory Card Format ');
+  if (buffer.byteLength !== 81920 && !isGamecubeGci(buffer) && !isGamecubeCard(buffer) && !ps2Card)
+    throw new Error('Choose a PS2 save or memory card, or a GameCube GCI save or raw memory card.');
   const saves =
-    buffer.byteLength === 81920 ? [{ name: 'Save', data: buffer }] : readMemoryCard(buffer);
+    buffer.byteLength === 81920
+      ? [{ name: 'Save', data: buffer }]
+      : isGamecubeGci(buffer)
+        ? readGamecubeGci(buffer)
+        : isGamecubeCard(buffer)
+          ? readGamecubeCard(buffer)
+          : readMemoryCard(buffer);
   const boxes: SaveBox[] = [];
   saves.forEach((save, index) => {
     const digimon = readPowerSave(save.data, stats, items);

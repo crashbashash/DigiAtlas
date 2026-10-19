@@ -92,11 +92,7 @@ function showPreview(kind: string): void {
           onProgress({ done, total, message: steps[Math.min(2, Math.floor((done * 3) / total))] });
           if (kind === 'failed' && done === 3) {
             clearInterval(timer);
-            reject(
-              new Error(
-                'this does not look like the Digimon World 4 USA PS2 disc (missing NDMW.AFS)',
-              ),
-            );
+            reject(new Error('this does not look like a Digimon World 4 disc (missing NDMW.AFS)'));
           } else if (done === total) {
             clearInterval(timer);
             resolve();

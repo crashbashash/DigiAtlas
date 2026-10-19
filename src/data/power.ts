@@ -1,4 +1,4 @@
-import type { PowerSpell } from './types';
+import type { Manifest, PowerSpell } from './types';
 
 /** Retail player-cast rules. Restrict inputs to ordinary game stat/skill values. */
 export function validPowerStat(value: number): boolean {
@@ -22,6 +22,11 @@ export function powerDownChance(force: number, spirit: number): number | null {
   return Math.min(100, Math.max(0, Math.floor((100 * a) / spirit) / 10));
 }
 
-export function durationText(frames: number): string {
-  return `${(frames / 60).toFixed(2)} s`;
+export function gameFrameRate(manifest: Pick<Manifest, 'region' | 'framesPerSecond'>): 50 | 60 {
+  if (manifest.framesPerSecond) return manifest.framesPerSecond;
+  return ['europe', 'pal'].includes(manifest.region.toLowerCase()) ? 50 : 60;
+}
+
+export function durationText(frames: number, framesPerSecond = 60): string {
+  return `${(frames / framesPerSecond).toFixed(2)} s`;
 }

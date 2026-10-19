@@ -40,6 +40,7 @@ describe('retail weapon damage', () => {
     })!;
     expect(r.base).toBe(100);
     expect(r.elementChance).toBe(49.9);
+    expect(r.elementBonus).toBe(50);
     expect([r.normal.min, r.normal.max]).toEqual([95, 157]);
     expect(r.normal.mean).toBeCloseTo(
       damageSpread(100).mean * 0.501 + damageSpread(150).mean * 0.499,
@@ -50,6 +51,7 @@ describe('retail weapon damage', () => {
     for (const resistance of [999, 1000, 1500, 32767]) {
       const r = weaponDamage({ ...input, element: 'fire', resistance })!;
       expect(r.elementChance).toBe(0);
+      expect(r.elementBonus).toBe(0);
       expect(r.normal).toEqual(weaponDamage(input)!.normal);
     }
   });

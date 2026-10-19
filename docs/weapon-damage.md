@@ -5,9 +5,12 @@ weapon attack hit chance, normal/critical damage ranges, elemental bonus rolls,
 average damage per landed hit, and average per normal attack input including misses.
 The home card and calculator index link to it.
 
-Manual inputs are total Strength and Speed, weapon skill, weapon accuracy,
-and effective target defense/Speed/resistance. Critical chance and attack element
-are derived from the selected equipment.
+Character Strength and Speed are derived from Digimon, level, XData power and
+equipment. Learned weapon skill is editable; accuracy, critical chance and attack
+element come from equipment. Target stats always come from the enemy list and
+selected variant. Defense, Speed and all four elemental resistances are shown
+as read-only values, with the active medal’s resistance highlighted. An elemental
+PWR result shows bonus chance and extra damage; all ranges and averages include it.
 Enemy selection uses exact stat variants on the selected difficulty; View spawns
 lists only that row. Imported enemy stats assume no temporary defense/Speed debuff.
 The hit roll assumes attack geometry reaches the target. Move-specific script
@@ -21,12 +24,12 @@ only when SHUSEINOURYOKU is TSUYOSA. Core and armor-pocket Strength values are n
 applied: retail's field-specific consumers exclude them. The base stat is capped
 before equipment; the final stat clamps to 1–9999, matching the recovered calculator.
 Only equipment references contribute; inventory, bank and spare weapon sockets do
-not. The equipment editor uses Weapon, Board and Sub board tabs and offers only
-bonuses that affect attack damage or accuracy. Weapon chips can contribute
-Strength, critical rate, element and Speed. Board chips and cores contribute only
-Speed to these calculations. Sub boards can contribute Strength and Speed;
-rarity adds to the matching main attribute. Other choices are filtered out, while
-currently loaded equipment remains visible so it can be removed. The full saved
+not. The equipment editor uses Weapon, Core and Sub board tabs and offers all
+identified weapons, cores, sub boards and compatible chips, regardless of whether
+their stats affect the calculator. Rarity can be selected for each equipment type.
+Weapon chips can contribute Strength, critical rate, element and Speed. Core
+chips and cores contribute Speed to attack calculations. Sub boards can contribute
+Strength and Speed; rarity adds to the matching main attribute. The full saved
 loadout stays intact when switching tabs or changing another slot.
 
 Speed is reconstructed from DEX_INI/DEX_GROW, BASE_UPCNT[species*11+6], all five
@@ -187,3 +190,7 @@ text filter; short lists retain the same menu styling. Arrow keys navigate
 options, buttons support ordinary keyboard activation, and Escape/light-dismiss
 use the browser popover behavior. Selection always calls the existing state
 handlers, including the one-PWR-element restriction and equipped weapon's skill.
+
+The chip picker offers all identified, equippable chips regardless of whether their
+stats affect this calculator. Weapon/core restrictions and the one-elemental-PWR
+rule still apply.

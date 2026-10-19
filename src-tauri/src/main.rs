@@ -19,6 +19,7 @@ use tauri_plugin_dialog::DialogExt;
 
 /// The name the importer writes into `manifest.exporter.name`.
 const IMPORTER_NAME: &str = "digiatlas-importer";
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Where the imported disc lives: the app keeps its own copy, so the ISO can be moved or deleted
 /// after the import. `importing` is set while an import runs (one at a time).
@@ -28,7 +29,8 @@ struct Cache {
 }
 
 impl Cache {
-    /// `<app data>/data/ps2-usa` (one folder per platform and region the importer reads).
+    /// Retain the original `ps2-usa` cache path for existing installations; the manifest
+    /// identifies the imported platform and release.
     fn new(app_data: &Path) -> Self {
         Cache { dir: app_data.join("data").join("ps2-usa"), importing: Arc::new(AtomicBool::new(false)) }
     }
@@ -66,6 +68,9 @@ fn cache_state(dir: &Path) -> CacheState {
     let exporter = &manifest["exporter"];
     if exporter["name"] != IMPORTER_NAME || exporter["version"] != importer::IMPORTER_VERSION {
         return stale("DigiAtlas has been updated since your disc was imported.");
+    }
+    if exporter["appVersion"] != APP_VERSION {
+        return stale("A new version of DigiAtlas is installed. Reload your disc data to continue.");
     }
     CacheState::Ready
 }
@@ -112,7 +117,13 @@ fn import_into(iso: &Path, dir: &Path, progress: &mut dyn FnMut(importer::Progre
     fs::create_dir_all(&fresh).map_err(|e| format!("{}: {e}", fresh.display()))?;
     let result = catch_unwind(AssertUnwindSafe(|| importer::export(iso, &fresh, true, progress)));
     let outcome = match result {
-        Ok(Ok(_)) => install(&fresh, dir).map_err(|e| format!("Could not store the imported data: {e}")),
+        Ok(Ok(mut manifest)) => {
+            manifest["exporter"]["appVersion"] = APP_VERSION.into();
+            let stamp = serde_json::to_vec_pretty(&manifest)
+                .map_err(|e| e.to_string())
+                .and_then(|bytes| fs::write(fresh.join("manifest.json"), bytes).map_err(|e| e.to_string()));
+            stamp.and_then(|_| install(&fresh, dir).map_err(|e| format!("Could not store the imported data: {e}")))
+        }
         Ok(Err(e)) => Err(e.to_string()),
         Err(panic) => {
             let detail = panic
@@ -185,8 +196,11 @@ async fn choose_disc_image(window: tauri::Window) -> Result<Option<String>, Stri
             .dialog()
             .file()
             .set_parent(&window)
-            .set_title("Choose your Digimon World 4 disc image (USA, PS2)")
-            .add_filter("Disc images (.iso)", &["iso", "ISO"])
+            .set_title("Choose your Digimon World 4 disc image (PS2 or GameCube)")
+            .add_filter(
+                "Disc images",
+                &["iso", "ISO", "gcm", "GCM", "rvz", "RVZ", "wia", "WIA", "gcz", "GCZ", "ciso", "CISO"],
+            )
             .add_filter("All files", &["*"])
             .blocking_pick_file()
             .map(|p| p.into_path().map(|p| p.to_string_lossy().into_owned()).map_err(|e| e.to_string()))
@@ -329,7 +343,7 @@ mod tests {
 
     fn write_manifest(dir: &Path, name: &str, version: &str) {
         fs::create_dir_all(dir).unwrap();
-        let manifest = serde_json::json!({"exporter": {"name": name, "version": version}});
+        let manifest = serde_json::json!({"exporter": {"name": name, "version": version, "appVersion": APP_VERSION}});
         fs::write(dir.join("manifest.json"), manifest.to_string()).unwrap();
     }
 
@@ -357,6 +371,24 @@ mod tests {
     #[test]
     fn a_cache_from_the_built_in_importer_is_ready() {
         let tmp = TempDir::new("ready");
+        write_manifest(&tmp.0, IMPORTER_NAME, importer::IMPORTER_VERSION);
+        assert_eq!(cache_state(&tmp.0), CacheState::Ready);
+    }
+
+    #[test]
+    fn an_app_update_requires_reloading_disc_data_even_if_the_importer_is_unchanged() {
+        let tmp = TempDir::new("app-version");
+        for app_version in [Some("0.0.0-older"), None] {
+            let mut manifest =
+                serde_json::json!({"exporter": {"name": IMPORTER_NAME, "version": importer::IMPORTER_VERSION}});
+            if let Some(version) = app_version {
+                manifest["exporter"]["appVersion"] = version.into();
+            }
+            fs::write(tmp.0.join("manifest.json"), manifest.to_string()).unwrap();
+            assert!(
+                matches!(cache_state(&tmp.0), CacheState::Stale { reason } if reason.contains("Reload your disc data"))
+            );
+        }
         write_manifest(&tmp.0, IMPORTER_NAME, importer::IMPORTER_VERSION);
         assert_eq!(cache_state(&tmp.0), CacheState::Ready);
     }

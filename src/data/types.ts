@@ -15,6 +15,7 @@ export interface Manifest {
   platform: string;
   region: string;
   serial: string | null;
+  framesPerSecond?: 50 | 60;
   counts: Record<string, number>;
   knownGaps: string[];
   mod?: {

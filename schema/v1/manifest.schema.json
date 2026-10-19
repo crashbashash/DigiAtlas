@@ -77,6 +77,10 @@
         },
         "version": {
           "type": "string"
+        },
+        "appVersion": {
+          "type": "string",
+          "description": "Desktop app version used to import this data; missing or changed versions require a new import."
         }
       }
     },
@@ -132,6 +136,14 @@
           "type": "object"
         }
       }
+    },
+    "framesPerSecond": {
+      "type": "integer",
+      "enum": [
+        50,
+        60
+      ],
+      "description": "Nominal game timer rate used to convert frame counts to seconds."
     }
   }
 }

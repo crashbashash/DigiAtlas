@@ -2,8 +2,7 @@ import { useId, useState } from 'preact/hooks';
 import {
   EQUIPMENT_RARITIES,
   equipmentRarity,
-  equipmentStats,
-  canEquipAttackChip,
+  canEquipChip,
   type EquippedItem,
   type WeaponEquipment,
 } from '../data/weapon-equipment';
@@ -16,26 +15,14 @@ import { FormulaHelp } from './FormulaHelp';
 type Group = 'weapon' | 'board' | 'sub';
 export function WeaponEquipmentEditor({
   equipment,
-  baseStrength,
-  baseSpeed,
-  onChange: applyChange,
+  onChange,
 }: {
   equipment: WeaponEquipment;
-  baseStrength: number;
-  baseSpeed: number;
-  onChange: (base: number, gear: WeaponEquipment, speed: number) => void;
+  onChange: (gear: WeaponEquipment) => void;
 }) {
   const id = useId();
   const [group, setGroup] = useState<Group>('weapon');
   const { model } = useApp();
-  const onChange = (base: number, gear: WeaponEquipment) => applyChange(base, gear, baseSpeed);
-  const totals = equipmentStats(
-    baseStrength,
-    equipment,
-    model.items,
-    model.raw.items.saveStats,
-    baseSpeed,
-  );
   const field = (
     label: string,
     category: string,
@@ -53,17 +40,8 @@ export function WeaponEquipmentEditor({
           { value: '', label: 'None' },
           ...[...model.items.entries()]
             .filter(
-              ([key, item]) =>
-                item.category === category &&
-                !item.unidentified &&
-                (category === 'weapon' ||
-                  key === value?.key ||
-                  (category === 'armor2' &&
-                    ((item.stats?.strength ?? 0) > 0 ||
-                      model.raw.items.saveStats?.strengthBoards?.includes(item.id))) ||
-                  (item.stats?.speed ?? 0) > 0 ||
-                  (category === 'armor2' &&
-                    model.raw.items.saveStats?.speedBoards?.includes(item.id))),
+              ([, item]) =>
+                item.category === category && !item.unidentified && item.name !== 'Sold Out',
             )
             .sort(([a], [b]) => model.itemLabel(a).localeCompare(model.itemLabel(b)))
             .map(([key]) => ({
@@ -73,40 +51,34 @@ export function WeaponEquipmentEditor({
             })),
         ]}
       />
-      {value &&
-        (category === 'weapon' ||
-          (category === 'armor2' &&
-            (model.raw.items.saveStats?.strengthBoards?.includes(model.items.get(value.key)!.id) ||
-              model.raw.items.saveStats?.speedBoards?.includes(
-                model.items.get(value.key)!.id,
-              )))) && (
-          <SearchPicker
-            label={`${label} rarity`}
-            value={equipmentRarity(value.revision).name}
-            closeLabel="Close rarity picker"
-            onChange={(name) =>
-              update({
-                ...value,
-                revision: EQUIPMENT_RARITIES.find((r) => r.name === name)!.minimum,
-              })
-            }
-            options={EQUIPMENT_RARITIES.map((r) => ({
-              value: r.name,
-              label: r.name,
-              content: (
-                <span class="rarity-choice">
-                  <span class="rarity-dot" style={{ background: r.color }} aria-hidden="true" />
-                  <span style={{ color: r.color }}>{r.name}</span>
-                </span>
-              ),
-            }))}
-          />
-        )}
+      {value && (
+        <SearchPicker
+          label={`${label} rarity`}
+          value={equipmentRarity(value.revision).name}
+          closeLabel="Close rarity picker"
+          onChange={(name) =>
+            update({
+              ...value,
+              revision: EQUIPMENT_RARITIES.find((r) => r.name === name)!.minimum,
+            })
+          }
+          options={EQUIPMENT_RARITIES.map((r) => ({
+            value: r.name,
+            label: r.name,
+            content: (
+              <span class="rarity-choice">
+                <span class="rarity-dot" style={{ background: r.color }} aria-hidden="true" />
+                <span style={{ color: r.color }}>{r.name}</span>
+              </span>
+            ),
+          }))}
+        />
+      )}
     </div>
   );
   const chips = (slot: 'weapon' | 'board') => {
     const key = slot === 'weapon' ? 'weaponChips' : 'boardChips';
-    const label = slot === 'weapon' ? 'Weapon' : 'Board';
+    const label = slot === 'weapon' ? 'Weapon' : 'Core';
     return (
       <section class="equipment-chips" aria-label={`${label} chips`}>
         <h3>
@@ -122,12 +94,9 @@ export function WeaponEquipmentEditor({
               label={`${label} chip ${i + 1}`}
               value={chip?.key ?? null}
               onChange={(item) => {
-                if (
-                  item &&
-                  !canEquipAttackChip(model.items.get(item)!, slot, equipment, i, model.items)
-                )
+                if (item && !canEquipChip(model.items.get(item)!, slot, equipment, i, model.items))
                   return;
-                onChange(baseStrength, {
+                onChange({
                   ...equipment,
                   [key]: equipment[key].map((c, index) =>
                     index === i ? (item ? { key: item, revision: 0 } : null) : c,
@@ -158,12 +127,12 @@ export function WeaponEquipmentEditor({
             <FormulaHelp title="Equipment bonuses">
               <p>
                 Attack Strength uses your base Strength, weapon, weapon chips and sub board.
-                Sub-board rarity adds to its matching main attribute: Strength or Speed.
+                Sub-board rarity adds to its matching main attribute: Strength, Speed or Wisdom.
               </p>
               <p>
                 Weapon accuracy comes from your weapon. Speed bonuses from any equipped slot improve
-                the hit roll. Only chips that help damage or accuracy are offered; saved equipment
-                stays visible so it can be removed.
+                the hit roll. All chips compatible with the selected slot are offered, including
+                chips that do not affect this calculator.
               </p>
               <p>
                 New rarity selections use the lowest bonus for that colour. Loaded saves keep their
@@ -181,56 +150,11 @@ export function WeaponEquipmentEditor({
             ✕
           </button>
         </header>
-        <div class="equipment-base-row">
-          <label class="power-field">
-            Strength without equipment
-            <input
-              type="number"
-              min="0"
-              max="9999"
-              step="1"
-              value={baseStrength}
-              onInput={(e) => {
-                const n = e.currentTarget.valueAsNumber;
-                if (Number.isInteger(n) && n >= 0 && n <= 9999) onChange(n, equipment);
-              }}
-            />
-          </label>
-          <label class="power-field">
-            Speed without equipment
-            <input
-              type="number"
-              min="0"
-              max="9999"
-              step="1"
-              value={baseSpeed}
-              onInput={(e) => {
-                const n = e.currentTarget.valueAsNumber;
-                if (Number.isInteger(n) && n >= 0 && n <= 9999)
-                  applyChange(baseStrength, equipment, n);
-              }}
-            />
-          </label>
-          <dl class="equipment-totals" aria-live="polite">
-            <div>
-              <dt>Total Strength</dt>
-              <dd>{totals.strength.toLocaleString('en-US')}</dd>
-            </div>
-            <div>
-              <dt>Critical chance</dt>
-              <dd>{totals.critChance}%</dd>
-            </div>
-            <div>
-              <dt>Total Speed</dt>
-              <dd>{totals.speed.toLocaleString('en-US')}</dd>
-            </div>
-          </dl>
-        </div>
         <nav class="equipment-tabs" aria-label="Equipment groups">
           {(
             [
               { id: 'weapon', label: 'Weapon' },
-              { id: 'board', label: 'Board' },
+              { id: 'board', label: 'Core' },
               { id: 'sub', label: 'Sub board' },
             ] as const
           ).map((t) => (
@@ -250,29 +174,27 @@ export function WeaponEquipmentEditor({
             group === 'weapon'
               ? 'Weapon equipment'
               : group === 'board'
-                ? 'Board equipment'
+                ? 'Core equipment'
                 : 'Sub board equipment'
           }
         >
           {group === 'weapon' && (
             <>
               {field('Weapon', 'weapon', equipment.weapon, (weapon) =>
-                onChange(baseStrength, { ...equipment, weapon }),
+                onChange({ ...equipment, weapon }),
               )}
               {chips('weapon')}
             </>
           )}
           {group === 'board' && (
             <>
-              {field('Core', 'armor1', equipment.core, (core) =>
-                onChange(baseStrength, { ...equipment, core }),
-              )}
+              {field('Core', 'armor1', equipment.core, (core) => onChange({ ...equipment, core }))}
               {chips('board')}
             </>
           )}
           {group === 'sub' &&
             field('Sub board', 'armor2', equipment.subBoard, (subBoard) =>
-              onChange(baseStrength, { ...equipment, subBoard }),
+              onChange({ ...equipment, subBoard }),
             )}
         </section>
       </div>

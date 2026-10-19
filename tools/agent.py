@@ -139,7 +139,7 @@ await window.__TAURI_INTERNALS__.invoke('agent_set_disc_image',{{path:{json.dump
 location.hash='#/'; {SETTLE}
 const reimport=[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Re-import from disc');
 if(reimport){{reimport.click(); {SETTLE}}}
-const choose=[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Load your Digimon World 4 disc image (USA, PS2)');
+const choose=[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='Load your Digimon World 4 disc image (PS2 or GameCube)');
 if(!choose)throw Error('Import screen missing');choose.click(); {SETTLE}return document.body.innerText;
 """
     else: script = args.script

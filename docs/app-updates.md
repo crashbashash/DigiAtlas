@@ -27,7 +27,12 @@ as text. The original CSP stays in force; networking happens in the native backe
 An import and an accepted update share one atomic operation gate, so the app cannot
 start an installer while disc data is being written. Saved games are only read by
 the calculators. App updates preserve the existing app identifier and data folder;
-an importer change can still require re-importing the disc.
+each installed app version requires a fresh disc import. The native import stamps
+`manifest.exporter.appVersion`. On startup, a changed or missing app-version stamp
+shows **Your data needs refreshing** and asks the user to load their disc again,
+even when the importer version is unchanged. Importer-version changes also require
+a reload. Existing data is retained until the new import succeeds; failed imports
+leave it intact.
 
 ## Release feed availability
 

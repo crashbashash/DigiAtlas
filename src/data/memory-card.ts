@@ -107,16 +107,18 @@ export function readMemoryCard(buffer: ArrayBuffer): CardSave[] {
     }
     return entries;
   }
+  const prefixes = ['BASLUS-20836', 'BESLES-53405', 'BISLPS-25453'];
   const saves: CardSave[] = [];
   for (const dir of directory(root)) {
-    if (!(dir.mode & 0x20) || !dir.name.startsWith('BASLUS-20836')) continue;
+    const prefix = prefixes.find((p) => dir.name.startsWith(p));
+    if (!(dir.mode & 0x20) || !prefix) continue;
     for (const file of directory(dir.cluster, dir.length)) {
-      if (!(file.mode & 0x10) || !file.name.startsWith('BASLUS-20836')) continue;
+      if (!(file.mode & 0x10) || !file.name.startsWith(prefix)) continue;
       if (file.length !== 81920) fail();
       saves.push({ name: dir.name, data: chain(file.cluster, file.length).buffer as ArrayBuffer });
     }
   }
   if (!saves.length)
-    throw new Error('No USA Digimon World 4 saves were found on this memory card.');
+    throw new Error('No supported Digimon World 4 saves were found on this memory card.');
   return saves;
 }

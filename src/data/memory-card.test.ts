@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readMemoryCard } from './memory-card';
 
-function fixture(ecc = false) {
+function fixture(ecc = false, prefix = 'BASLUS-20836') {
   const card = new Uint8Array(256 * 1024);
   const view = new DataView(card.buffer);
   const put = (o: number, v: number) => view.setUint32(o, v, true);
@@ -35,8 +35,8 @@ function fixture(ecc = false) {
   }
   entry(0, 0, '.', 0x8020, 4, 0);
   entry(0, 1, '..', 0x8020, 0, 0);
-  entry(1, 0, 'BASLUS-20836savedata', 0x8020, 3, 2);
-  entry(1, 1, 'BASLUS-20836savedata2', 0x8020, 3, 4);
+  entry(1, 0, `${prefix}savedata`, 0x8020, 3, 2);
+  entry(1, 1, `${prefix}savedata2`, 0x8020, 3, 4);
   link([0, 1]);
   link([2, 3]);
   link([4, 5]);
@@ -46,7 +46,7 @@ function fixture(ecc = false) {
   ]) {
     entry(dir, 0, '.', 0x8020, 3, 0);
     entry(dir, 1, '..', 0x8020, 0, 0);
-    entry(dir + 1, 0, 'BASLUS-20836savedata', 0x8010, 81920, first);
+    entry(dir + 1, 0, `${prefix}savedata`, 0x8010, 81920, first);
     const chain = Array.from({ length: 80 }, (_, i) => first + (i < 40 ? i * 2 : (i - 40) * 2 + 1));
     link(chain);
     chain.forEach((c, i) => card.fill((i + dir) & 255, (8 + c) * 1024, (9 + c) * 1024));
@@ -88,7 +88,17 @@ describe('PS2 memory-card reader', () => {
     const v = new DataView(card);
     v.setUint32(9 * 1024, 0x20, true);
     v.setUint32(9 * 1024 + 512, 0x20, true);
-    expect(() => readMemoryCard(card)).toThrow('No USA');
+    expect(() => readMemoryCard(card)).toThrow('No supported');
     expect(() => readMemoryCard(new ArrayBuffer(100))).toThrow('Choose a PS2');
   });
+});
+
+it('finds European and Japanese saves in flat and ECC memory cards', () => {
+  for (const prefix of ['BESLES-53405', 'BISLPS-25453']) {
+    for (const ecc of [false, true]) {
+      const saves = readMemoryCard(fixture(ecc, prefix));
+      expect(saves.map((s) => s.name)).toEqual([`${prefix}savedata`, `${prefix}savedata2`]);
+      expect(saves.every((s) => s.data.byteLength === 81920)).toBe(true);
+    }
+  }
 });

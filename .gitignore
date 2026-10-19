@@ -9,6 +9,19 @@ test-results/
 *.AFS
 *.afs
 *.iso
+*.gcm
+*.rvz
+*.wia
+*.gcz
+*.ciso
+*.dol
+
+# Save files and memory-card images stay private
+*.gci
+*.raw
+*.gcp
+*.ps2
+*.psu
 *.igb
 *.bin
 *.elf

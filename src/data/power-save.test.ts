@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { characterStats } from './character-stats';
 import { readPowerSave } from './power-save';
 import { equipmentStats } from './weapon-equipment';
 import { readPowerBoxes } from './power-save-file';
@@ -58,6 +59,18 @@ describe('power calculator save reader', () => {
       [0, 10, 1500, 202],
       [2, 10, 1502, 202],
     ]);
+    for (const saved of result) {
+      const derived = characterStats(
+        stats.forms[0],
+        saved.level,
+        saved.xdata,
+        saved.equipment,
+        items,
+        stats,
+      );
+      expect(derived.wisdom).toBe(saved.wisdom);
+      expect(saved.xdata.wisdom).toBe(20);
+    }
     expect(new Uint8Array(buffer)).toEqual(before);
   });
   it('only adds board revision for a matching main attribute', () => {

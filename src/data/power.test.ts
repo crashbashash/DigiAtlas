@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { powerDownChance, powerDuration } from './power';
+import { powerDownChance, powerDuration, gameFrameRate, durationText } from './power';
 import { parseHash, formatHash, DEFAULT_SETTINGS } from '../app/route';
 
 describe('player-cast power spells', () => {
@@ -41,4 +41,18 @@ describe('player-cast power spells', () => {
       settings: { difficulty: 'hard' },
     });
   });
+});
+
+it('converts all duration displays using the imported frame rate', () => {
+  for (const [region, fps] of [
+    ['usa', 60],
+    ['japan', 60],
+    ['europe', 50],
+    ['pal', 50],
+  ] as const) {
+    expect(gameFrameRate({ region })).toBe(fps);
+    expect(durationText(1800, gameFrameRate({ region }))).toBe(fps === 50 ? '36.00 s' : '30.00 s');
+  }
+  expect(gameFrameRate({ region: 'usa', framesPerSecond: 50 })).toBe(50);
+  expect(durationText(60)).toBe('1.00 s');
 });

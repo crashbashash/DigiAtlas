@@ -37,8 +37,12 @@ fn decode_tail(tail: &[u8]) -> Result<Option<Value>> {
         {
             return Err(fail());
         }
-        if value["platform"] != "ps2" || value["release"] != "SLUS_208.36" {
-            return Err(Error("Crown Mod signature does not identify a USA PS2 image".into()));
+        let ps2 =
+            value["platform"] == "ps2" && crate::regions::RELEASES.iter().any(|r| value["release"] == r.executable);
+        let gc = value["platform"] == "gc"
+            && crate::regions::GAMECUBE_RELEASES.iter().any(|r| value["release"] == r.serial[..4]);
+        if !ps2 && !gc {
+            return Err(Error("Crown Mod signature does not identify a supported PS2 or GameCube image".into()));
         }
         return Ok(Some(value));
     }
@@ -49,7 +53,13 @@ fn decode_tail(tail: &[u8]) -> Result<Option<Value>> {
 mod tests {
     use super::*;
     fn block() -> Vec<u8> {
-        let value = serde_json::json!({"formatVersion":1,"id":"dw4-crown-mod","version":"0.11.0","platform":"ps2","release":"SLUS_208.36","options":{"randomCrownColours":true}});
+        block_for("SLUS_208.36")
+    }
+    fn block_for(release: &str) -> Vec<u8> {
+        block_for_platform("ps2", release)
+    }
+    fn block_for_platform(platform: &str, release: &str) -> Vec<u8> {
+        let value = serde_json::json!({"formatVersion":1,"id":"dw4-crown-mod","version":"0.11.0","platform":platform,"release":release,"options":{"randomCrownColours":true}});
         let json = serde_json::to_vec(&value).unwrap();
         let mut b = vec![0; SIZE];
         b[..32].copy_from_slice(MAGIC);
@@ -68,6 +78,20 @@ mod tests {
         assert_eq!(value["version"], "0.11.0");
         assert_eq!(value["options"]["randomCrownColours"], true);
         assert_eq!(decode_tail(&vec![0; SIZE]).unwrap(), None);
+    }
+    #[test]
+    fn accepts_signatures_for_each_supported_ps2_release() {
+        for release in crate::regions::RELEASES {
+            assert_eq!(decode_tail(&block_for(release.executable)).unwrap().unwrap()["release"], release.executable);
+        }
+        assert!(decode_tail(&block_for("SLES_000.00")).is_err());
+    }
+    #[test]
+    fn accepts_signatures_for_supported_gamecube_releases() {
+        for release in crate::regions::GAMECUBE_RELEASES {
+            let value = decode_tail(&block_for_platform("gc", &release.serial[..4])).unwrap().unwrap();
+            assert_eq!(value["platform"], "gc");
+        }
     }
     #[test]
     fn refuses_corruption_and_unknown_formats() {

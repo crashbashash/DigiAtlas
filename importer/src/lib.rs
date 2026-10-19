@@ -1,4 +1,4 @@
-//! DigiAtlas importer: reads a Digimon World 4 (USA) PS2 disc image and writes DigiAtlas data
+//! DigiAtlas importer: reads a Digimon World 4 PS2 or GameCube disc image and writes DigiAtlas data
 //! (schema v1, see docs/schema.md). It began as a port of a Python exporter and was checked to
 //! write the same data, byte for byte and pixel for pixel; comments that mention Python explain
 //! details of the output that come from it.
@@ -9,6 +9,7 @@ pub mod pyfmt;
 pub mod afs;
 pub mod banners;
 pub mod database;
+pub mod gamecube;
 pub mod generators;
 pub mod igb;
 pub mod iso;
@@ -24,6 +25,7 @@ pub mod crown_signature;
 pub mod luadec;
 pub mod maps;
 pub mod power_spells;
+pub mod regions;
 pub mod render;
 pub mod scene;
 pub mod scripts;

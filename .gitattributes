@@ -1,0 +1,2 @@
+# Keep formatting and shell scripts consistent across Linux and Windows checkouts.
+* text=auto eol=lf

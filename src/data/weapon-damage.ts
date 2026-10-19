@@ -25,6 +25,7 @@ export interface WeaponDamageResult {
   base: number;
   criticalBonus: number;
   elementChance: number;
+  elementBonus: number;
   normal: DamageRange;
   critical: DamageRange;
   average: number;
@@ -108,6 +109,7 @@ export function weaponDamage(input: WeaponDamageInput): WeaponDamageResult | nul
     base,
     criticalBonus: bonus,
     elementChance: proc * 100,
+    elementBonus: proc > 0 ? boosted - base : 0,
     normal,
     critical,
     average: normal.mean * (1 - critChance / 100) + (critical.mean * critChance) / 100,

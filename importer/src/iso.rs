@@ -12,6 +12,9 @@ use crate::fail;
 
 pub const SECTOR: u64 = 2048;
 
+trait ReadSeek: Read + Seek {}
+impl<T: Read + Seek> ReadSeek for T {}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct IsoFile {
     pub path: String,
@@ -22,7 +25,7 @@ pub struct IsoFile {
 /// A byte range of a file (a disc image, or one file on it) read on demand.
 #[derive(Clone)]
 pub struct Source {
-    file: Rc<RefCell<File>>,
+    file: Rc<RefCell<Box<dyn ReadSeek>>>,
     path: PathBuf,
     offset: u64,
     size: u64,
@@ -30,9 +33,21 @@ pub struct Source {
 
 impl Source {
     pub fn open(path: &Path) -> Result<Source> {
-        let file = File::open(path).map_err(|e| Error(format!("{}: {e}", path.display())))?;
-        let size = file.metadata()?.len();
-        Ok(Source { file: Rc::new(RefCell::new(file)), path: path.to_owned(), offset: 0, size })
+        let mut file = File::open(path).map_err(|e| Error(format!("{}: {e}", path.display())))?;
+        let mut magic = [0u8; 4];
+        let _ = file.read(&mut magic)?;
+        file.rewind()?;
+        let (reader, size): (Box<dyn ReadSeek>, u64) =
+            if matches!(&magic, b"RVZ\x01" | b"WIA\x01" | b"CISO" | b"\x01\xc0\x0b\xb1") {
+                let disc =
+                    nod::Disc::new(path).map_err(|e| Error(format!("could not read compressed GameCube disc: {e}")))?;
+                let size = disc.disc_size();
+                (Box::new(disc), size)
+            } else {
+                let size = file.metadata()?.len();
+                (Box::new(file), size)
+            };
+        Ok(Source { file: Rc::new(RefCell::new(reader)), path: path.to_owned(), offset: 0, size })
     }
 
     /// A sub-range of this source.
@@ -45,7 +60,7 @@ impl Source {
     }
 
     pub fn read(&self, pos: u64, length: u64) -> Result<Vec<u8>> {
-        if pos + length > self.size {
+        if pos.checked_add(length).is_none_or(|end| end > self.size) {
             fail!("read {pos}+{length} outside {} (size {})", self.path.display(), self.size);
         }
         let mut file = self.file.borrow_mut();

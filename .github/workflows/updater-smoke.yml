@@ -1,0 +1,55 @@
+name: Windows updater smoke test
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: Installed release tag
+        required: true
+        default: v0.1.0
+      to:
+        description: Expected update tag
+        required: true
+        default: v0.2.0
+permissions:
+  contents: read
+jobs:
+  upgrade:
+    name: Verify public update and MSI upgrade
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.from }}
+          path: old-version
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: old-version/src-tauri
+      - run: npm ci
+        working-directory: old-version
+      - run: npm run build
+        working-directory: old-version
+      - name: Check the released updater and upgrade the installed app
+        shell: pwsh
+        env:
+          FROM_VERSION: ${{ inputs.from }}
+          TO_VERSION: ${{ inputs.to }}
+        run: |
+          ./harness/tools/test-windows-update.ps1 -SourceRoot "$env:GITHUB_WORKSPACE/old-version" -Repository "$env:GITHUB_REPOSITORY" -FromVersion "$env:FROM_VERSION" -ToVersion "$env:TO_VERSION"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: updater-smoke-results
+          path: |
+            ${{ runner.temp }}/digiatlas-update-smoke/*.log
+            ${{ runner.temp }}/digiatlas-update-smoke/result.json
+          if-no-files-found: ignore

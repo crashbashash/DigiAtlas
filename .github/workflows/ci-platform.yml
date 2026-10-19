@@ -1,0 +1,95 @@
+# Shared checks called by the separate platform workflows.
+name: Shared platform checks
+'on':
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      check_interface:
+        required: false
+        type: boolean
+        default: true
+permissions:
+  contents: read
+jobs:
+  interface:
+    name: Interface checks
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: 'false'
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+    - run: npm ci
+    - run: npm run check:format
+    - run: npm run build
+    - run: npm test
+    if: ${{ inputs.check_interface }}
+  importer:
+    name: Importer checks
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: importer
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: 'false'
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: importer
+    - run: cargo fmt --check
+      if: runner.os == 'Linux'
+    - run: cargo clippy --all-targets --locked -- -D warnings
+    - run: cargo test --locked
+  native:
+    name: Desktop build
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: 'false'
+    - name: Install Linux desktop dependencies
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev \
+          libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+    - run: npm ci
+    - run: npm run build
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src-tauri
+    - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+      if: runner.os == 'Linux'
+    - run: cargo clippy --all-targets --locked --manifest-path src-tauri/Cargo.toml -- -D warnings
+    - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+    - name: Build desktop executable
+      run: npm run tauri -- build --ci --no-bundle
+    - name: Upload desktop executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: digiatlas-${{ runner.os }}-${{ runner.arch }}
+        path: |
+          src-tauri/target/release/digiatlas
+          src-tauri/target/release/digiatlas.exe
+          src-tauri/target/release/bundle/macos/DigiAtlas.app
+        if-no-files-found: error
+        retention-days: '14'

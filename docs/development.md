@@ -76,9 +76,11 @@ The [Release workflow](../.github/workflows/release.yml) produces Windows MSI/ZI
 DEB/tarball downloads from version tags. Its commands are the reference for packaging each platform.
 See [app updates and release builds](app-updates.md) for version checks and publishing details.
 
-[CI](../.github/workflows/ci.yml) checks the interface on Linux and Windows, runs importer and native
-checks on Linux, Windows and macOS, and attaches desktop executables to successful runs.
-The main README's build badge links to these results.
+[Linux CI](../.github/workflows/ci-linux.yml) and [Windows CI](../.github/workflows/ci-windows.yml)
+run independently, each checking the interface, importer and desktop build and attaching its
+executable to successful runs. The README has a live build-status badge for each platform.
+[macOS source checks](../.github/workflows/ci-macos.yml) remain separate. These platform workflows
+reuse the [shared check definitions](../.github/workflows/ci-platform.yml).
 
 ## Imported data
 

@@ -1,0 +1,17 @@
+name: Linux build
+'on':
+  push:
+    branches:
+    - main
+  pull_request: null
+  workflow_dispatch: null
+permissions:
+  contents: read
+concurrency:
+  group: ci-linux-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    uses: ./.github/workflows/ci-platform.yml
+    with:
+      runner: ubuntu-24.04

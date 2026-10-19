@@ -1,6 +1,7 @@
 # DigiAtlas
 
-[![Build status](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci.yml)
+[![Linux build](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-linux.yml/badge.svg?branch=main&event=push)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-linux.yml)
+[![Windows build](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-windows.yml/badge.svg?branch=main&event=push)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-windows.yml)
 
 **Maps, item drops and character calculators for Digimon World 4 and Digimon World X.**
 
@@ -41,8 +42,7 @@ You will need a disc image from your own copy of the game.
 - **PS2:** `.iso`
 - **GameCube:** `.iso`, `.gcm`, NKit ISO, `.rvz`, `.wia`, `.gcz` and `.ciso`
 
-Japanese copies are titled **Digimon World X**. Signed Crown Mod images are also supported;
-DigiAtlas shows the detected mod version and uses the data from that image.
+Signed Crown Mod images are also supported; DigiAtlas shows the detected mod version and uses the data from that image.
 
 ## Getting started
 

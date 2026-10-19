@@ -1,0 +1,17 @@
+name: Windows build
+'on':
+  push:
+    branches:
+    - main
+  pull_request: null
+  workflow_dispatch: null
+permissions:
+  contents: read
+concurrency:
+  group: ci-windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    uses: ./.github/workflows/ci-platform.yml
+    with:
+      runner: windows-latest

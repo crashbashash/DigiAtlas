@@ -1,3 +1,4 @@
+import { SearchPicker } from './SearchPicker';
 import type { ComponentChildren, JSX } from 'preact';
 import { formatHash, type Route } from '../app/route';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty, type EnemyKind } from '../data/types';
@@ -62,20 +63,12 @@ export function SettingsBar(props: {
   return (
     <div class="settings">
       {props.players !== false && (
-        <label class="field">
-          <span>Players</span>
-          <select
-            value={String(settings.players)}
-            title="Spawn counts and drops depend on how many players are in the game"
-            onChange={(e) =>
-              setSettings({ players: Number((e.target as HTMLSelectElement).value) })
-            }
-          >
-            {[1, 2, 3, 4].map((n) => (
-              <option value={String(n)}>{n}</option>
-            ))}
-          </select>
-        </label>
+        <SearchPicker
+          label="Players"
+          value={String(settings.players)}
+          onChange={(value) => setSettings({ players: Number(value) })}
+          options={[1, 2, 3, 4].map((n) => ({ value: String(n), label: String(n) }))}
+        />
       )}
       {avail.length > 0 && (
         <Segmented

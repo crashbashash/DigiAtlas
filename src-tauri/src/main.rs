@@ -1,5 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(feature = "agent-control")]
+mod agent;
+mod updates;
+
 use serde::Serialize;
 use std::{
     fs,
@@ -171,6 +175,10 @@ fn data_state(cache: State<Cache>) -> CacheState {
 
 #[tauri::command]
 async fn choose_disc_image(window: tauri::Window) -> Result<Option<String>, String> {
+    #[cfg(feature = "agent-control")]
+    if let Some(path) = window.state::<agent::AgentState>().next_disc.lock().unwrap().take() {
+        return Ok(Some(path));
+    }
     // The plugin's JS open command omits a parent on Linux; set it so the portal can attach.
     tauri::async_runtime::spawn_blocking(move || {
         window
@@ -253,26 +261,50 @@ fn read_data_file(cache: State<Cache>, rel: String) -> Result<Response, String> 
 }
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .manage(updates::UpdateState::default())
         .manage(StartIso(Mutex::new(arg_after("--iso"))))
         .setup(|app| {
             let cache = Cache::new(&app.path().app_data_dir()?);
             recover(&cache.dir);
             app.manage(cache);
+            #[cfg(feature = "agent-control")]
+            {
+                app.manage(agent::AgentState::default());
+                agent::start(app.handle().clone())?;
+            }
             Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            data_state,
-            choose_disc_image,
-            import_disc,
-            read_data_file,
-            start_view,
-            start_iso,
-            open_popout
-        ])
-        .run(tauri::generate_context!())
-        .expect("Could not start DigiAtlas");
+        });
+    #[cfg(not(feature = "agent-control"))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        data_state,
+        choose_disc_image,
+        import_disc,
+        read_data_file,
+        start_view,
+        start_iso,
+        open_popout,
+        updates::check_updates,
+        updates::accept_update
+    ]);
+    #[cfg(feature = "agent-control")]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        data_state,
+        choose_disc_image,
+        import_disc,
+        read_data_file,
+        start_view,
+        start_iso,
+        open_popout,
+        updates::check_updates,
+        updates::accept_update,
+        agent::agent_reply,
+        agent::agent_read_file,
+        agent::agent_set_disc_image
+    ]);
+    builder.run(tauri::generate_context!()).expect("Could not start DigiAtlas");
 }
 
 #[cfg(test)]

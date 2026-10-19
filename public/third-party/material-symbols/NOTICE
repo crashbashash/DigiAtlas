@@ -1,0 +1,6 @@
+Google Material Symbols
+Copyright Google LLC
+https://github.com/google/material-design-icons/tree/49d4db35df873165d6bd6ba09b063c7dafbac2f4
+
+Icons: local_fire_department, ac_unit, bolt, dark_mode (outlined, 24px).
+SVG path data is bundled in src/ui/element-icons.ts. Licensed under Apache-2.0.

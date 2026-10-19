@@ -7,6 +7,10 @@ describe('routes', () => {
   it('round-trips every page', () => {
     const pages: Route[] = [
       routes.home(),
+      routes.calculators(),
+      routes.calculator('attack-damage'),
+      routes.calculator('power-up'),
+      routes.calculator('power-down'),
       routes.search('long sword', 'weapon'),
       routes.item('weapon:175'),
       routes.item('armor1:3', 'drops'),
@@ -42,6 +46,13 @@ describe('routes', () => {
   it('leaves out settings that are not written', () => {
     expect(parseHash('#/map/stag0102').settings).toEqual({});
     expect(parseHash('#/map/stag0102?d=nope&p=7').settings).toEqual({});
+  });
+
+  it('keeps old weapon damage links working after the Attack damage rename', () => {
+    expect(parseHash('#/calculators/weapon-damage?d=normal')).toEqual({
+      route: routes.calculator('attack-damage'),
+      settings: { difficulty: 'normal' },
+    });
   });
 
   it('opens old stage links on the map page', () => {

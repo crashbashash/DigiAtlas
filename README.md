@@ -8,12 +8,23 @@ the static spreadsheets with something you can click through.
 
 Early development. The PS2 exporter, the data schema and a first working viewer are in place.
 
+## App updates
+
+DigiAtlas checks for new stable versions at startup. **Check for updates** runs
+another check; release notes appear before you choose whether to update.
+Windows MSI installations download and verify the installer before launching it.
+Portable builds and Linux open the GitHub release page. See [updates and release builds](docs/app-updates.md).
+
 ## What it does
 
 The app opens on a home page with one search box over items, enemies and rooms, and entry points
 into each section. From any result you can keep going: an item's page shows its stats, every map it
 drops in (best chance first) and its trades; picking a map opens it with the droppers highlighted.
 
+- **Calculators** (`#/calculators`): [attack damage](docs/weapon-damage.md) with hit chance, normal, critical
+  and elemental ranges, automatic normal-attack hit counts and average damage including misses, plus Power Up/Down durations for every spell grade and Power Down
+  application chance against an enemy variant or entered Spirit. Enter Wisdom and Force manually,
+  or load a USA PS2 save or memory card, choose a save box, then a Digimon. See [calculation rules and save support](docs/power-calculators.md).
 - **Home:** search, "continue where you left off", the worlds, item categories and bosses.
 - **Item pages** (`#/item/weapon:175`): description and stats; **Where it drops**, ranked by chance per
   kill, each opening the map zoomed to the droppers; **Trades & appraisal**, with the traders who give or
@@ -114,3 +125,12 @@ and descriptions, 98 named stages, 81 stages of spawn generators across all thre
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+## Agent control
+
+The opt-in [direct control interface](docs/agent-control.md) can inspect the real desktop
+webview, navigate, select controls, load saves/cards and import ISOs without desktop input.
+
+Signed Crown Mod images are identified by their embedded version and options. The app
+shows the detected version and labels random crowns; older unsigned images still import
+from their actual data without claiming a mod version.

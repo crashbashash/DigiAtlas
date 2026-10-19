@@ -1,3 +1,4 @@
+import { ItemName } from './ItemName';
 import { useMemo, useRef, useState } from 'preact/hooks';
 import { formatHash, routes, type Route } from '../app/route';
 import { search, type Hit } from '../data/search';
@@ -107,7 +108,9 @@ export function SearchBox(props: {
                         onMouseEnter={() => setActive(i)}
                         onClick={() => props.onDone?.()}
                       >
-                        <span class="hit-label">{hit.label}</span>
+                        <span class="hit-label">
+                          {hit.kind === 'item' ? <ItemName itemKey={hit.id} /> : hit.label}
+                        </span>
                         <span class="muted">{hit.detail}</span>
                       </a>
                     );

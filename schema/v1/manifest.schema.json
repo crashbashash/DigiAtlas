@@ -110,6 +110,28 @@
         "type": "string"
       },
       "description": "Directories of extracted images, relative to the export directory."
+    },
+    "mod": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "id",
+        "version",
+        "options"
+      ],
+      "properties": {
+        "id": {
+          "const": "dw4-crown-mod"
+        },
+        "version": {
+          "type": "string"
+        },
+        "options": {
+          "type": "object"
+        }
+      }
     }
   }
 }

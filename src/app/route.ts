@@ -13,6 +13,8 @@ import { DIFFICULTIES, type Difficulty } from '../data/types';
  *   #/enemies?kind=boss&view=resist     the enemy table
  */
 
+export type Calculator = 'power-up' | 'power-down' | 'attack-damage';
+
 export type ItemTab = 'overview' | 'drops' | 'trades';
 export const ITEM_TABS: ItemTab[] = ['overview', 'drops', 'trades'];
 export type EnemyTab = 'overview' | 'spawns' | 'drops';
@@ -37,6 +39,8 @@ export type MapSelection =
 
 export type Route =
   | { page: 'home' }
+  | { page: 'calculators' }
+  | { page: 'calculator'; calculator: Calculator }
   | { page: 'search'; q: string; category: string | null }
   | { page: 'item'; key: string; tab: ItemTab }
   | { page: 'enemy'; name: string; tab: EnemyTab }
@@ -99,6 +103,13 @@ export function parseHash(hash: string): Location {
       route: { page: 'items', category: q.get('cat'), q: '', sort: { column: null, desc: false } },
       settings,
     };
+  }
+  if (first === 'calculators') {
+    if (second === 'weapon-damage')
+      return { route: { page: 'calculator', calculator: 'attack-damage' }, settings };
+    if (second === 'power-up' || second === 'power-down' || second === 'attack-damage')
+      return { route: { page: 'calculator', calculator: second }, settings };
+    return { route: { page: 'calculators' }, settings };
   }
   if (first === 'items')
     return {
@@ -164,6 +175,14 @@ export function formatHash(route: Route, s: Settings): string {
   switch (route.page) {
     case 'home':
       return '#/';
+    case 'calculator':
+      settingsQuery(s, q);
+      path = `calculators/${route.calculator}`;
+      break;
+    case 'calculators':
+      settingsQuery(s, q);
+      path = 'calculators';
+      break;
     case 'search':
       if (route.q) q.set('q', route.q);
       if (route.category) q.set('cat', route.category);
@@ -210,6 +229,8 @@ export function formatHash(route: Route, s: Settings): string {
 
 /** Shorthand for the common links. */
 export const routes = {
+  calculator: (calculator: Calculator): Route => ({ page: 'calculator', calculator }),
+  calculators: (): Route => ({ page: 'calculators' }),
   home: (): Route => ({ page: 'home' }),
   search: (q = '', category: string | null = null): Route => ({ page: 'search', q, category }),
   item: (key: string, tab: ItemTab = 'overview'): Route => ({ page: 'item', key, tab }),

@@ -19,8 +19,11 @@ pub mod stats;
 pub mod textures;
 
 pub mod appraisal;
+pub mod attack_profiles;
+pub mod crown_signature;
 pub mod luadec;
 pub mod maps;
+pub mod power_spells;
 pub mod render;
 pub mod scene;
 pub mod scripts;

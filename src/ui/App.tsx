@@ -6,7 +6,11 @@ import type { Model } from '../data/model';
 import { Link } from './common';
 import logoUrl from './logo.svg';
 import { AppContext, type AppServices } from './context';
+import { Calculators } from './Calculators';
+import { PowerCalculator } from './PowerCalculator';
+import { WeaponDamageCalculator } from './WeaponDamageCalculator';
 import { Home } from './Home';
+import { UpdateCenter } from './UpdateCenter';
 import { ItemPage } from './ItemPage';
 import { MapPage } from './map/MapPage';
 import { SearchBox } from './SearchBox';
@@ -19,6 +23,10 @@ function pageTitle(model: Model, route: Route): string {
   switch (route.page) {
     case 'home':
       return 'DigiAtlas';
+    case 'calculator':
+      return `${route.calculator === 'attack-damage' ? 'Attack damage' : route.calculator === 'power-up' ? 'Power Up' : 'Power Down'} · DigiAtlas`;
+    case 'calculators':
+      return 'Calculators · DigiAtlas';
     case 'search':
       return 'Search · DigiAtlas';
     case 'item':
@@ -120,14 +128,32 @@ export function App({
       ? 'items'
       : route.page === 'enemy' || route.page === 'enemies'
         ? 'enemies'
-        : route.page;
+        : route.page === 'calculator'
+          ? 'calculators'
+          : route.page;
   return (
     <AppContext.Provider value={services}>
       <div class="shell">
         <header class="app-header">
           <Link to={routes.home()} class="brand" aria-label="DigiAtlas home">
             <img src={logoUrl} alt="" width={26} height={26} />
-            DigiAtlas
+            <span class="brand-text">
+              DigiAtlas
+              {model.raw.manifest.mod && (
+                <small
+                  class="mod-badge"
+                  title={[
+                    model.raw.manifest.mod.options.betterLoot && 'Better Loot',
+                    model.raw.manifest.mod.options.fourPlayerSpawns && 'Four-player spawns',
+                    model.raw.manifest.mod.options.randomCrownColours && 'Random crown colours',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                >
+                  Crown Mod v{model.raw.manifest.mod.version}
+                </small>
+              )}
+            </span>
           </Link>
           <nav class="main-nav" aria-label="Sections">
             <Link to={routes.home()} aria-current={section === 'home' ? 'page' : undefined}>
@@ -142,14 +168,36 @@ export function App({
             <Link to={routes.enemies()} aria-current={section === 'enemies' ? 'page' : undefined}>
               Enemies
             </Link>
+            <Link
+              to={routes.calculators()}
+              aria-current={section === 'calculators' ? 'page' : undefined}
+            >
+              Calculators
+            </Link>
           </nav>
-          <button type="button" class="search-trigger" onClick={() => setSearching(true)}>
+          <UpdateCenter />
+          <button
+            type="button"
+            class="search-trigger"
+            aria-label="Search items, enemies and rooms"
+            onClick={() => setSearching(true)}
+          >
             <span>Search items, enemies, rooms</span>
             <kbd>/</kbd>
           </button>
         </header>
         <div class="content">
           {route.page === 'home' && <Home />}
+          {route.page === 'calculators' && <Calculators />}
+          {route.page === 'calculator' &&
+            (route.calculator === 'attack-damage' ? (
+              <WeaponDamageCalculator />
+            ) : (
+              <PowerCalculator
+                key={route.calculator}
+                kind={route.calculator === 'power-up' ? 'up' : 'down'}
+              />
+            ))}
           {route.page === 'search' && <SearchPage q={route.q} category={route.category} />}
           {route.page === 'item' && <ItemPage itemKey={route.key} tab={route.tab} />}
           {route.page === 'enemy' && <EnemyPage name={route.name} tab={route.tab} />}

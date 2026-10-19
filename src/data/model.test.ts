@@ -407,6 +407,32 @@ describe('Model', () => {
     expect(sources[0].generators).toEqual([0, 1, 4]);
   });
 
+  it('renders elemental chip icons as readable names and descriptions without changing imported data', () => {
+    const raw = model().raw;
+    for (const [id, glyph] of ['⊂', '⊃', '∪', '∩'].entries()) {
+      raw.items.items.push(
+        { category: 'abChip', id, name: `${glyph}PWR Medal α+30`, description: null },
+        {
+          category: 'abChip',
+          id: id + 4,
+          name: `${glyph}Resist ROM β`,
+          description: `${glyph}resistance up 120 pts.\nEquip with AB only`,
+        },
+      );
+    }
+    const m = new Model(raw);
+    for (const [id, element] of ['Fire', 'Ice', 'Thunder', 'Dark'].entries()) {
+      expect(m.itemLabel(`abChip:${id}`)).toBe(`${element} PWR Medal α+30`);
+      expect(m.itemLabel(`abChip:${id + 4}`)).toBe(`${element} Resist ROM β`);
+      expect(m.items.get(`abChip:${id + 4}`)?.description).toBe(
+        `${element} resistance up 120 pts.\nEquip with AB only`,
+      );
+    }
+    expect(raw.items.items.find((i) => i.category === 'abChip' && i.id === 0)?.name).toBe(
+      '⊂PWR Medal α+30',
+    );
+  });
+
   it('numbers items that share a name', () => {
     const raw = model().raw;
     raw.items.items.push(
@@ -435,6 +461,24 @@ describe('Model', () => {
 });
 
 describe('species', () => {
+  it('keeps spawn locations and counts specific to the selected variant', () => {
+    const m = model();
+    m.enemies.set(3, enemy(3, 'Goburimon'));
+    const variant = { ...gen('Crown', 3, undefined), count: 9 };
+    m.byId.get('stag0102')!.difficulties.hard!.generators.push(variant);
+    expect(m.rowSpawns(3, 'hard').map((s) => [s.stage.id, s.total, s.rows])).toEqual([
+      ['stag0102', 9, [3]],
+    ]);
+    expect(m.rowSpawns(1, 'hard').map((s) => [s.stage.id, s.total])).toEqual([
+      ['stag0102', 4],
+      ['dng101b1', 2],
+    ]);
+    expect(m.rowSpawns(3, 'veryhard')).toEqual([]);
+    variant.script = { status: 'none' };
+    expect(m.rowSpawns(3, 'hard')).toEqual([]);
+    expect(m.rowSpawns(3, 'hard', { players: 1, hideUnused: false })[0].total).toBe(9);
+  });
+
   it('lists the rooms an enemy spawns in, most placed first', () => {
     const spawns = model().spawnsOf('Goburimon', 'hard');
     expect(spawns.map((s) => [s.stage.id, s.spawners, s.total])).toEqual([

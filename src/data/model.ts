@@ -178,7 +178,27 @@ export class Model {
 
   constructor(readonly raw: RawData) {
     for (const e of raw.enemies.rows) this.enemies.set(e.row, e);
-    for (const i of raw.items.items) this.items.set(itemKey(i.category, i.id), i);
+    // The game's font uses these glyphs for elemental icons on ability chips.
+    // Keep imported data intact while making labels, search and descriptions readable.
+    const elements: Record<string, string> = {
+      '⊂': 'Fire',
+      '⊃': 'Ice',
+      '∪': 'Thunder',
+      '∩': 'Dark',
+    };
+    const chipText = (text: string) =>
+      text.replace(/[⊂⊃∪∩][ \t]*/g, (icon) => `${elements[icon.trim()]} `);
+    for (const i of raw.items.items) {
+      const item =
+        i.category === 'abChip'
+          ? {
+              ...i,
+              name: chipText(i.name),
+              description: i.description === null ? null : chipText(i.description),
+            }
+          : i;
+      this.items.set(itemKey(i.category, i.id), item);
+    }
     this.buildLabels();
     // Only stages that spawn something are worth browsing.
     this.stages = raw.stages.stages.filter(
@@ -534,6 +554,15 @@ export class Model {
   /** Where an enemy spawns on a difficulty, most placed first. */
   spawnsOf(name: string, d: Difficulty, scope: Scope = DEFAULT_SCOPE): SpeciesSpawn[] {
     const rows = new Set(this.speciesRows(name).map((e) => e.row));
+    return this.spawnsForRows(rows, d, scope);
+  }
+
+  /** Locations for exactly one stat variant, using the current difficulty and spawn settings. */
+  rowSpawns(row: number, d: Difficulty, scope: Scope = DEFAULT_SCOPE): SpeciesSpawn[] {
+    return this.spawnsForRows(new Set([row]), d, scope);
+  }
+
+  private spawnsForRows(rows: Set<number>, d: Difficulty, scope: Scope): SpeciesSpawn[] {
     const out: SpeciesSpawn[] = [];
     for (const stage of this.stages) {
       const hidden = this.hidden(stage, d, scope);

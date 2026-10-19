@@ -30,5 +30,5 @@ export default defineConfig({
   plugins: [exportedData()],
   server: { port: 5175, strictPort: true },
   build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },
-  test: { include: ['src/**/*.test.ts'] },
+  test: { include: ['src/**/*.test.ts', 'tests/**/*.test.js'] },
 });

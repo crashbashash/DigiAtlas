@@ -3,7 +3,9 @@ name = "digiatlas"
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
+authors = ["DigiAtlas contributors"]
 [features]
+agent-control = []
 custom-protocol = ["tauri/custom-protocol"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -13,6 +15,14 @@ tauri-plugin-dialog = { version = "2", default-features = false, features = ["xd
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 digiatlas-importer = { path = "../importer" }
+tauri-plugin-opener = "2"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+semver = "1"
+sha2 = "0.10"
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_ApplicationInstallationAndServicing", "Win32_System_SystemInformation"] }
 
 # The importer walks every byte of the disc; unoptimised it would take many minutes in debug builds.
 [profile.dev.package.digiatlas-importer]

@@ -86,10 +86,27 @@ export function Home() {
           </p>
         </section>
 
-        <section class="section-card planned">
-          <h2>Calculators</h2>
-          <p class="muted">
-            Damage, buffs and debuffs, worked out from the game's own formulas. Planned.
+        <section class="section-card">
+          <h2>
+            <Link to={routes.calculators()}>Calculators</Link>
+          </h2>
+          <p class="muted">Work out damage, spell durations and effects.</p>
+          <ul class="link-list">
+            <li>
+              <Link to={routes.calculator('attack-damage')}>Attack damage</Link>
+              <span class="muted">Damage range</span>
+            </li>
+            <li>
+              <Link to={routes.calculator('power-up')}>Power Up</Link>
+              <span class="muted">Duration</span>
+            </li>
+            <li>
+              <Link to={routes.calculator('power-down')}>Power Down</Link>
+              <span class="muted">Duration &amp; chance</span>
+            </li>
+          </ul>
+          <p class="card-more">
+            <Link to={routes.calculators()}>All calculators →</Link>
           </p>
         </section>
       </div>

@@ -1,0 +1,126 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  windows:
+    name: Windows installer and portable build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Validate version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node tools/check-release.mjs "$env:RELEASE_TAG"
+      - run: npm ci
+      - run: npm test
+      - run: npm run tauri -- build --ci --bundles msi
+      - name: Prepare update assets
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:RELEASE_TAG.Substring(1)
+          New-Item -ItemType Directory release-assets
+          $msi = @(Get-ChildItem src-tauri/target/release/bundle/msi -Filter *.msi)
+          if ($msi.Count -ne 1) { throw "Expected one MSI" }
+          Copy-Item $msi[0].FullName "release-assets/digiatlas-$version-windows-x86_64.msi"
+          Compress-Archive -Path src-tauri/target/release/digiatlas.exe,LICENSE,README.md -DestinationPath "release-assets/digiatlas-$env:RELEASE_TAG-windows-x86_64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-assets
+          path: release-assets/*
+          if-no-files-found: error
+  linux:
+    name: Linux package and portable build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Install desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+      - name: Validate version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node tools/check-release.mjs "$RELEASE_TAG"
+      - run: npm ci
+      - run: npm run check:format
+      - run: npm test
+      - run: npm run tauri -- build --ci --bundles deb
+      - name: Prepare Linux assets
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir release-assets
+          files=(src-tauri/target/release/bundle/deb/*.deb)
+          test "${#files[@]}" -eq 1
+          cp "${files[0]}" "release-assets/digiatlas-${RELEASE_TAG}-linux-x86_64.deb"
+          tar -czf "release-assets/digiatlas-${RELEASE_TAG}-linux-x86_64.tar.gz" -C src-tauri/target/release digiatlas -C "$GITHUB_WORKSPACE" LICENSE README.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-assets
+          path: release-assets/*
+          if-no-files-found: error
+  publish:
+    name: Publish complete release
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-assets'
+          merge-multiple: true
+          path: release-assets
+      - name: Verify complete asset set
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          for file in "digiatlas-${version}-windows-x86_64.msi" "digiatlas-${RELEASE_TAG}-windows-x86_64.zip" "digiatlas-${RELEASE_TAG}-linux-x86_64.deb" "digiatlas-${RELEASE_TAG}-linux-x86_64.tar.gz"; do
+            test -s "release-assets/$file"
+          done
+      - name: Upload as draft
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2, shared with Crown Mod
+        with:
+          name: DigiAtlas ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish after all assets are uploaded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

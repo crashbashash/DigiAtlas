@@ -191,3 +191,47 @@ export matched an independent live capture for all 72 generators of Abyss of Gri
 Write a reader that emits these five files with its own `platform` value. Fields that differ
 between versions (for example a drop rate changed on another platform) are separate exports, so
 two platforms can be compared by loading both.
+
+## Power calculators
+
+Importer 1.2.0 adds two blocks to `items.json`:
+
+- `powerSpells`: ten `{kind, grade, row, baseFrames}` records from `pcTech` rows 80–89.
+  `kind` is `up` or `down`; `baseFrames` comes from `TIME`, at 60 frames per second.
+- `saveStats`: sixteen `shinka` forms with `{species, name, model, wisdomInitial, wisdomGrowth}`,
+  plus `wisdomBoards` (armor2 ids whose `SHUSEINOURYOKU` is `KASHIKOSA`). Together with item
+  stats these allow a loaded save's Wisdom to be recalculated without shipping game data.
+
+Older desktop caches require re-import. Browser data without these fields still opens, with a
+re-import notice in the duration calculator.
+
+## Crown Mod identification
+
+Importer 1.3.0 reads the Crown Mod format-1 metadata footer before importing game data.
+`manifest.mod` is the checksummed metadata object for a recognized USA PS2 image, or null
+when no marker is present. It includes `id`, `formatVersion`, `version`, `platform`, `release`
+and `options`. Unknown/corrupt signature formats are reported rather than guessed.
+An unsigned modified image is still read normally; its failed vanilla anchors do not
+establish a particular mod version. For signed random-colour builds, enemy rows with the
+cosmetic marker 127 carry `crownStyle: "random"`; original `rarity` is retained as raw data.
+
+The format is specified in Crown Mod's `docs/image-signature.md`.
+
+## Weapon calculation inputs
+
+Importer 1.4.0 adds `saveStats.forms[].strengthInitial`/`strengthGrowth` from
+`STR_INI`/`STR_GROW`, `saveStats.strengthBoards` (board ids whose main upgrade
+attribute is `TSUYOSA`), and `items[].element` for recognized fire, ice, thunder
+and dark `ZOKUSEI` strings. These are used to rebuild saved weapon Strength,
+critical chance and attack element. See [weapon damage](weapon-damage.md).
+
+Importer 1.5.0 adds optional `saveStats.forms[].speedInitial`/`speedGrowth` from
+`DEX_INI`/`DEX_GROW`, plus `saveStats.speedBoards` for sub boards with SUBAYASA as
+their main attribute. Attack damage uses them to reconstruct equipped Speed for
+the hit-chance roll. These are separate from the saved Strength upgrade counter.
+
+Importer 1.6.0 adds optional `items[].normalHits` (integer 1–16). It is the
+verified number of ordinary damage-bearing phases per normal attack input,
+resolved from the weapon's sequence mapping and agreeing across all 16 character
+models. It is omitted for unverified/projectile profiles. It never multiplies
+the item's base stats or the calculator's individual normal/critical hit ranges.

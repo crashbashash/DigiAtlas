@@ -153,6 +153,19 @@
           "unidentified": {
             "const": true,
             "description": "Placeholder drop that a Digimon in the central area identifies as a random weapon, core or board."
+          },
+          "element": {
+            "enum": [
+              "fire",
+              "ice",
+              "thunder",
+              "dark"
+            ]
+          },
+          "normalHits": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
           }
         }
       }
@@ -306,6 +319,125 @@
                 "description": "Possible results by kind of unidentified item; the weights of each list add up to 10000."
               }
             }
+          }
+        }
+      }
+    },
+    "powerSpells": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "grade",
+          "row",
+          "baseFrames"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "up",
+              "down"
+            ]
+          },
+          "grade": {
+            "enum": [
+              "Petty",
+              "Mega",
+              "Giga",
+              "Terra",
+              "Infinity"
+            ]
+          },
+          "row": {
+            "type": "integer",
+            "minimum": 80,
+            "maximum": 89
+          },
+          "baseFrames": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "saveStats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "forms",
+        "wisdomBoards"
+      ],
+      "properties": {
+        "forms": {
+          "type": "array",
+          "minItems": 16,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "species",
+              "name",
+              "model",
+              "wisdomInitial",
+              "wisdomGrowth"
+            ],
+            "properties": {
+              "species": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "name": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "wisdomInitial": {
+                "type": "integer"
+              },
+              "wisdomGrowth": {
+                "type": "integer"
+              },
+              "strengthInitial": {
+                "type": "integer"
+              },
+              "strengthGrowth": {
+                "type": "integer"
+              },
+              "speedInitial": {
+                "type": "integer"
+              },
+              "speedGrowth": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "wisdomBoards": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "strengthBoards": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "speedBoards": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }

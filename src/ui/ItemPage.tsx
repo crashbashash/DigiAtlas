@@ -6,6 +6,7 @@ import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty } from '../data/types';
 import { Empty, Link, SettingsBar, settingsText } from './common';
 import { useApp } from './context';
 import { ItemLink, StatGrid } from './pieces';
+import { ItemName } from './ItemName';
 
 const exactPercent = (p: number): string => `${+p.toFixed(2)}%`;
 
@@ -49,7 +50,7 @@ export function ItemPage({ itemKey, tab }: { itemKey: string; tab: ItemTab }) {
         </nav>
         <div class="title-row">
           <h1>
-            {model.itemLabel(itemKey)}
+            <ItemName itemKey={itemKey} />
             <small>
               {categoryLabel(item.category)}
               {item.skillType ? ` · ${item.skillType}` : ''}
@@ -101,6 +102,13 @@ function Overview(props: {
   const { itemKey, maps, trades, appraisal, appraisedFrom } = props;
   const { model, settings } = useApp();
   const item = model.items.get(itemKey)!;
+  const description = ['weapon', 'armor1', 'armor2'].includes(item.category)
+    ? item.description
+        ?.split('\n')
+        .filter((line) => !/^\s*Mods:\s*$/i.test(line))
+        .join('\n')
+        .trim()
+    : item.description;
   const best = maps[0];
   const stats = Object.entries(item.stats ?? {}).map(
     ([k, v]) => [statLabel(k), v] as [string, number],
@@ -118,11 +126,7 @@ function Overview(props: {
   return (
     <div class="item-overview">
       <section class="card">
-        {item.description ? (
-          <p class="desc">{item.description}</p>
-        ) : (
-          <p class="muted">No description.</p>
-        )}
+        {description ? <p class="desc">{description}</p> : <p class="muted">No description.</p>}
         {stats.length > 0 && <StatGrid stats={stats} />}
       </section>
       <div class="summary-cards">

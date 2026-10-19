@@ -17,6 +17,11 @@ export interface Manifest {
   serial: string | null;
   counts: Record<string, number>;
   knownGaps: string[];
+  mod?: {
+    id: 'dw4-crown-mod';
+    version: string;
+    options: { fourPlayerSpawns: boolean; betterLoot: boolean; randomCrownColours: boolean };
+  } | null;
 }
 
 export type EnemyKind = 'enemy' | 'boss' | 'object';
@@ -50,7 +55,10 @@ export interface Enemy {
   };
   rates: { crit: number; paralysis: number };
   rarity: number;
+  crownStyle?: 'random';
 }
+
+export type AttackElement = 'none' | 'fire' | 'ice' | 'thunder' | 'dark';
 
 export interface Item {
   category: string;
@@ -58,6 +66,9 @@ export interface Item {
   name: string;
   description: string | null;
   skillType?: string;
+  /** Verified ordinary hit attempts per normal attack input. */
+  normalHits?: number;
+  element?: Exclude<AttackElement, 'none'>;
   unidentified?: true;
   stats?: Record<string, number>;
 }
@@ -194,7 +205,36 @@ export interface Appraisal {
 export interface RawData {
   manifest: Manifest;
   enemies: { rows: Enemy[] };
-  items: { items: Item[]; appraisal?: Appraisal };
+  items: {
+    items: Item[];
+    appraisal?: Appraisal;
+    powerSpells?: PowerSpell[];
+    saveStats?: SaveStats;
+  };
   drops: { pools: Record<string, DropPool> };
   stages: { stages: Stage[] };
+}
+
+export interface PowerSpell {
+  kind: 'up' | 'down';
+  grade: string;
+  row: number;
+  baseFrames: number;
+}
+
+export interface SaveStats {
+  forms: {
+    species: number;
+    name: string;
+    model: string;
+    wisdomInitial: number;
+    wisdomGrowth: number;
+    strengthInitial?: number;
+    strengthGrowth?: number;
+    speedInitial?: number;
+    speedGrowth?: number;
+  }[];
+  wisdomBoards: number[];
+  strengthBoards?: number[];
+  speedBoards?: number[];
 }

@@ -25,7 +25,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
 pub const STACK_SIZE: usize = 64 << 20;
 
-pub const IMPORTER_VERSION: &str = "1.1.0";
+pub const IMPORTER_VERSION: &str = "1.6.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
     "enemies[].name: Mecha Rogue names follow Wikipedia and Wikimon; object names are not in the game text",
@@ -278,6 +278,7 @@ fn write_json(path: &Path, value: &Value) -> Result<()> {
 /// Read the disc at `iso_path` and write its data into `out_dir`. Returns the manifest.
 pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut dyn FnMut(Progress)) -> Result<Value> {
     let disc = Source::open(iso_path)?;
+    let crown_mod = crate::crown_signature::read(&disc)?;
     let files = iso::list_files(&disc)?;
     for needed in REQUIRED_FILES {
         if !files.contains_key(needed) {
@@ -291,6 +292,8 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     // --- text databases (English copy) -------------------------------------------------
     progress(Progress { done: 0, total: 1, message: "Reading the game's databases".into() });
     let tables = database::read_tables(area.entry(database::DATABASE_ENTRY)?)?;
+    let power_spells = crate::power_spells::extract(&tables)?;
+    let save_stats = crate::power_spells::save_stats(&tables)?;
     let models = database::enemy_models(&tables)?;
     let flag_names = scripts::load_flag_names();
     let mut player_digimon: HashMap<String, String> = HashMap::new();
@@ -327,6 +330,9 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         rec.insert("resist".into(), Value::Object(resist));
         rec.insert("rates".into(), json!({"crit": r.crit_rate, "paralysis": r.paralysis_rate}));
         rec.insert("rarity".into(), json!(r.rarity));
+        if r.rarity == 127 && crown_mod.as_ref().is_some_and(|m| m["options"]["randomCrownColours"] == true) {
+            rec.insert("crownStyle".into(), json!("random"));
+        }
         rows.push(Value::Object(rec));
     }
     let enemies = json!({"rowCount": table.len(), "rows": rows});
@@ -334,6 +340,7 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     // --- stages, generators, drop pools --------------------------------------------------
     let manifest_bytes = src("NDMW.IGB")?.read_all()?;
     let archive_names = archive_manifest::read_names(&manifest_bytes)?;
+    let normal_hits = crate::attack_profiles::extract(&ndmw, &archive_names, &tables)?;
     let map_dir = out_dir.join("maps");
     let banner_dir = out_dir.join("banners");
     std::fs::create_dir_all(&banner_dir)?;
@@ -464,6 +471,20 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         if i.unidentified {
             rec.insert("unidentified".into(), json!(true));
         }
+        if let Some(element) = tables
+            .get(i.category)
+            .and_then(|t| t.get(i.id))
+            .and_then(|r| r.get("ZOKUSEI"))
+            .and_then(database::Cell::str)
+            .filter(|e| ["fire", "ice", "thunder", "dark"].contains(e))
+        {
+            rec.insert("element".into(), json!(element));
+        }
+        if i.category == "weapon" {
+            if let Some(hits) = normal_hits.get(&i.id) {
+                rec.insert("normalHits".into(), json!(hits));
+            }
+        }
         if let Some(skill) = i.skill_type {
             rec.insert("skillType".into(), json!(skill));
         }
@@ -491,6 +512,7 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         "platform": "ps2",
         "region": "usa",
         "serial": serial(&system_cnf),
+        "mod": crown_mod,
         "source": {
             "kind": "iso",
             "name": iso_path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
@@ -517,6 +539,8 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     std::fs::create_dir_all(out_dir)?;
     let mut items_doc = Map::new();
     items_doc.insert("items".into(), Value::Array(items));
+    items_doc.insert("powerSpells".into(), power_spells);
+    items_doc.insert("saveStats".into(), save_stats);
     if let Some(a) = appraisal_block {
         items_doc.insert("appraisal".into(), a);
     }

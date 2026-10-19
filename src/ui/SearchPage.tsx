@@ -1,3 +1,4 @@
+import { ItemName } from './ItemName';
 import { useMemo } from 'preact/hooks';
 import { routes } from '../app/route';
 import { categoryLabel } from '../data/logic';
@@ -25,7 +26,9 @@ export function SearchPage({ q, category }: { q: string; category: string | null
         <ul class="result-list">
           {hits.map((hit) => (
             <li>
-              <Link to={hitRoute(hit)}>{hit.label}</Link>
+              <Link to={hitRoute(hit)}>
+                {hit.kind === 'item' ? <ItemName itemKey={hit.id} /> : hit.label}
+              </Link>
               <span class="muted">{hit.detail}</span>
             </li>
           ))}

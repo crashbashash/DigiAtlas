@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { UpdateCenter } from './UpdateCenter';
 import type { DiscImporter, ImportProgress } from '../data/source';
 
 type Phase =
@@ -69,6 +70,7 @@ export function DiscImport(props: {
     return (
       <div class="welcome disc-import">
         <h1>DigiAtlas</h1>
+        <UpdateCenter blocked />
         <h2>Importing your disc</h2>
         <p class="muted import-file">{fileName(phase.file)}</p>
         <div
@@ -94,6 +96,7 @@ export function DiscImport(props: {
     return (
       <div class="welcome disc-import">
         <h1>DigiAtlas</h1>
+        <UpdateCenter />
         <h2>The disc could not be imported</h2>
         <p class="import-error" role="alert">
           {phase.message}
@@ -116,6 +119,7 @@ export function DiscImport(props: {
   return (
     <div class="welcome disc-import">
       <h1>DigiAtlas</h1>
+      <UpdateCenter />
       {onCancel && !stale ? (
         <>
           <h2>Import your disc again</h2>

@@ -151,6 +151,11 @@
           "partOf": {
             "type": "string",
             "description": "For a part: the display name of its boss."
+          },
+          "crownStyle": {
+            "enum": [
+              "random"
+            ]
           }
         }
       }

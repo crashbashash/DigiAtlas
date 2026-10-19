@@ -547,3 +547,44 @@ fn boss_health_bars_mark_the_boss_fights() {
     every_generator(&mut |_, g| count += g.get("bossHealthBar").is_some() as usize);
     assert!(count > 40, "{count}");
 }
+
+#[test]
+fn power_spell_data_and_save_growth() {
+    needs_disc!();
+    let data = load("items.json");
+    let spells = data["powerSpells"].as_array().unwrap();
+    assert_eq!(spells.len(), 10);
+    for tier in 0..5 {
+        assert_eq!(spells[tier]["baseFrames"], 1800 + tier * 360);
+        assert_eq!(spells[tier + 5]["baseFrames"], 1200 + tier * 360);
+        assert_eq!(spells[tier]["kind"], "up");
+        assert_eq!(spells[tier + 5]["kind"], "down");
+        assert_eq!(spells[tier]["row"], 80 + tier);
+        assert_eq!(spells[tier + 5]["row"], 85 + tier);
+    }
+    let forms = data["saveStats"]["forms"].as_array().unwrap();
+    assert_eq!(forms.len(), 16);
+    assert_eq!(forms[3]["model"], "p_dorumon");
+    assert_eq!(forms[3]["name"], "Dorumon");
+    assert!(forms.iter().all(|f| f["strengthInitial"].is_i64() && f["strengthGrowth"].is_i64()));
+    assert!(data["saveStats"]["strengthBoards"].is_array());
+    assert!(data["saveStats"]["speedBoards"].is_array());
+    assert!(forms.iter().all(|f| f["speedInitial"].is_i64() && f["speedGrowth"].is_i64()));
+    assert!(forms.iter().all(|f| f["wisdomInitial"].is_i64() && f["wisdomGrowth"].is_i64()));
+}
+
+#[test]
+fn normal_attack_counts_follow_weapon_sequence_mapping() {
+    needs_disc!();
+    let data = load("items.json");
+    let items = data["items"].as_array().unwrap();
+    let weapon = |id| items.iter().find(|i| i["category"] == "weapon" && i["id"] == id).unwrap();
+    for id in 150..=154 {
+        assert_eq!(weapon(id)["normalHits"], 2, "Dbl Rapier grade {id}");
+    }
+    assert_eq!(weapon(274)["normalHits"], 2, "Crush Arm");
+    assert_eq!(weapon(100)["normalHits"], 2, "Dbl Axe");
+    assert_eq!(weapon(0)["normalHits"], 1, "Battle Hawk");
+    assert_eq!(weapon(30)["normalHits"], 1, "War Sword");
+    assert!(weapon(264).get("normalHits").is_none(), "Unverified gun profiles must not be guessed");
+}

@@ -351,6 +351,11 @@ export class Model {
     return raw.map((g) => this.forPlayers(g, scope.players));
   }
 
+  /** Dungeon e/h/v copies contain all three data columns, but only one copy is entered per difficulty. */
+  stagesOn(d: Difficulty): Stage[] {
+    return this.stages.filter((stage) => !stage.variant || VARIANT_DIFFICULTY[stage.variant] === d);
+  }
+
   /** Difficulties a stage actually has data for. */
   available(stage: Stage): Difficulty[] {
     // A shop has no spawners, but its traders still differ by difficulty.
@@ -382,7 +387,7 @@ export class Model {
 
   private buildSources(d: Difficulty, scope: Scope): Map<string, ItemSource[]> {
     const index = new Map<string, ItemSource[]>();
-    for (const stage of this.stages) {
+    for (const stage of this.stagesOn(d)) {
       const gens = this.generators(stage, d, scope);
       // A stage's spawners often share a pool, and several stat rows can be one enemy (crown ranks);
       // collapse them to one row per stage, enemy name and chance.
@@ -575,7 +580,7 @@ export class Model {
 
   private spawnsForRows(rows: Set<number>, d: Difficulty, scope: Scope): SpeciesSpawn[] {
     const out: SpeciesSpawn[] = [];
-    for (const stage of this.stages) {
+    for (const stage of this.stagesOn(d)) {
       const hidden = this.hidden(stage, d, scope);
       const gens = this.generators(stage, d, scope).filter(
         (g, i) => rows.has(g.row) && !hidden.has(i),
@@ -645,7 +650,7 @@ export class Model {
   dropsOf(name: string, d: Difficulty, scope: Scope = DEFAULT_SCOPE): SpeciesDrop[] {
     const rows = new Set(this.speciesRows(name).map((e) => e.row));
     const byKey = new Map<string, SpeciesDrop>();
-    for (const stage of this.stages) {
+    for (const stage of this.stagesOn(d)) {
       const hidden = this.hidden(stage, d, scope);
       this.generators(stage, d, scope).forEach((g, i) => {
         if (!rows.has(g.row) || hidden.has(i)) return;

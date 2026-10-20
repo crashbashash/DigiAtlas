@@ -168,7 +168,8 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
 - Stage variants: a trailing `e`, `h` or `v` on a dungeon id is the copy the game enters on Normal, Hard and
   Very Hard. The entrance scripts branch on the game difficulty (0, 1, else) and call `funcStageChange`
   with `<id>e`, `<id>h` or `<id>v` (seen for `dngq4b1`, `dngq5b1` and `dngq2b2`; the app labels every
-  variant this way).
+  variant this way). Enemy spawn/drop lookups and item drop locations include only the copy
+  entered on the selected difficulty; ordinary stages still use their selected-difficulty data.
 - Trader Hall (`dngq5b1e/h/v`) and the Home Server lobbies have no spawners. Their maps are the largest
   terrain scene cropped to the rooms (no markers). System scenes (logo, opening) have no map.
   Stage packs are followed on disc by their own generator packs only; Trader Hall's neighbours' packs

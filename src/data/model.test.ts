@@ -576,3 +576,102 @@ describe('boss fights', () => {
     expect(model().isBossFight({ ...gen('G9', 1, undefined), bossHealthBar: true })).toBe(true);
   });
 });
+
+describe('difficulty-specific dungeon copies', () => {
+  function dungeonCopies() {
+    const raw = model().raw;
+    const copies = [
+      ['e', 'normal', 1, 900],
+      ['h', 'hard', 11, 100],
+      ['v', 'veryhard', 12, 200],
+    ] as const;
+    raw.enemies.rows.push(enemy(11, 'Goburimon'), enemy(12, 'Goburimon'));
+    raw.stages.stages = copies.map(([variant, , row, rate]) => {
+      const key = `copy-${variant}`;
+      raw.drops.pools[key] = pool(['weapon', 0, rate]);
+      const spawn = gen('Boss', row, { normal: key, hard: key, veryhard: key });
+      return {
+        ...stage(`dngq4b3${variant}`, 'Death Valley', 'Cursed Dungeon', 'dungeon', [spawn]),
+        floor: 'B3',
+        variant,
+        difficulties: {
+          normal: { generators: [spawn] },
+          hard: { generators: [spawn] },
+          veryhard: { generators: [spawn] },
+        },
+      };
+    });
+    // Ordinary rooms are shared across difficulties and must remain in the results.
+    const shared = stage('stag0102', 'Death Valley', 'Abyss of Grief', 'field', [
+      gen('Shared', 1, { normal: 'nB', hard: 'nB', veryhard: 'nB' }),
+    ]);
+    shared.difficulties.veryhard = shared.difficulties.hard;
+    raw.stages.stages.push(shared);
+    return new Model(raw);
+  }
+
+  it('filters enemy drop rooms, spawn rooms and stat variants to the copy entered on each difficulty', () => {
+    const m = dungeonCopies();
+    for (const [difficulty, variant, row, percent] of [
+      ['normal', 'e', 1, 9],
+      ['hard', 'h', 11, 1],
+      ['veryhard', 'v', 12, 2],
+    ] as const) {
+      const ids = [`dngq4b3${variant}`, 'stag0102'];
+      expect(
+        m
+          .spawnsOf('Goburimon', difficulty)
+          .map((s) => s.stage.id)
+          .sort(),
+      ).toEqual(ids);
+      expect(
+        m
+          .dropsOf('Goburimon', difficulty)[0]
+          .stages.map((s) => s.stage.id)
+          .sort(),
+      ).toEqual(ids);
+      expect(m.dropsOf('Goburimon', difficulty)[0].percent).toBe(percent);
+      expect(m.variantsOn('Goburimon', difficulty).map((e) => e.row)).toEqual([
+        ...new Set([1, row]),
+      ]);
+      expect(m.rowSpawns(row, difficulty).some((s) => s.stage.id === `dngq4b3${variant}`)).toBe(
+        true,
+      );
+    }
+    expect(m.rowSpawns(11, 'veryhard')).toEqual([]);
+    expect(m.rowSpawns(12, 'hard')).toEqual([]);
+  });
+
+  it('uses the same room filter for item sources, player counts and unused-spawner settings', () => {
+    const m = dungeonCopies();
+    for (const players of [1, 4])
+      for (const hideUnused of [true, false]) {
+        const scope = { players, hideUnused };
+        const expected = ['dngq4b3h', 'stag0102'];
+        expect(
+          m
+            .sourcesOf('weapon:0', 'hard', scope)
+            .map((s) => s.stage.id)
+            .sort(),
+        ).toEqual(expected);
+        expect(
+          m
+            .mapsFor('weapon:0', 'hard', scope)
+            .map((s) => s.stage.id)
+            .sort(),
+        ).toEqual(expected);
+        expect(
+          m
+            .spawnsOf('Goburimon', 'hard', scope)
+            .map((s) => s.stage.id)
+            .sort(),
+        ).toEqual(expected);
+        expect(
+          m
+            .dropsOf('Goburimon', 'hard', scope)[0]
+            .stages.map((s) => s.stage.id)
+            .sort(),
+        ).toEqual(expected);
+      }
+  });
+});

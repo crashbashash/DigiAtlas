@@ -119,6 +119,30 @@ fn difficulty_packs_scale_spawn_rows() {
 }
 
 #[test]
+fn immediate_pickup_effects() {
+    needs_disc!();
+    let items = load("items.json");
+    let pickups: Vec<&Value> =
+        items["items"].as_array().unwrap().iter().filter(|i| i["category"] == "insItem").collect();
+    assert_eq!(pickups.len(), 26);
+    for (id, amount) in [(1, 5), (2, 20), (3, 100)] {
+        assert_eq!(pickups[id]["pickup"], json!({"attribute": "xdata", "amount": amount}));
+    }
+    for (index, attribute) in
+        ["tuyosa", "mamori", "maxhp", "maxmp", "kashikosa", "seishin", "subayasa", "fire", "ice", "thunder", "dark"]
+            .iter()
+            .enumerate()
+    {
+        for offset in 0..2 {
+            assert_eq!(
+                pickups[4 + index * 2 + offset]["pickup"],
+                json!({"attribute": attribute, "amount": offset + 1})
+            );
+        }
+    }
+}
+
+#[test]
 fn known_names() {
     needs_disc!();
     let enemies: HashMap<i64, Value> = load("enemies.json")["rows"]

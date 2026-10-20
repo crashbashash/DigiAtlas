@@ -60,7 +60,11 @@ export function search(model: Model, query: string, category: string | null = nu
   for (const [key, item] of model.items) {
     if (category && item.category !== category) continue;
     const label = model.itemLabel(key);
-    const rank = q ? matchRank(normalize(label), q) : category ? 0 : null;
+    const rank = q
+      ? (matchRank(normalize(label), q) ?? matchRank(normalize(model.itemSearchText(key)), q))
+      : category
+        ? 0
+        : null;
     // Within a category the category is a given; the weapon type or nothing says more.
     const detail = category ? (item.skillType ?? '') : categoryLabel(item.category);
     if (rank !== null)

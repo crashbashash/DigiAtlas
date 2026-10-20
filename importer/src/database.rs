@@ -224,6 +224,8 @@ pub struct Item {
     pub stats: Vec<(&'static str, Cell)>,
     pub skill_type: Option<&'static str>,
     pub unidentified: bool,
+    /// Immediate pickup effect: database attribute key and its UP value.
+    pub pickup: Option<(String, i64)>,
 }
 
 pub fn parse_items(tables: &Tables) -> Result<Vec<Item>> {
@@ -283,6 +285,14 @@ pub fn parse_items(tables: &Tables) -> Result<Vec<Item>> {
                 stats,
                 skill_type: skill,
                 unidentified,
+                pickup: if category == "insItem" {
+                    row.get("NOURYOKU")
+                        .and_then(Cell::str)
+                        .zip(row.get("UP").and_then(Cell::int))
+                        .map(|(attribute, amount)| (attribute.to_string(), amount))
+                } else {
+                    None
+                },
             });
         }
     }
@@ -349,6 +359,28 @@ mod tests {
         let stats: Vec<(&str, i64)> = hawk.stats.iter().map(|(k, v)| (*k, v.int().unwrap())).collect();
         assert_eq!(stats, [("strength", 78), ("requiredSkill", 1), ("buyPrice", 196), ("sellPrice", 49)]);
         assert_eq!(items[1].skill_type, Some("Slash"));
+    }
+
+    #[test]
+    fn reads_pickup_effects_without_assuming_retail_amounts_or_ids() {
+        let pickups = vec![
+            row(&[
+                ("NAME", Cell::Str(Some("X-Data".into()))),
+                ("NOURYOKU", Cell::Str(Some("xdata".into()))),
+                ("UP", Cell::Int(100)),
+            ]),
+            row(&[
+                ("NAME", Cell::Str(Some("∩↑Plug".into()))),
+                ("NOURYOKU", Cell::Str(Some("dark".into()))),
+                ("UP", Cell::Int(7)),
+            ]),
+            row(&[("NAME", Cell::Str(Some("Unknown".into())))]),
+        ];
+        let items = parse_items(&tables(vec![("insItem", pickups)])).unwrap();
+        assert_eq!(items[0].pickup, Some(("xdata".into(), 100)));
+        assert_eq!(items[1].pickup, Some(("dark".into(), 7)));
+        assert_eq!(items[1].name, "∩↑Plug");
+        assert_eq!(items[2].pickup, None);
     }
 
     #[test]

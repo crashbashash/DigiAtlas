@@ -44,7 +44,7 @@ export function ItemsTable(props: { category: string | null; q: string; sort: So
       if (category && item.category !== category) continue;
       const key = itemKey(item.category, item.id);
       const label = model.itemLabel(key);
-      if (query && matchRank(normalize(label), query) === null) continue;
+      if (query && matchRank(normalize(model.itemSearchText(key)), query) === null) continue;
       const maps = model.mapsFor(key, settings.difficulty, scope);
       out.push({ key, item, label, best: maps[0]?.percent ?? null, rooms: maps.length });
     }

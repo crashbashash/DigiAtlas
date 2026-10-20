@@ -433,15 +433,15 @@ describe('Model', () => {
     );
   });
 
-  it('numbers items that share a name', () => {
+  it('marks unresolved duplicate names as variants rather than collection counts', () => {
     const raw = model().raw;
     raw.items.items.push(
       { category: 'insItem', id: 1, name: 'X-Data', description: null },
       { category: 'insItem', id: 2, name: 'X-Data', description: null },
     );
     const m = new Model(raw);
-    expect(m.itemLabel('insItem:1')).toBe('X-Data (1 of 2)');
-    expect(m.itemLabel('insItem:2')).toBe('X-Data (2 of 2)');
+    expect(m.itemLabel('insItem:1')).toBe('X-Data (variant 1)');
+    expect(m.itemLabel('insItem:2')).toBe('X-Data (variant 2)');
     expect(m.itemLabel('weapon:0')).toBe('Battle Hawk α');
   });
 

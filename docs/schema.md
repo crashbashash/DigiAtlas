@@ -45,7 +45,10 @@ Players see `name`, never the internal ids.
 - **Items** (`items.json`): all 590 items with their in-game English `name` and `description`, read
   from the disc's text database (AREA.AFS entry 9, Shift-JIS). `id` is the index within its category
   and matches drop-pool entries. Slot glyphs (`∈ ∋ ∨ ∧`) are stripped from names; the X-Data item
-  (stored as a pilcrow) is written `X-Data`. The three X-Data rows share one name.
+  (stored as a pilcrow) is written `X-Data`. The three X-Data rows share one name. Immediate pickups also export `pickup.attribute`
+  and `pickup.amount` from the `insItem` database’s `NOURYOKU` and `UP` columns. The interface
+  uses these values to distinguish X-Data amounts and permanent stat buffs, preserving the original
+  name on the item page and in search. BIT’s pickup amount is determined separately by the game.
 - **Enemies** (`enemies.json`): `name` comes from a small curated table (`names/enemies.json`).
   `kind` is `enemy`, `boss`, or `object` (a destructible box, barrel or case). `model` is the engine's
   internal name, kept only for debugging and icon lookup. Each name in the table records its source:

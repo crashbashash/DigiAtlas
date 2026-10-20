@@ -8,7 +8,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   armor2: 'Board',
   abChip: 'Chip',
   conItem: 'Consumable',
-  insItem: 'Mod item',
+  insItem: 'Pickup',
   impItem: 'Key item',
 };
 export const categoryLabel = (c: string): string => CATEGORY_LABEL[c] ?? c;

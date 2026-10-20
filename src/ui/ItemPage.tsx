@@ -127,6 +127,18 @@ function Overview(props: {
     <div class="item-overview">
       <section class="card">
         {description ? <p class="desc">{description}</p> : <p class="muted">No description.</p>}
+        {model.itemOriginalName(itemKey) !== item.name && (
+          <p class="muted">In-game name: {model.itemOriginalName(itemKey)}</p>
+        )}
+        {model.itemLabel(itemKey) !== item.name && (
+          <p class="muted">
+            This item shares its name with another entry. Variant numbers distinguish entries; they
+            do not indicate strength or collection progress.
+            {item.category === 'insItem' &&
+              !item.pickup &&
+              ' Re-import your disc to show the exact pickup amounts.'}
+          </p>
+        )}
         {stats.length > 0 && <StatGrid stats={stats} />}
       </section>
       <div class="summary-cards">

@@ -1,4 +1,5 @@
 import type { DataSource } from './source';
+import { presentPickup } from './item-presentation';
 import { dropTable, isUnused, itemKey, type DropRow } from './logic';
 import type {
   DropPool,
@@ -171,6 +172,7 @@ export class Model {
   readonly enemies = new Map<number, Enemy>();
   readonly items = new Map<string, Item>();
   private readonly labels = new Map<string, string>();
+  private readonly originalNames = new Map<string, string>();
   readonly stages: Stage[];
   readonly byId = new Map<string, Stage>();
   readonly worlds: World[];
@@ -189,6 +191,7 @@ export class Model {
     const chipText = (text: string) =>
       text.replace(/[⊂⊃∪∩][ \t]*/g, (icon) => `${elements[icon.trim()]} `);
     for (const i of raw.items.items) {
+      this.originalNames.set(itemKey(i.category, i.id), i.name);
       const item =
         i.category === 'abChip'
           ? {
@@ -196,7 +199,7 @@ export class Model {
               name: chipText(i.name),
               description: i.description === null ? null : chipText(i.description),
             }
-          : i;
+          : presentPickup(i);
       this.items.set(itemKey(i.category, i.id), item);
     }
     this.buildLabels();
@@ -211,7 +214,7 @@ export class Model {
     this.worlds = this.buildWorlds();
   }
 
-  /** The game has several items with one name (three X-Data, paired plugs); number them. */
+  /** Preserve distinct records when their effects still leave them with identical labels. */
   private buildLabels(): void {
     const groups = new Map<string, string[]>();
     for (const [key, i] of this.items) {
@@ -221,13 +224,21 @@ export class Model {
     }
     for (const [name, keys] of groups) {
       keys.forEach((k, n) =>
-        this.labels.set(k, keys.length > 1 ? `${name} (${n + 1} of ${keys.length})` : name),
+        this.labels.set(k, keys.length > 1 ? `${name} (variant ${n + 1})` : name),
       );
     }
   }
 
   itemLabel(key: string): string {
     return this.labels.get(key) ?? key;
+  }
+
+  itemOriginalName(key: string): string {
+    return this.originalNames.get(key) ?? key;
+  }
+
+  itemSearchText(key: string): string {
+    return `${this.itemLabel(key)} ${this.itemOriginalName(key)}`;
   }
 
   get pools(): Record<string, DropPool> {

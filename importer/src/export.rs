@@ -25,7 +25,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
 pub const STACK_SIZE: usize = 64 << 20;
 
-pub const IMPORTER_VERSION: &str = "1.10.0";
+pub const IMPORTER_VERSION: &str = "1.11.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
     "enemies[].name: Mecha Rogue names follow Wikipedia and Wikimon; object names are not in the game text",
@@ -473,6 +473,9 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         rec.insert("id".into(), json!(i.id));
         rec.insert("name".into(), json!(i.name));
         rec.insert("description".into(), json!(i.description));
+        if let Some((attribute, amount)) = i.pickup {
+            rec.insert("pickup".into(), json!({ "attribute": attribute, "amount": amount }));
+        }
         if i.unidentified {
             rec.insert("unidentified".into(), json!(true));
         }

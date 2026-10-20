@@ -166,6 +166,24 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 16
+          },
+          "pickup": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attribute",
+              "amount"
+            ],
+            "properties": {
+              "attribute": {
+                "type": "string",
+                "description": "insItem NOURYOKU key: xdata, bit or a permanent stat attribute."
+              },
+              "amount": {
+                "type": "integer",
+                "description": "insItem UP value; BIT amount is determined separately by the game."
+              }
+            }
           }
         }
       }

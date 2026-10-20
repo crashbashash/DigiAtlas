@@ -66,6 +66,8 @@ export interface Item {
   id: number;
   name: string;
   description: string | null;
+  /** Immediate pickup effect from the disc's NOURYOKU and UP columns. */
+  pickup?: { attribute: string; amount: number };
   skillType?: string;
   /** Verified ordinary hit attempts per normal attack input. */
   normalHits?: number;

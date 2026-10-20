@@ -354,7 +354,7 @@ fn stage_maps_cover_their_spawn_points() {
     // Three stage types: field, dungeon floor and fortress room, each cropped to its spawn area.
     let ndmw = ndmw();
     let all = stages();
-    for id in ["stag0102", "dng101b1", "stagGF01"] {
+    for id in ["stag0102", "dng101b1", "stagGF01", "dng101b2", "dng308b3", "dng412b4"] {
         let st = &all[id];
         let mut points = Vec::new();
         every_generator(&mut |sid, g| {

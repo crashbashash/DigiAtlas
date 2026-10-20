@@ -23,6 +23,8 @@ const WALL: [u8; 4] = [16, 28, 50, 255];
 const BACKDROP_AREA: f64 = 0.6;
 const MAX_SIDE: f64 = 2000.0;
 const MAX_PPU: f64 = 4.0;
+const FLOOR_LOW: [u8; 3] = [166, 192, 211];
+const FLOOR_HIGH: [u8; 3] = [196, 218, 232];
 
 pub struct Raster {
     pub width: usize,
@@ -291,9 +293,125 @@ pub fn floor_mask(triangles: &[Triangle], like: &Raster, grow: f64) -> Vec<u8> {
     mask
 }
 
+/// A navigation map made only from collision floors. Higher surfaces are brighter;
+/// ramps interpolate their true height continuously, without triangle or wall outlines.
+/// A one-pixel edge stamp closes raster seams without changing the floor footprint.
+pub fn floor_silhouette(triangles: &[Triangle], roi: [f64; 4]) -> Raster {
+    let [min_x, max_x, min_z, max_z] = roi;
+    let ppu = py_min(MAX_PPU, MAX_SIDE / py_max(max_x - min_x, max_z - min_z));
+    let width = ((max_x - min_x) * ppu) as usize + 1;
+    let height = ((max_z - min_z) * ppu) as usize + 1;
+    let mut raster = Raster { width, height, pixels_per_unit: ppu, min_x, min_z, rgba: vec![0; width * height * 4] };
+    let mut heights = vec![f64::NEG_INFINITY; width * height];
+    let mut low = f64::INFINITY;
+    let mut high = f64::NEG_INFINITY;
+    for triangle in triangles {
+        if normal_y(triangle).abs() < WALL_NORMAL_Y {
+            continue;
+        }
+        for p in triangle {
+            low = low.min(p[1]);
+            high = high.max(p[1]);
+        }
+        let q = project(triangle, min_x, min_z, ppu);
+        let [(x0, z0), (x1, z1), (x2, z2)] = q;
+        let determinant = (x1 - x0) * (z2 - z0) - (x2 - x0) * (z1 - z0);
+        if determinant.abs() < 1e-9 {
+            continue;
+        }
+        let dy1 = triangle[1][1] - triangle[0][1];
+        let dy2 = triangle[2][1] - triangle[0][1];
+        let gx = (dy1 * (z2 - z0) - dy2 * (z1 - z0)) / determinant;
+        let gz = ((x1 - x0) * dy2 - (x2 - x0) * dy1) / determinant;
+        let mut paint = |x: i64, z: i64| {
+            if x < 0 || z < 0 || x >= width as i64 || z >= height as i64 {
+                return;
+            }
+            let y = triangle[0][1] + gx * (x as f64 + 0.5 - x0) + gz * (z as f64 + 0.5 - z0);
+            let index = z as usize * width + x as usize;
+            heights[index] = heights[index].max(y);
+        };
+        let left = x0.min(x1).min(x2).floor().max(0.0) as i64;
+        let right = x0.max(x1).max(x2).ceil().min(width as f64 - 1.0) as i64;
+        let top = z0.min(z1).min(z2).floor().max(0.0) as i64;
+        let bottom = z0.max(z1).max(z2).ceil().min(height as f64 - 1.0) as i64;
+        for z in top..=bottom {
+            for x in left..=right {
+                let px = x as f64 + 0.5;
+                let pz = z as f64 + 0.5;
+                let a = ((x1 - px) * (z2 - pz) - (x2 - px) * (z1 - pz)) / determinant;
+                let b = ((x2 - px) * (z0 - pz) - (x0 - px) * (z2 - pz)) / determinant;
+                if a >= -1e-9 && b >= -1e-9 && a + b <= 1.0 + 1e-9 {
+                    paint(x, z);
+                }
+            }
+        }
+        // Match floor_mask's one-pixel seam closure, including inverted triangle winding.
+        for (a, b) in [(0, 1), (1, 2), (2, 0)] {
+            for (x, z) in line_points(q[a], q[b]) {
+                for (dx, dz) in [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)] {
+                    paint(x + dx, z + dz);
+                }
+            }
+        }
+    }
+    for (pixel, y) in raster.rgba.as_chunks_mut::<4>().0.iter_mut().zip(heights) {
+        if !y.is_finite() {
+            continue;
+        }
+        let amount = if high > low { ((y - low) / (high - low)).clamp(0.0, 1.0) } else { 1.0 };
+        for channel in 0..3 {
+            pixel[channel] =
+                (FLOOR_LOW[channel] as f64 + (FLOOR_HIGH[channel] - FLOOR_LOW[channel]) as f64 * amount).round() as u8;
+        }
+        pixel[3] = 255;
+    }
+    raster
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collision_ramps_shade_continuously_and_keep_the_upper_surface() {
+        let triangles = [
+            [[10.0, 0.0, 10.0], [90.0, 80.0, 10.0], [10.0, 0.0, 90.0]],
+            [[90.0, 80.0, 10.0], [90.0, 80.0, 90.0], [10.0, 0.0, 90.0]],
+            // A lower floor overlapping the ramp must never draw over it.
+            [[10.0, -20.0, 10.0], [90.0, -20.0, 10.0], [10.0, -20.0, 90.0]],
+        ];
+        let raster = floor_silhouette(&triangles, [0.0, 100.0, 0.0, 100.0]);
+        let at = |x: f64, z: f64| {
+            let index = raster.pixel(x, z).unwrap();
+            raster.rgba[index * 4]
+        };
+        assert!(at(20.0, 20.0) < at(50.0, 20.0));
+        assert!(at(50.0, 20.0) < at(80.0, 20.0));
+        assert_eq!(at(50.0, 20.0), at(50.0, 80.0));
+        let mut reversed = triangles;
+        reversed.reverse();
+        assert_eq!(raster.rgba, floor_silhouette(&reversed, [0.0, 100.0, 0.0, 100.0]).rgba);
+        let mask = floor_mask(&triangles, &raster, 0.0);
+        assert!(raster.rgba.as_chunks::<4>().0.iter().zip(mask).all(|(p, m)| (p[3] > 0) == (m > 0)));
+    }
+
+    #[test]
+    fn collision_silhouette_fills_floors_without_wall_or_triangle_outlines() {
+        let a = [[10.0, 0.0, 10.0], [30.0, 0.0, 10.0], [10.0, 0.0, 30.0]];
+        let b = [[30.0, 0.0, 10.0], [30.0, 0.0, 30.0], [10.0, 0.0, 30.0]];
+        let wall = [[50.0, 0.0, 50.0], [80.0, 0.0, 50.0], [50.0, 100.0, 50.0]];
+        let raster = floor_silhouette(&[a, b, wall], [0.0, 100.0, 0.0, 100.0]);
+        assert!(raster.covered(20.0, 20.0));
+        assert!(raster.covered(29.0, 29.0));
+        assert!(!raster.covered(65.0, 50.0));
+        assert!(raster
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|p| *p == [0; 4] || *p == [FLOOR_HIGH[0], FLOOR_HIGH[1], FLOOR_HIGH[2], 255]));
+    }
 
     /// The set pixels of a one-byte-per-pixel image, as text rows.
     fn rows(img: &[u8], w: usize) -> Vec<String> {

@@ -123,18 +123,23 @@ Players see `name`, never the internal ids.
   bar to this spawner's enemy model (`METERCTRL ... SETMODELHP "<model>/I<n>"`). The game has no other
   boss flag; the app also counts a kill that always gives a key item (a dungeon boss's ID), which covers
   the Vine Tunnel Mecha Rogue 04, the one key-item boss without a bar.
-- **Maps** (`stages[].map`, export option `--maps`): a top-down footprint of each stage's terrain mesh,
-  written to `maps/<id>.png` (transparent where there is no geometry) with its world `bounds` and
-  `pixelsPerUnit`, so `pixel = (world - min) * pixelsPerUnit`. Image x is world x and image y is world
-  z (z grows downward); the in-game compass direction has not been checked. Floors are shaded by
-  closeness to the height where things spawn, and walls are drawn as lines. Small meshes (trees, pillars and
-  other ornaments, under 60 units across) and ground or sky planes (including grids of flat ground tiles) are left out. Where the stage has a collision mesh
-  (a small unnamed scene next to the terrain) that lies under nearly every spawn point and trader, only the terrain
-  above its floors is drawn and the image is cropped to it; otherwise the map is cropped to the spawn area plus a
-  margin. It is
-  shared by all three difficulties. `coverage` is the share of spawn points on drawn geometry (1.0 for
-  all but one stage). `fill` is the share of the image that has geometry: boss arenas, the debug and
-  practice stages and two dungeon floors are above 0.97, meaning a flat floor with little to show.
+- **Maps** (`stages[].map`, export option `--maps`): a top-down navigation footprint,
+  written to `maps/<id>.png` (transparent outside the floor) with its world `bounds` and
+  `pixelsPerUnit`, so `pixel = (world - min) * pixelsPerUnit`. Image x is world x and image y is
+  world z (z grows downward); the in-game compass direction has not been checked.
+  When an unnamed collision scene covers at least 97% of the stage's points of interest,
+  its floor triangles are drawn directly, without wall or decorative outlines. A light blue palette
+  represents relative height within the floor: higher surfaces are brighter, ramps interpolate
+  continuously, and the upper surface wins where floors overlap in the top-down projection.
+  Collision surfaces beneath stepping stones are retained; gaps can appear filled while the
+  raised platforms remain visible through height shading.
+  Candidate scenes are ranked by actual floor coverage, then triangle count; choosing only
+  the largest can select an unrelated scene (Electro Mine B4). The full collision floor bounds
+  retain empty corridors and dead ends. A one-pixel edge stamp closes raster seams.
+  Stages without a suitable collision floor retain the terrain fallback: height shading,
+  wall lines, filtering of small props/ground planes and a crop around the points of interest.
+  Maps are shared by all difficulties. `coverage` is the share of spawn points actually on
+  the rendered map, and `fill` is the share of the image containing drawn pixels.
 
 ## Not extracted yet
 

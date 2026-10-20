@@ -1,8 +1,9 @@
-//! Top-down stage maps built from each stage's own terrain geometry.
+//! Top-down stage maps built from collision floors, with terrain geometry as a fallback.
 //!
 //! A stage pack holds several scenes (terrain, props, interface, characters). The terrain scene is
 //! the large one that actually covers the places generators spawn things, so it is chosen by how
-//! many spawn points fall inside its footprint. The map is cropped to the spawn area plus a margin.
+//! many spawn points fall inside its footprint. Suitable collision floors use their full bounds;
+//! terrain fallback maps are cropped to the spawn area plus a margin.
 
 use std::collections::{HashMap, HashSet};
 
@@ -22,8 +23,6 @@ const TRIM_MARGIN: f64 = 20.0;
 const MIN_COLLISION_TRIANGLES: usize = 150;
 /// The collision mesh has under 1/8 of the visible terrain's triangles.
 const COLLISION_RATIO: usize = 8;
-/// World units the walkable area is widened by, so cliff edges are not cut.
-const WALKABLE_GROW: f64 = 6.0;
 /// Share of points that must lie on collision floor for it to be used.
 const MIN_WALKABLE_SHARE: f64 = 0.97;
 /// Flat two-triangle meshes at one height that make up a ground plane.
@@ -173,44 +172,39 @@ fn bounds(r: &Raster) -> [f64; 4] {
     [r.min_x, r.min_x + r.width as f64 / r.pixels_per_unit, r.min_z, r.min_z + r.height as f64 / r.pixels_per_unit]
 }
 
-/// The stage's collision mesh: an unnamed scene in the same pack, much smaller than the visible
-/// terrain.
-///
-/// It holds only the floors a character can stand on (and the walls around them), so it says which
-/// parts of the terrain are playable. Most stages carry one; some (arenas) do not.
-pub fn collision_scene(scenes: &[Scene], terrain: usize) -> Option<&Scene> {
+/// Choose an unnamed collision scene by actual floor coverage, rather than mesh size alone.
+/// Scenes whose floors do not cover nearly every point of interest leave the terrain fallback intact.
+/// Full floor bounds preserve corridors and dead ends without enemy spawn positions.
+pub fn collision_floor_map(scenes: &[Scene], terrain: usize, points: &[(f64, f64)]) -> Option<Raster> {
+    if points.is_empty() {
+        return None;
+    }
     let limit = scenes[terrain].triangles.len();
-    let mut best: Option<&Scene> = None;
-    for (i, s) in scenes.iter().enumerate() {
-        let scaled = s.triangles.len() * COLLISION_RATIO;
-        if i == terrain || !s.name.is_empty() || !(MIN_COLLISION_TRIANGLES <= scaled && scaled <= limit) {
+    let mut best: Option<(usize, usize, Raster)> = None;
+    for (i, scene) in scenes.iter().enumerate() {
+        let scaled = scene.triangles.len() * COLLISION_RATIO;
+        if i == terrain || !scene.name.is_empty() || !(MIN_COLLISION_TRIANGLES <= scaled && scaled <= limit) {
             continue;
         }
-        if best.is_none_or(|b| s.triangles.len() > b.triangles.len()) {
-            best = Some(s);
+        let floors: Vec<&Triangle> = scene.triangles.iter().filter(|t| render::normal_y(t).abs() >= 0.35).collect();
+        if floors.is_empty() {
+            continue;
+        }
+        let [x0, x1, z0, z1] = bbox(floors.iter().copied());
+        let raster = render::floor_silhouette(
+            &scene.triangles,
+            [x0 - TRIM_MARGIN, x1 + TRIM_MARGIN, z0 - TRIM_MARGIN, z1 + TRIM_MARGIN],
+        );
+        let covered = points.iter().filter(|&&(x, z)| raster.covered(x, z)).count();
+        if (covered as f64) < MIN_WALKABLE_SHARE * points.len() as f64 {
+            continue;
+        }
+        let key = (covered, scene.triangles.len());
+        if best.as_ref().is_none_or(|b| key > (b.0, b.1)) {
+            best = Some((covered, scene.triangles.len(), raster));
         }
     }
-    best
-}
-
-/// Clear the parts of the map that are not floor in the collision mesh; false when it does not
-/// fit.
-///
-/// The mesh is used only when it lies under nearly every point of interest, so a stage whose
-/// collision data is partial keeps its full picture rather than losing places people stand.
-pub fn walkable_only(raster: &mut Raster, collision: Option<&Scene>, points: &[(f64, f64)]) -> bool {
-    let Some(collision) = collision else { return false };
-    if points.is_empty() {
-        return false;
-    }
-    let keep = render::floor_mask(&collision.triangles, raster, WALKABLE_GROW);
-    let on_floor = points.iter().filter(|&&(x, z)| raster.kept(&keep, x, z)).count();
-    if (on_floor as f64) < MIN_WALKABLE_SHARE * points.len() as f64 {
-        return false;
-    }
-    raster.clip(&keep);
-    raster.trim(TRIM_MARGIN);
-    true
+    best.map(|(_, _, raster)| raster)
 }
 
 /// The scenes of an object pack, or None for packs that are not one (textures, scripts).
@@ -252,10 +246,11 @@ pub fn build(ndmw: &Afs, packs: &[usize], spawns: &[[f64; 3]], extra: &[(f64, f6
         0.25 * py_max([py_max(xs.clone()) - py_min(xs.clone()), py_max(zs.clone()) - py_min(zs.clone())]),
     ]);
     let roi = [py_min(xs.clone()) - pad, py_max(xs) + pad, py_min(zs.clone()) - pad, py_max(zs) + pad];
-    let parts = terrain_parts(terrain, MIN_PART_SPAN);
-    let mut raster = render::render(parts.iter().copied().flatten(), roi, Some(ys[ys.len() / 2]));
+    let raster = collision_floor_map(&scenes, s, &points).unwrap_or_else(|| {
+        let parts = terrain_parts(terrain, MIN_PART_SPAN);
+        render::render(parts.iter().copied().flatten(), roi, Some(ys[ys.len() / 2]))
+    });
     let coverage = points.iter().filter(|&&(x, z)| raster.covered(x, z)).count() as f64 / points.len() as f64;
-    walkable_only(&mut raster, collision_scene(&scenes, s), &points);
     Ok(Some(StageMap { pack, scene: terrain.name.clone(), bounds: bounds(&raster), raster, coverage }))
 }
 
@@ -309,10 +304,40 @@ fn build_empty(ndmw: &Afs, packs: &[usize], extra: &[(f64, f64)]) -> Result<Opti
             break;
         }
     }
-    let mut raster = raster.expect("at least one crop is rendered");
-    walkable_only(&mut raster, collision_scene(&scenes, s), extra);
+    let raster =
+        collision_floor_map(&scenes, s, extra).unwrap_or_else(|| raster.expect("at least one crop is rendered"));
     if raster.fill() < 0.02 {
         return Ok(None);
     }
     Ok(Some(StageMap { pack, scene: terrain.name.clone(), bounds: bounds(&raster), raster, coverage: 1.0 }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scene(name: &str, side: f64, repeats: usize) -> Scene {
+        let floor = [
+            [[0.0, 0.0, 0.0], [side, 0.0, 0.0], [0.0, 0.0, side]],
+            [[side, 0.0, 0.0], [side, 0.0, side], [0.0, 0.0, side]],
+        ];
+        Scene { index: 0, name: name.into(), triangles: floor.repeat(repeats), parts: vec![] }
+    }
+
+    #[test]
+    fn collision_selection_prioritizes_floor_coverage_over_larger_unrelated_meshes() {
+        let scenes = [scene("terrain", 200.0, 500), scene("", 10.0, 40), scene("", 100.0, 20)];
+        let raster = collision_floor_map(&scenes, 0, &[(5.0, 5.0), (75.0, 75.0)]).unwrap();
+        assert!(raster.covered(75.0, 75.0));
+        // Keep empty corridors and floor beyond the spawn area.
+        assert!(raster.covered(95.0, 95.0));
+        assert!(!raster.covered(150.0, 150.0));
+    }
+
+    #[test]
+    fn incomplete_or_named_collision_candidates_keep_the_terrain_fallback() {
+        let scenes = [scene("terrain", 200.0, 500), scene("", 10.0, 40), scene("prop", 100.0, 20)];
+        assert!(collision_floor_map(&scenes, 0, &[(5.0, 5.0), (75.0, 75.0)]).is_none());
+        assert!(collision_floor_map(&scenes, 0, &[]).is_none());
+    }
 }

@@ -1,13 +1,11 @@
 //! Top-down rasteriser for stage geometry.
 //!
-//! Floors (triangles facing up) are filled with a colour ramp, drawn lowest first so higher
-//! surfaces cover lower ones. The ramp peaks at the height where things spawn so walkable floors
-//! stand out. Steep triangles (walls) are drawn as thin edge lines on top. The background stays
-//! transparent so the app can place the map on its own theme. Image x is world x and image y is
-//! world z (z grows downward).
+//! Collision floors use a continuous height ramp, with the upper surface visible at overlaps.
+//! Optional scenery is drawn as a neutral silhouette underneath. Pixels outside geometry stay
+//! transparent so the app supplies its own background. Image x is world x and image y is world z.
 //!
-//! Python's `int()` truncates toward zero, which `as i64` matches; the order of every float
-//! operation follows the original so the pixels come out the same.
+//! The legacy `render` function retains the original terrain-and-wall rendering for comparison.
+//! Its float operation order follows the original Python implementation for matching pixels.
 
 use std::cmp::Ordering;
 
@@ -23,8 +21,9 @@ const WALL: [u8; 4] = [16, 28, 50, 255];
 const BACKDROP_AREA: f64 = 0.6;
 const MAX_SIDE: f64 = 2000.0;
 const MAX_PPU: f64 = 4.0;
-const FLOOR_LOW: [u8; 3] = [166, 192, 211];
-const FLOOR_HIGH: [u8; 3] = [196, 218, 232];
+const FLOOR_LOW: [u8; 3] = [108, 150, 182];
+const FLOOR_FLAT: [u8; 3] = [196, 218, 232];
+const FLOOR_HIGH: [u8; 3] = [218, 238, 250];
 
 pub struct Raster {
     pub width: usize,
@@ -383,6 +382,11 @@ pub fn floor_silhouette_with_cutout(triangles: &[Triangle], roi: [f64; 4], cutou
         if cutout.is_some_and(|region| region.contains(x, z, y)) {
             continue;
         }
+        if high - low < 0.5 {
+            pixel[..3].copy_from_slice(&FLOOR_FLAT);
+            pixel[3] = 255;
+            continue;
+        }
         let amount = if high > low { ((y - low) / (high - low)).clamp(0.0, 1.0) } else { 1.0 };
         for channel in 0..3 {
             pixel[channel] =
@@ -393,9 +397,97 @@ pub fn floor_silhouette_with_cutout(triangles: &[Triangle], roi: [f64; 4], cutou
     raster
 }
 
+/// Add visible scenery behind a navigation floor. Scenery is a separate neutral silhouette;
+/// it never supplies floor heights or paints over the collision floor's height colours.
+pub fn with_scenery(floor: &Raster, triangles: &[Triangle], min_height: f64) -> Raster {
+    let selected: Vec<Triangle> = triangles.iter().filter(|t| t.iter().any(|p| p[1] > min_height)).copied().collect();
+    if selected.is_empty() {
+        return Raster {
+            width: floor.width,
+            height: floor.height,
+            pixels_per_unit: floor.pixels_per_unit,
+            min_x: floor.min_x,
+            min_z: floor.min_z,
+            rgba: floor.rgba.clone(),
+        };
+    }
+    let points: Vec<_> = selected.iter().flatten().collect();
+    let roi = [
+        points.iter().map(|p| p[0]).fold(floor.min_x, f64::min) - 20.0,
+        points.iter().map(|p| p[0]).fold(floor.min_x + floor.width as f64 / floor.pixels_per_unit, f64::max) + 20.0,
+        points.iter().map(|p| p[2]).fold(floor.min_z, f64::min) - 20.0,
+        points.iter().map(|p| p[2]).fold(floor.min_z + floor.height as f64 / floor.pixels_per_unit, f64::max) + 20.0,
+    ];
+    // Project every selected face, including steep walls; use a uniform colour so mesh
+    // triangulation and decorative edges cannot create wireframe clutter.
+    let flat: Vec<_> = selected.iter().map(|t| t.map(|[x, _, z]| [x, 0.0, z])).collect();
+    let mut out = floor_silhouette(&flat, roi);
+    const SCENERY: [u8; 4] = [57, 72, 89, 255];
+    for pixel in out.rgba.as_chunks_mut::<4>().0 {
+        if pixel[3] != 0 {
+            *pixel = SCENERY;
+        }
+    }
+    for triangle in &selected {
+        let q = project(triangle, out.min_x, out.min_z, out.pixels_per_unit);
+        for (a, b) in [(0, 1), (1, 2), (2, 0)] {
+            for (x, y) in line_points(q[a], q[b]) {
+                if x >= 0 && y >= 0 && x < out.width as i64 && y < out.height as i64 {
+                    let off = (y as usize * out.width + x as usize) * 4;
+                    out.rgba[off..off + 4].copy_from_slice(&SCENERY);
+                }
+            }
+        }
+    }
+    for y in 0..out.height {
+        for x in 0..out.width {
+            let wx = out.min_x + (x as f64 + 0.5) / out.pixels_per_unit;
+            let wz = out.min_z + (y as f64 + 0.5) / out.pixels_per_unit;
+            if let Some(i) = floor.pixel(wx, wz) {
+                if floor.rgba[i * 4 + 3] != 0 {
+                    let off = (y * out.width + x) * 4;
+                    out.rgba[off..off + 4].copy_from_slice(&floor.rgba[i * 4..i * 4 + 4]);
+                }
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scenery_adds_walls_without_changing_floor_colours() {
+        let floor = floor_silhouette(
+            &[[[0.0, 10.0, 0.0], [100.0, 10.0, 0.0], [0.0, 10.0, 100.0]]],
+            [-10.0, 110.0, -10.0, 110.0],
+        );
+        let wall = [[120.0, 0.0, 0.0], [120.0, 80.0, 0.0], [120.0, 0.0, 100.0]];
+        let result = with_scenery(&floor, &[wall], 20.0);
+        let before = floor.pixel(20.0, 20.0).unwrap() * 4;
+        let after = result.pixel(20.0, 20.0).unwrap() * 4;
+        assert_eq!(&floor.rgba[before..before + 4], &result.rgba[after..after + 4]);
+        assert!(result.covered(120.0, 50.0), "vertical scenery remains visible");
+        assert!(!floor.covered(120.0, 50.0));
+        assert!(result.width <= 2001 && result.height <= 2001);
+    }
+
+    #[test]
+    fn scenery_ignores_low_water_or_backdrop_planes() {
+        let floor = floor_silhouette(
+            &[[[0.0, 10.0, 0.0], [100.0, 10.0, 0.0], [0.0, 10.0, 100.0]]],
+            [-10.0, 110.0, -10.0, 110.0],
+        );
+        let plane = [[-500.0, 0.0, -500.0], [500.0, 0.0, -500.0], [-500.0, 0.0, 500.0]];
+        let result = with_scenery(&floor, &[plane], 20.0);
+        assert_eq!(result.rgba, floor.rgba);
+        assert_eq!(
+            (result.width, result.height, result.min_x, result.min_z),
+            (floor.width, floor.height, floor.min_x, floor.min_z)
+        );
+    }
 
     #[test]
     fn floor_cutout_hides_only_the_low_surface_inside_its_bounds() {
@@ -429,6 +521,10 @@ mod tests {
             let index = raster.pixel(x, z).unwrap();
             raster.rgba[index * 4]
         };
+        assert!(
+            at(80.0, 20.0).saturating_sub(at(20.0, 20.0)) >= 50,
+            "floor heights need a clearly visible brightness difference"
+        );
         assert!(at(20.0, 20.0) < at(50.0, 20.0));
         assert!(at(50.0, 20.0) < at(80.0, 20.0));
         assert_eq!(at(50.0, 20.0), at(50.0, 80.0));
@@ -453,7 +549,7 @@ mod tests {
             .as_chunks::<4>()
             .0
             .iter()
-            .all(|p| *p == [0; 4] || *p == [FLOOR_HIGH[0], FLOOR_HIGH[1], FLOOR_HIGH[2], 255]));
+            .all(|p| *p == [0; 4] || *p == [FLOOR_FLAT[0], FLOOR_FLAT[1], FLOOR_FLAT[2], 255]));
     }
 
     /// The set pixels of a one-byte-per-pixel image, as text rows.

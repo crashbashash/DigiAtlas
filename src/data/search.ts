@@ -1,6 +1,6 @@
 import type { Model, Scope } from './model';
 import { categoryLabel } from './logic';
-import { DIFFICULTIES, type EnemyKind } from './types';
+import { DIFFICULTIES, type Difficulty, type EnemyKind } from './types';
 
 export type HitKind = 'item' | 'enemy' | 'room';
 
@@ -54,7 +54,12 @@ const byRank = (a: Hit, b: Hit) =>
  * Search everything a player can look up. With a `category`, only items of that category are
  * returned, and an empty query lists all of them.
  */
-export function search(model: Model, query: string, category: string | null = null): Results {
+export function search(
+  model: Model,
+  query: string,
+  category: string | null = null,
+  difficulty: Difficulty = 'normal',
+): Results {
   const q = normalize(query);
   const items: Hit[] = [];
   for (const [key, item] of model.items) {
@@ -115,7 +120,13 @@ export function search(model: Model, query: string, category: string | null = nu
           (matchRank(normalize(r.area), q) ?? 9) + 1,
         );
         if (rank < 9)
-          rooms.push({ kind: 'room', id: r.stages[0].id, label: r.room, detail: r.area, rank });
+          rooms.push({
+            kind: 'room',
+            id: model.stageOn(r.stages[0], difficulty).id,
+            label: r.room,
+            detail: r.area,
+            rank,
+          });
       }
     }
   }

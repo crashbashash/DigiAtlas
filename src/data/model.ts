@@ -207,7 +207,8 @@ export class Model {
     this.stages = raw.stages.stages.filter(
       (s) =>
         !DEV_STAGES.has(s.id) &&
-        (s.map !== null ||
+        ((s.services?.length ?? 0) > 0 ||
+          s.map !== null ||
           DIFFICULTIES.some((d) => (s.difficulties[d]?.generators.length ?? 0) > 0)),
     );
     for (const s of this.stages) this.byId.set(s.id, s);
@@ -354,6 +355,33 @@ export class Model {
   /** Dungeon e/h/v copies contain all three data columns, but only one copy is entered per difficulty. */
   stagesOn(d: Difficulty): Stage[] {
     return this.stages.filter((stage) => !stage.variant || VARIANT_DIFFICULTY[stage.variant] === d);
+  }
+
+  /** Choose this room's copy for a difficulty, retaining its floor when possible. */
+  stageOn(stage: Stage, d: Difficulty): Stage {
+    if (!stage.variant) return stage;
+    const copies = this.stages.filter(
+      (s) =>
+        s.area === stage.area &&
+        s.room === stage.room &&
+        s.variant &&
+        VARIANT_DIFFICULTY[s.variant] === d,
+    );
+    return copies.find((s) => s.floor === stage.floor) ?? copies[0] ?? stage;
+  }
+
+  /** The difficulty choices for a room, including its other dungeon copies. */
+  mapDifficulties(stage: Stage): Difficulty[] {
+    if (!stage.variant) return this.available(stage);
+    return DIFFICULTIES.filter((d) =>
+      this.stages.some(
+        (s) =>
+          s.area === stage.area &&
+          s.room === stage.room &&
+          s.variant &&
+          VARIANT_DIFFICULTY[s.variant] === d,
+      ),
+    );
   }
 
   /** Difficulties a stage actually has data for. */
@@ -543,9 +571,9 @@ export class Model {
     return (stage.trades ?? []).filter((t) => (t.tables[d]?.length ?? 0) > 0);
   }
 
-  /** The difficulty a shop's e/h/v copy is entered on (its tables are the ones that apply there). */
+  /** The difficulty an e/h/v dungeon copy is entered on. */
   entryDifficulty(stage: Stage): Difficulty | null {
-    return stage.variant && !this.hasSpawns(stage) ? VARIANT_DIFFICULTY[stage.variant] : null;
+    return stage.variant ? VARIANT_DIFFICULTY[stage.variant] : null;
   }
 
   /** Whether anything spawns in the room on any difficulty. */

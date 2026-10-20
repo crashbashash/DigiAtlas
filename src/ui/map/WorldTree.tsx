@@ -8,7 +8,7 @@ import { useApp } from '../context';
  * stays short. Keyboard: Up/Down move, Right opens a world, Left closes it or goes up to it.
  */
 export function WorldTree({ currentId, keep }: { currentId: string; keep: MapSelection }) {
-  const { model } = useApp();
+  const { model, settings } = useApp();
   const currentWorld = model.worlds.find((w) =>
     w.rooms.some((r) => r.stages.some((s) => s.id === currentId)),
   )?.area;
@@ -86,7 +86,12 @@ export function WorldTree({ currentId, keep }: { currentId: string; keep: MapSel
               <ul role="group">
                 {w.rooms.map((r) => {
                   const active = r.stages.some((s) => s.id === currentId);
-                  const target = active ? currentId : r.stages[0].id;
+                  const target = active
+                    ? currentId
+                    : model.stageOn(r.stages[0], settings.difficulty).id;
+                  const floors = r.stages.filter(
+                    (s) => model.stageOn(s, settings.difficulty).id === s.id,
+                  );
                   return (
                     <li
                       role="treeitem"
@@ -102,9 +107,9 @@ export function WorldTree({ currentId, keep }: { currentId: string; keep: MapSel
                       >
                         {r.room}
                       </Link>
-                      {active && r.stages.length > 1 && (
+                      {active && floors.length > 1 && (
                         <div class="floors" role="group" aria-label={`${r.room} maps`}>
-                          {r.stages.map((s) => (
+                          {floors.map((s) => (
                             <Link
                               to={routes.map(s.id, keep)}
                               class={`chip${s.id === currentId ? ' on' : ''}`}

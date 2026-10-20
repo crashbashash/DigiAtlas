@@ -137,8 +137,15 @@ Players see `name`, never the internal ids.
   Candidate scenes are ranked by actual floor coverage, then triangle count; choosing only
   the largest can select an unrelated scene (Electro Mine B4). The full collision floor bounds
   retain empty corridors and dead ends. A one-pixel edge stamp closes raster seams.
-  Stages without a suitable collision floor retain the terrain fallback: height shading,
-  wall lines, filtering of small props/ground planes and a crop around the points of interest.
+  Rooms without enemy or trader markers can also use an unnamed collision floor. Collision
+  candidates may have up to one quarter of the terrain triangle count (Mechanical Core needs
+  this allowance). Stages without a sufficiently complete collision floor use filtered terrain
+  floor triangles, with the same height palette and no wall outlines. Small props and ground
+  planes are filtered out, and the terrain fallback is cropped around points of interest.
+  Standing heights remove ceiling surfaces where this preserves at least 97% of markers;
+  moving-platform rooms retain wider terrain context when static floor geometry is incomplete.
+  New maps declare `shading: "height"` and `floorSource: "collision" | "terrain"`; older imports
+  may omit these fields. The UI shows a relative-height key only for loaded height-shaded maps.
   Maps are shared by all difficulties. `coverage` is the share of spawn points actually on
   the rendered map, and `fill` is the share of the image containing drawn pixels.
 
@@ -170,8 +177,9 @@ Anything the exporter cannot read is absent or listed in `manifest.knownGaps`, n
   with `<id>e`, `<id>h` or `<id>v` (seen for `dngq4b1`, `dngq5b1` and `dngq2b2`; the app labels every
   variant this way). Enemy spawn/drop lookups and item drop locations include only the copy
   entered on the selected difficulty; ordinary stages still use their selected-difficulty data.
-- Trader Hall (`dngq5b1e/h/v`) and the Home Server lobbies have no spawners. Their maps are the largest
-  terrain scene cropped to the rooms (no markers). System scenes (logo, opening) have no map.
+- Trader Hall (`dngq5b1e/h/v`) and the Home Server lobbies have no spawners. Their maps use
+  collision floors when available, otherwise filtered terrain floors cropped to the rooms.
+  System scenes (logo, opening) have no map.
   Stage packs are followed on disc by their own generator packs only; Trader Hall's neighbours' packs
   are not borrowed.
 - Room names, doors and icons on the maps; the maps are geometry only.
@@ -262,3 +270,24 @@ GameCube manifests use platform `gc`, serial/game ID `GDJEB2` (USA) or `GDJJB2`
 (Japan), and 60 frames per second. `source.executableSha1` fingerprints the boot DOL.
 The desktop app adds `exporter.appVersion` after a successful import and requires
 that version to match the installed app before opening cached data.
+
+## Home Server services
+
+Hub stages may include `services`: placed NPCs with stable `id`, readable `label`, NPC `name`,
+`description`, world-space `position` and `facing`. The importer follows literal dialogue-script
+calls from each placed NPC to a recognized service (saving, digivolution, banking, X-Data,
+appraisal, cards, multiplayer reception and shops). It omits ambient NPCs and unrecognized
+interactions. Repeated placements are deduplicated by model and instance; availability can
+still depend on game progress. Older imports can omit `services`.
+
+`landmarks` uses the same spatial fields for navigation markers. Numenume River's boat start
+and end come from the first and last translation keys of `r_boatz01`'s `route00` transform.
+`boatRoute` contains all world-space translation keys, joined in order for the route overlay.
+Height shading uses a wider dark-to-light palette; single-height floors retain the original
+flat-floor brightness. The app's height key uses the same palette.
+
+Numenume River additionally draws non-collision banks and walls from its visible terrain.
+These are a uniform muted-grey scenery silhouette behind the collision floors (`map.scenery`),
+with bounds expanded to include the visible river banks. Low water/backdrop planes and small
+props are omitted. Collision coverage is measured before adding scenery, and floor height
+colours are preserved. The scenery key is separate from the floor-height key.

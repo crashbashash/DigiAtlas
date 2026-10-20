@@ -24,19 +24,25 @@ function effectiveDifficulty(
 }
 
 export function MapPage(props: { stageId: string | null; selection: MapSelection; zoom: boolean }) {
-  const { model, go } = useApp();
+  const { model, settings, setSettings, go } = useApp();
   const fallback = [props.stageId, lastMap(), DEFAULT_STAGE, model.stages[0]?.id].find(
     (id): id is string => !!id && model.byId.has(id),
   );
-  const stage = fallback ? model.byId.get(fallback)! : null;
+  const stage = fallback ? model.stageOn(model.byId.get(fallback)!, settings.difficulty) : null;
 
+  // Keep single-difficulty rooms consistent too: a missing copy uses its entry difficulty.
   // An address without a (known) stage gets the one shown, so links and Back point at it. Old-style
   // links (#/stag0102?...) are rewritten to the map page's own address too.
   const legacy = !location.hash.startsWith('#/map/');
   useEffect(() => {
+    const own = stage && model.entryDifficulty(stage);
+    if (own && own !== settings.difficulty) {
+      setSettings({ difficulty: own });
+      return;
+    }
     if (stage && (props.stageId !== stage.id || legacy))
       go(routes.map(stage.id, props.selection, props.zoom), true);
-  }, [stage?.id, props.stageId, legacy]);
+  }, [stage?.id, props.stageId, legacy, settings.difficulty]);
   useEffect(() => {
     if (stage) rememberMap(stage.id);
   }, [stage?.id]);
@@ -98,13 +104,18 @@ function StageMap({
   }, [resolved, stage, d, model]);
 
   // One canvas for the life of the page; it keeps its own pan and zoom.
-  const [reveal, setReveal] = useState<{ index: number; n: number } | null>(null);
+  const [reveal, setReveal] = useState<{
+    kind: 'trader' | 'service';
+    index: number;
+    n: number;
+  } | null>(null);
   // The canvas outlives renders, so its callbacks read the current values through a ref.
   const handlers = useRef({
     select,
     selection,
     gens,
-    reveal: (index: number) => setReveal((r) => ({ index, n: (r?.n ?? 0) + 1 })),
+    service: (index: number) => setReveal((r) => ({ kind: 'service', index, n: (r?.n ?? 0) + 1 })),
+    reveal: (index: number) => setReveal((r) => ({ kind: 'trader', index, n: (r?.n ?? 0) + 1 })),
   });
   handlers.current = { ...handlers.current, select, selection, gens };
   const map = useMemo(
@@ -116,6 +127,7 @@ function StageMap({
           else if (current.kind === 'spawner' || current.kind === 'group') pick({ kind: 'none' });
         },
         onTrader: (index) => handlers.current.reveal(index),
+        onService: (index) => handlers.current.service(index),
       }),
     [model, source],
   );
@@ -151,7 +163,7 @@ function StageMap({
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const avail = model.available(stage);
+  const avail = model.mapDifficulties(stage);
   const spawns = model.hasSpawns(stage);
   const canZoom = !!(matches?.size || litPins?.size);
   // Item and enemy selections follow you from room to room; spawners belong to one stage.
@@ -170,8 +182,7 @@ function StageMap({
             {stage.area && <span class="muted">{stage.area}</span>}
           </h1>
           <SettingsBar
-            // A shop's Normal/Hard/Very Hard copies are separate rooms, picked with the floor chips.
-            difficulties={model.entryDifficulty(stage) ? [] : avail}
+            difficulties={avail}
             players={spawns}
             unused={spawns ? model.unusedCount(stage, d) : 0}
           />

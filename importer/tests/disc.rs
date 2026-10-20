@@ -354,7 +354,10 @@ fn stage_maps_cover_their_spawn_points() {
     // Three stage types: field, dungeon floor and fortress room, each cropped to its spawn area.
     let ndmw = ndmw();
     let all = stages();
-    for id in ["stag0102", "dng101b1", "stagGF01", "dng101b2", "dng308b3", "dng412b4"] {
+    for id in [
+        "stag0102", "stag0103", "dng101b1", "stagGF01", "stagGF04", "stag0203", "stag0403", "dng101b2", "dng308b3",
+        "dng412b4",
+    ] {
         let st = &all[id];
         let mut points = Vec::new();
         every_generator(&mut |sid, g| {
@@ -367,8 +370,16 @@ fn stage_maps_cover_their_spawn_points() {
         });
         let built =
             maps::build(&ndmw, id, &packs(st), &points, &[]).unwrap().unwrap_or_else(|| panic!("{id} has no map"));
-        assert!(built.coverage >= 0.95, "{id}");
+        assert!(built.coverage >= 0.95, "{id}: {}", built.coverage);
+        if id == "stag0403" {
+            assert_eq!(built.floor_source, "collision");
+        }
         assert!(built.raster.fill() > 0.0, "{id}");
+        assert_eq!(built.scenery, id == "stag0103");
+        if id == "stag0103" {
+            assert!(built.raster.covered(720.0, 365.0), "river backdrop extends beyond the collision floor");
+            assert!(!built.raster.covered(575.0, 395.0), "the decorative boat-start arrow is omitted");
+        }
         assert!(built.png().unwrap().starts_with(b"\x89PNG"));
         if id == "stag0102" {
             assert!(!built.raster.covered(-70.0, -100.0), "lower surface should be transparent");
@@ -394,10 +405,17 @@ fn shop_and_lobby_rooms_get_a_map_without_spawn_points() {
     needs_disc!();
     let ndmw = ndmw();
     let all = stages();
-    for id in ["dngq5b1e", "dngq5b1h", "dngq5b1v", "stagML11"] {
+    for id in ["dngq5b1e", "dngq5b1h", "dngq5b1v", "stagML02", "stagML11", "stagML12", "stagML13"] {
         let built =
             maps::build(&ndmw, id, &packs(&all[id]), &[], &[]).unwrap().unwrap_or_else(|| panic!("{id} has no map"));
-        assert!(built.raster.fill() < 0.9, "{id}"); // an outline, not a flat arena
+        assert!(built.raster.fill() < 0.9, "{id}"); // a floor footprint, not a flat arena
+        assert_eq!(built.floor_source, "collision", "{id}");
+    }
+    for id in ["stagIS11", "stagIS12", "stagIS13"] {
+        assert!(
+            maps::build(&ndmw, id, &packs(&all[id]), &[], &[]).unwrap().is_none(),
+            "{id} is not a playable floor map"
+        );
     }
 }
 
@@ -616,4 +634,38 @@ fn normal_attack_counts_follow_weapon_sequence_mapping() {
     assert_eq!(weapon(0)["normalHits"], 1, "Battle Hawk");
     assert_eq!(weapon(30)["normalHits"], 1, "War Sword");
     assert!(weapon(264).get("normalHits").is_none(), "Unverified gun profiles must not be guessed");
+}
+
+#[test]
+fn home_server_services_follow_the_placed_npc_dialogue() {
+    needs_disc!();
+    let all = stages();
+    for (id, expected) in [
+        ("stagML11", vec!["Multiplayer Reception"]),
+        ("stagML12", vec!["Appraiser", "Bank", "Card Keeper", "Data Keeper", "Digivolution", "Save Keeper"]),
+        ("stagML13", vec!["Ability Chip Shop", "Bank", "Core & Board Shop", "Disk Shop", "Junk Shop", "Weapon Shop"]),
+    ] {
+        let npcs = all[id]["services"].as_array().unwrap();
+        assert_eq!(npcs.iter().map(|n| n["label"].as_str().unwrap()).collect::<Vec<_>>(), expected);
+        assert!(npcs.iter().all(|n| n["position"]["x"].is_number() && n["position"]["z"].is_number()));
+    }
+    let save = all["stagML12"]["services"].as_array().unwrap().iter().find(|n| n["label"] == "Save Keeper").unwrap();
+    assert_eq!(save["position"], json!({"x":-130.0,"y":40.0,"z":-40.0}));
+}
+
+#[test]
+fn river_boat_markers_follow_the_first_and_last_route_keys() {
+    needs_disc!();
+    let all = stages();
+    let points = all["stag0103"]["landmarks"].as_array().unwrap();
+    assert_eq!(points.len(), 2);
+    let route = all["stag0103"]["boatRoute"].as_array().unwrap();
+    assert_eq!(route.len(), 46);
+    assert_eq!(route[0], json!([585.0, 15.0, 395.0]));
+    assert_eq!(route.last().unwrap()[0], points[1]["position"]["x"]);
+    assert_eq!(points[0]["label"], "Boat start");
+    assert_eq!(points[0]["position"], json!({"x":585.0,"y":15.0,"z":395.0}));
+    assert_eq!(points[1]["label"], "Boat end");
+    assert!((points[1]["position"]["x"].as_f64().unwrap() - 537.12146).abs() < 0.001);
+    assert!((points[1]["position"]["z"].as_f64().unwrap() + 153.9959).abs() < 0.001);
 }

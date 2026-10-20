@@ -698,7 +698,7 @@
               "v",
               null
             ],
-            "description": "Trailing letter on the side dungeons (dngq*); its meaning is not confirmed."
+            "description": "Dungeon entry difficulty: e = Normal, h = Hard, v = Very Hard."
           },
           "banner": {
             "type": [
@@ -707,12 +707,80 @@
             ],
             "description": "Loading-screen picture, relative to the export directory."
           },
+          "boatRoute": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "landmarks": {
+            "$ref": "#/properties/stages/items/properties/services"
+          },
+          "services": {
+            "type": "array",
+            "description": "Placed Home Server service NPCs, identified through their dialogue scripts.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "label",
+                "description",
+                "position",
+                "facing"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y",
+                    "z"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "z": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "facing": {
+                  "type": "number"
+                }
+              }
+            }
+          },
           "map": {
             "type": [
               "object",
               "null"
             ],
-            "description": "Top-down terrain map, present when the export was run with --maps and the stage has spawn points.",
+            "description": "Top-down navigation map, present when the export was run with --maps and suitable geometry is available, including rooms without spawners.",
             "additionalProperties": false,
             "required": [
               "image",
@@ -758,6 +826,17 @@
               },
               "height": {
                 "type": "integer"
+              },
+              "scenery": {
+                "type": "boolean",
+                "description": "Muted visible terrain behind the collision floor; not walkable geometry."
+              },
+              "shading": {
+                "const": "height",
+                "description": "Brighter floors are higher within this map."
+              },
+              "floorSource": {
+                "enum": ["collision", "terrain"]
               },
               "pixelsPerUnit": {
                 "type": "number",

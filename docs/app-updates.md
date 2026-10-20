@@ -51,8 +51,8 @@ Keep `package.json`, the root package version in `package-lock.json`,
 
 Pushing a `vVERSION` tag triggers `.github/workflows/release.yml`. It builds a
 Windows MSI and portable ZIP, plus Linux DEB and portable tarball. It publishes
-only after both platforms succeed and all four assets exist. GitHub generates
-the release notes; those notes are what the application displays. Release assets
+only after both platforms succeed and all four assets exist. The release body comes from
+`release-notes/vVERSION.md`; those notes are what the application displays. Release assets
 contain the application and public documentation, never imported disc data.
 MSI identity is pinned by the WiX upgrade code in `tauri.conf.json` and the native
 Windows helper. Do not change it for normal version upgrades.

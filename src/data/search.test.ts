@@ -81,6 +81,25 @@ function model(): Model {
 }
 
 describe('search', () => {
+  it('opens the matching dungeon copy for each selected difficulty', () => {
+    const raw = model().raw;
+    raw.stages.stages = (['e', 'h', 'v'] as const).map((variant) => ({
+      ...stage(`dngq8b3${variant}`, 'Death Valley', 'Cursed Dungeon'),
+      variant,
+      floor: 'B3',
+    }));
+    raw.stages.stages.push({ ...raw.stages.stages[0], id: 'dngq8b1e', floor: 'B1' });
+    const m = new Model(raw);
+    for (const [d, v] of [
+      ['normal', 'e'],
+      ['hard', 'h'],
+      ['veryhard', 'v'],
+    ] as const)
+      expect(search(m, 'Cursed Dungeon', null, d).rooms[0].id).toBe(
+        d === 'normal' ? 'dngq8b1e' : `dngq8b3${v}`,
+      );
+  });
+
   it('spells Greek tier letters in Latin', () => {
     expect(normalize('Long Sword α')).toBe('long sword a');
     expect(normalize('  HP-Disk  β ')).toBe('hp disk b');

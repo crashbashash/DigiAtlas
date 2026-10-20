@@ -129,6 +129,10 @@ export interface Generator {
 }
 
 export interface StageMap {
+  /** Absent on older imports, whose terrain shading did not represent height. */
+  shading?: 'height';
+  floorSource?: 'collision' | 'terrain';
+  scenery?: boolean;
   image: string;
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   width: number;
@@ -170,6 +174,15 @@ export interface Trader {
   tables: Partial<Record<Difficulty, Offer[]>>;
 }
 
+export interface ServiceNpc {
+  id: string;
+  name: string;
+  label: string;
+  description: string;
+  position: { x: number; y: number; z: number };
+  facing: number;
+}
+
 export interface Stage {
   id: string;
   area: string | null;
@@ -180,6 +193,9 @@ export interface Stage {
   banner: string | null;
   map: StageMap | null;
   trades: Trader[];
+  services?: ServiceNpc[];
+  landmarks?: ServiceNpc[];
+  boatRoute?: [number, number, number][];
   difficulties: Partial<Record<Difficulty, { generators: Generator[] }>>;
 }
 

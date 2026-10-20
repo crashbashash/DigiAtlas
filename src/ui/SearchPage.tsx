@@ -9,10 +9,10 @@ import { hitRoute } from './SearchBox';
 
 /** Every result for a search. Browsing a whole category is the item table's job. */
 export function SearchPage({ q, category }: { q: string; category: string | null }) {
-  const { model, go } = useApp();
+  const { model, settings, go } = useApp();
   const results = useMemo(
-    () => (q.trim() ? search(model, q, category) : null),
-    [model, q, category],
+    () => (q.trim() ? search(model, q, category, settings.difficulty) : null),
+    [model, q, category, settings.difficulty],
   );
   const set = (next: { q?: string; category?: string | null }) =>
     go(routes.search(next.q ?? q, next.category === undefined ? category : next.category), true);

@@ -36,6 +36,14 @@ fn imports_supported_disc_regions() {
             assert!(manifest["counts"]["stageMaps"].as_u64().unwrap() > 0);
         }
         let load = |name| serde_json::from_slice::<Value>(&std::fs::read(out.join(name)).unwrap()).unwrap();
+        let stages = load("stages.json");
+        for (id, count) in [("stagML11", 1), ("stagML12", 6), ("stagML13", 6)] {
+            let stage = stages["stages"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap();
+            assert_eq!(stage["services"].as_array().unwrap().len(), count, "{} {id}", release.region);
+        }
+        let river = stages["stages"].as_array().unwrap().iter().find(|s| s["id"] == "stag0103").unwrap();
+        assert_eq!(river["landmarks"].as_array().unwrap().len(), 2);
+        assert_eq!(river["boatRoute"].as_array().unwrap().len(), 46);
         let items = load("items.json");
         assert_eq!(items["powerSpells"].as_array().unwrap().len(), 10);
         assert_eq!(items["mpTechs"].as_array().unwrap().len(), 100);

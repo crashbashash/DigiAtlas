@@ -22,6 +22,7 @@ pub mod textures;
 pub mod appraisal;
 pub mod attack_profiles;
 pub mod crown_signature;
+pub mod landmarks;
 pub mod luadec;
 pub mod maps;
 pub mod mp_techs;
@@ -30,6 +31,7 @@ pub mod regions;
 pub mod render;
 pub mod scene;
 pub mod scripts;
+pub mod services;
 pub mod trades;
 
 pub mod export;

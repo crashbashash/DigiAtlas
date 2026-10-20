@@ -9,9 +9,10 @@ import { SearchBox } from './SearchBox';
 
 /** The landing page: search for anything, or start from one of the sections. */
 export function Home() {
-  const { model, scope, reimport } = useApp();
+  const { model, settings, scope, reimport } = useApp();
   const recent = lastMap();
-  const recentStage = recent ? model.byId.get(recent) : undefined;
+  const storedStage = recent ? model.byId.get(recent) : undefined;
+  const recentStage = storedStage ? model.stageOn(storedStage, settings.difficulty) : undefined;
   const categories = useMemo(() => itemCategories(model), [model]);
   const enemies = useMemo(() => featuredEnemies(model, 4, scope), [model, scope]);
   const m = model.raw.manifest;
@@ -45,7 +46,9 @@ export function Home() {
           <ul class="link-list">
             {model.worlds.map((w) => (
               <li>
-                <Link to={routes.map(w.rooms[0].stages[0].id)}>{w.area}</Link>
+                <Link to={routes.map(model.stageOn(w.rooms[0].stages[0], settings.difficulty).id)}>
+                  {w.area}
+                </Link>
                 <span class="muted">{w.rooms.length} rooms</span>
               </li>
             ))}

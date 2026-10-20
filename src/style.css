@@ -659,6 +659,8 @@ a.trade-row:hover {
   touch-action: none;
 }
 .tip {
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   position: absolute;
@@ -668,7 +670,7 @@ a.trade-row:hover {
   padding: 4px 8px;
   border-radius: 5px;
   font-size: var(--text-xs);
-  white-space: nowrap;
+  white-space: normal;
   z-index: 2;
 }
 .legend {
@@ -695,6 +697,16 @@ a.trade-row:hover {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+.legend[hidden],
+.legend [hidden] {
+  display: none;
+}
+.legend .height-ramp {
+  width: 48px;
+  border-radius: 2px;
+  background: linear-gradient(to right, rgb(108, 150, 182), rgb(218, 238, 250));
 }
 
 /* World tree */
@@ -993,18 +1005,21 @@ table.appraisal td:first-child {
 table.appraisal tr:nth-child(even) td {
   background: rgba(255, 255, 255, 0.03);
 }
-.trader {
+.trader,
+.service-npc {
   background: var(--panel2);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 6px 10px;
   margin: 0 0 6px;
 }
-.trader summary {
+.trader summary,
+.service-npc summary {
   cursor: pointer;
   font-weight: 600;
 }
-.trader[open] summary {
+.trader[open] summary,
+.service-npc[open] summary {
   margin-bottom: 6px;
 }
 .trade {
@@ -1014,7 +1029,8 @@ table.appraisal tr:nth-child(even) td {
   gap: 2px 8px;
   padding: 3px 0;
 }
-.trader.flash {
+.trader.flash,
+.service-npc.flash {
   animation: trader-flash 1.2s ease-out;
 }
 @keyframes trader-flash {

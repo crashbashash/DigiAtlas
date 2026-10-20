@@ -19,7 +19,7 @@ import {
 } from '../../data/types';
 import { Empty, KindDot, Link, settingsText } from '../common';
 import { useApp } from '../context';
-import { KIND_LABEL } from '../mapview';
+import { KIND_LABEL, SERVICE_COLOR } from '../mapview';
 import { DropTableView, EnemyStats, ItemLink, variantLabel } from '../pieces';
 
 const fmt = (n: number): string => n.toLocaleString('en-US');
@@ -40,7 +40,7 @@ export interface PanelProps {
   /** Spawners on this stage that drop the selected item. */
   itemSpawners: number;
   /** A trader pin that was clicked: open its list. `n` changes on every click so the same pin can flash again. */
-  reveal: { index: number; n: number } | null;
+  reveal: { kind: 'trader' | 'service'; index: number; n: number } | null;
   select(sel: MapSelection): void;
 }
 
@@ -268,9 +268,8 @@ function Overview({ stage, difficulty: d, reveal, select }: PanelProps) {
       {model.tradersAt(stage, d).length > 0 && (
         <Traders stage={stage} difficulty={d} reveal={reveal} />
       )}
-      {!gens.length ? (
-        <p class="note">No enemies or breakable objects spawn here.</p>
-      ) : (
+      {!!stage.services?.length && <Services stage={stage} reveal={reveal} />}
+      {gens.length > 0 && (
         <>
           <h3 class="sub">Enemies ({fights.length})</h3>
           <div class="list">
@@ -288,10 +287,6 @@ function Overview({ stage, difficulty: d, reveal, select }: PanelProps) {
               </div>
             </>
           )}
-          <p class="note">
-            Markers show every enemy spawn in the stage. Some only appear after game events such as
-            traps, cutscenes or story progress.
-          </p>
           {hidden.size > 0 && (
             <p class="note">
               {hidden.size} spawner{hidden.size === 1 ? ' is' : 's are'} left out because no game
@@ -310,6 +305,43 @@ function Overview({ stage, difficulty: d, reveal, select }: PanelProps) {
   );
 }
 
+/** Service pins reveal their matching NPC and purpose in the keyboard-accessible list. */
+function Services({ stage, reveal }: { stage: Stage; reveal: PanelProps['reveal'] }) {
+  const refs = useRef<(HTMLDetailsElement | null)[]>([]);
+  useEffect(() => {
+    if (!reveal || reveal.kind !== 'service') return;
+    const el = refs.current[reveal.index];
+    if (!el) return;
+    el.open = true;
+    el.scrollIntoView({ block: 'nearest' });
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  }, [reveal]);
+  return (
+    <section aria-label="Service NPCs">
+      <h3 class="sub">Services ({stage.services!.length})</h3>
+      <p class="note">Select a green map pin to find its service here.</p>
+      {stage.services!.map((npc, i) => (
+        <details
+          class="service-npc"
+          key={npc.id}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
+        >
+          <summary>
+            <i class="dot" style={{ background: SERVICE_COLOR }} aria-hidden="true" /> {npc.label}
+          </summary>
+          <p class="note">
+            <strong>{npc.name}</strong> · {npc.description}
+          </p>
+        </details>
+      ))}
+    </section>
+  );
+}
+
 /** The Digimon in a shop room and what each one swaps on the chosen difficulty. */
 function Traders({
   stage,
@@ -325,7 +357,7 @@ function Traders({
   const total = traders.reduce((n, t) => n + (t.tables[d]?.length ?? 0), 0);
   const refs = useRef<(HTMLDetailsElement | null)[]>([]);
   useEffect(() => {
-    if (!reveal) return;
+    if (!reveal || reveal.kind !== 'trader') return;
     const el = refs.current[reveal.index];
     if (!el) return;
     el.open = true;

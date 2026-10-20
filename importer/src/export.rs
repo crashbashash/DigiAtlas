@@ -25,7 +25,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
 pub const STACK_SIZE: usize = 64 << 20;
 
-pub const IMPORTER_VERSION: &str = "1.13.0";
+pub const IMPORTER_VERSION: &str = "1.16.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
     "enemies[].name: Mecha Rogue names follow Wikipedia and Wikimon; object names are not in the game text",
@@ -432,6 +432,15 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         rec.insert("difficulties".into(), Value::Object(difficulties));
         let placed = trades::extract(&pack_data, &player_digimon);
         rec.insert("trades".into(), trades_json(&placed));
+        if rec["kind"] == "hub" {
+            rec.insert("services".into(), json!(crate::services::extract(&pack_data)));
+        }
+        if st.id == "stag0103" {
+            if let Some((markers, points)) = crate::landmarks::boat_route(&pack_data) {
+                rec.insert("landmarks".into(), json!(markers));
+                rec.insert("boatRoute".into(), json!(points));
+            }
+        }
         rec.insert("map".into(), Value::Null);
         let system = rec["kind"] == "system";
         if with_maps && !(system && map_points.is_empty()) {
@@ -448,6 +457,9 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
                         "width": built.raster.width,
                         "height": built.raster.height,
                         "pixelsPerUnit": float(pyfmt::round(built.raster.pixels_per_unit, 4)),
+                        "shading": "height",
+                        "floorSource": built.floor_source,
+                        "scenery": built.scenery,
                         "coverage": float(pyfmt::round(built.coverage, 3)),
                         "fill": float(pyfmt::round(built.raster.fill(), 3)),
                     }),

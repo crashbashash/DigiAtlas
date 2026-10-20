@@ -35,8 +35,8 @@ export function SearchBox(props: {
   const [active, setActive] = useState(0);
   const listId = useRef(`search-${nextId++}`).current;
   const results = useMemo(
-    () => (query.trim().length >= 2 ? search(model, query) : null),
-    [model, query],
+    () => (query.trim().length >= 2 ? search(model, query, null, settings.difficulty) : null),
+    [model, query, settings.difficulty],
   );
   const shown = GROUPS.map((g) => ({
     ...g,

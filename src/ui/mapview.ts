@@ -1,8 +1,9 @@
 import type { DataSource } from '../data/source';
 import { traderLabel, type Model, type Scope } from '../data/model';
-import type { Difficulty, Enemy, EnemyKind, Stage } from '../data/types';
+import type { Difficulty, Enemy, EnemyKind, ServiceNpc, Stage } from '../data/types';
 import { h } from './dom';
 import { makeMarkers, type Marker } from './markers';
+import { hasHeightVariation } from './map-legend';
 
 export const KIND_COLOR: Record<EnemyKind, string> = {
   enemy: '#ff6b6b',
@@ -25,12 +26,17 @@ export interface MapEvents {
   onSelect(generator: number | null): void;
   /** A trader's pin was clicked; `index` is its place in `Model.tradersAt`. */
   onTrader(index: number): void;
+  onService(index: number): void;
 }
 
 export const TRADER_COLOR = '#b98cff';
+export const SERVICE_COLOR = '#73dfb5';
+const ROUTE_COLOR = '#ffb46b';
 
 /** A trader standing in a shop room. */
 interface Pin {
+  service?: ServiceNpc;
+  landmark?: ServiceNpc;
   index: number;
   x: number;
   z: number;
@@ -49,11 +55,63 @@ export class MapView {
   readonly el: HTMLElement;
   private readonly canvas = h('canvas');
   private readonly ctx: CanvasRenderingContext2D;
+  private readonly markerKeys = new Map(
+    (Object.keys(KIND_COLOR) as EnemyKind[]).map((kind) => [
+      kind,
+      h(
+        'span',
+        { hidden: true },
+        h('i', { style: `background:${KIND_COLOR[kind]}` }),
+        KIND_LABEL[kind],
+      ),
+    ]),
+  );
+  private readonly traderKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: `background:${TRADER_COLOR}` }),
+    'Trader',
+  );
+  private readonly numberKey = h(
+    'span',
+    { class: 'muted', hidden: true },
+    'Number = enemies at a spot',
+  );
+  private readonly heightKey = h(
+    'span',
+    {
+      class: 'height-key',
+      hidden: true,
+      title: 'Relative floor height within this map; brighter means higher.',
+    },
+    'Height: Lower',
+    h('i', { class: 'height-ramp', 'aria-hidden': 'true' }),
+    'Higher',
+  );
+  private readonly sceneryKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: 'background:rgb(57,72,89)' }),
+    'Scenery',
+  );
+  private readonly routeKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: `background:${ROUTE_COLOR}` }),
+    'Boat route',
+  );
+  private readonly serviceKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: `background:${SERVICE_COLOR}` }),
+    'Service NPC',
+  );
   private readonly tip = h('div', { class: 'tip', hidden: true });
   private view: View = { tx: 0, ty: 0, scale: 1 };
   private bounds = { minX: -100, maxX: 100, minZ: -100, maxZ: 100 };
   private image: HTMLImageElement | null = null;
   private markers: Marker[] = [];
+  private route: [number, number, number][] = [];
   private highlight: Set<number> | null = null;
   private selected: number | null = null;
   private stageId: string | null = null;
@@ -63,6 +121,7 @@ export class MapView {
   private pins: Pin[] = [];
   private litPins: Set<number> | null = null;
   private hoverPin: Pin | null = null;
+  private readonly legendEl = this.legend();
 
   constructor(
     private readonly model: Model,
@@ -70,7 +129,7 @@ export class MapView {
     private readonly events: MapEvents,
   ) {
     this.ctx = this.canvas.getContext('2d')!;
-    this.el = h('div', { class: 'map' }, this.canvas, this.tip, this.legend());
+    this.el = h('div', { class: 'map' }, this.canvas, this.tip, this.legendEl);
     new ResizeObserver(() => this.resize()).observe(this.el);
     this.canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     this.canvas.addEventListener('pointermove', (e) => this.onMove(e));
@@ -86,19 +145,13 @@ export class MapView {
     return h(
       'div',
       { class: 'legend' },
-      ...(Object.keys(KIND_COLOR) as EnemyKind[]).map((k) =>
-        h('span', null, h('i', { style: `background:${KIND_COLOR[k]}` }), KIND_LABEL[k]),
-      ),
-      h('span', null, h('i', { style: `background:${TRADER_COLOR}` }), 'Trader'),
-      h(
-        'span',
-        {
-          class: 'muted',
-          title:
-            'A number on a marker is how many enemies spawn at that spot. Hover or select a marker to see how close you must get for it to start.',
-        },
-        'Number = enemies at a spot',
-      ),
+      ...this.markerKeys.values(),
+      this.traderKey,
+      this.numberKey,
+      this.serviceKey,
+      this.routeKey,
+      this.heightKey,
+      this.sceneryKey,
     );
   }
 
@@ -113,6 +166,7 @@ export class MapView {
     const stageChanged = stage.id !== this.stageId;
     this.stageId = stage.id;
     this.highlight = highlight;
+    this.route = stage.boatRoute ?? [];
     this.selected = selected;
     this.litPins = litPins;
     this.markers = makeMarkers(
@@ -121,6 +175,10 @@ export class MapView {
       scope.hideUnused,
       (g) => this.model.isBossFight(g),
     );
+    for (const [kind, key] of this.markerKeys)
+      key.hidden = !this.markers.some((m) => m.kind === kind);
+    this.numberKey.hidden = !this.markers.some((m) => m.badge > 1);
+    this.traderKey.hidden = !this.model.tradersAt(stage, d).length;
     this.pins = this.model.tradersAt(stage, d).map((t, index) => ({
       index,
       x: t.position.x,
@@ -129,10 +187,36 @@ export class MapView {
       trades: t.tables[d]?.length ?? 0,
       facing: t.facing,
     }));
+    this.pins.push(
+      ...(stage.services ?? []).map((service, index) => ({
+        index,
+        service,
+        x: service.position.x,
+        z: service.position.z,
+        label: service.label,
+        trades: 0,
+        facing: service.facing,
+      })),
+    );
+    this.pins.push(
+      ...(stage.landmarks ?? []).map((landmark, index) => ({
+        index,
+        landmark,
+        x: landmark.position.x,
+        z: landmark.position.z,
+        label: landmark.label,
+        trades: 0,
+        facing: landmark.facing,
+      })),
+    );
+    this.routeKey.hidden = !stage.landmarks?.length && this.route.length < 2;
+    this.serviceKey.hidden = !stage.services?.length;
     if (stageChanged) {
       this.setHover(null);
       this.setHoverPin(null);
       this.image = null;
+      this.heightKey.hidden = true;
+      this.sceneryKey.hidden = true;
       this.computeBounds(stage);
       this.pendingFit = true;
       this.fit();
@@ -143,6 +227,20 @@ export class MapView {
           img.onload = () => {
             if (this.stageId === id) {
               this.image = img;
+              let varied = false;
+              if (stage.map?.shading === 'height') {
+                const sample = document.createElement('canvas');
+                sample.width = img.naturalWidth;
+                sample.height = img.naturalHeight;
+                const pixels = sample.getContext('2d', { willReadFrequently: true })!;
+                pixels.drawImage(img, 0, 0);
+                varied = hasHeightVariation(
+                  pixels.getImageData(0, 0, sample.width, sample.height).data,
+                );
+              }
+              this.heightKey.hidden = !varied;
+              this.sceneryKey.hidden = !stage.map?.scenery;
+              this.updateLegendVisibility();
               this.draw();
             }
           };
@@ -150,7 +248,14 @@ export class MapView {
         });
       }
     }
+    this.updateLegendVisibility();
     this.draw();
+  }
+
+  private updateLegendVisibility(): void {
+    this.legendEl.hidden = Array.from(this.legendEl.children).every(
+      (key) => (key as HTMLElement).hidden,
+    );
   }
 
   private computeBounds(stage: Stage): void {
@@ -173,7 +278,7 @@ export class MapView {
   zoomTo(generators: Set<number>, pins: Set<number> | null = null): void {
     const ms: { x: number; z: number }[] = [
       ...this.markers.filter((m) => generators.has(m.gi)),
-      ...this.pins.filter((p) => pins?.has(p.index)),
+      ...this.pins.filter((p) => !p.service && !p.landmark && pins?.has(p.index)),
     ];
     const w = this.canvas.clientWidth;
     const hgt = this.canvas.clientHeight;
@@ -235,6 +340,7 @@ export class MapView {
     }
     ctx.restore();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.drawRoute(ctx);
     const order = [...this.markers].sort((a, c) => this.rank(a) - this.rank(c));
     const triggered = new Set<number>();
     for (const m of order) {
@@ -254,36 +360,60 @@ export class MapView {
     for (const p of this.pins) this.drawPin(ctx, p);
   }
 
+  private drawRoute(ctx: CanvasRenderingContext2D): void {
+    if (this.route.length < 2) return;
+    ctx.save();
+    ctx.beginPath();
+    this.route.forEach(([x, , z], i) => {
+      const px = this.view.tx + x * this.view.scale;
+      const py = this.view.ty + z * this.view.scale;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(10, 14, 24, 0.75)';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.strokeStyle = ROUTE_COLOR;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([8, 5]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /** A trader: a violet disc with a nose pointing the way it faces, and its name beside it. */
   private drawPin(ctx: CanvasRenderingContext2D, p: Pin): void {
     const sx = this.view.tx + p.x * this.view.scale;
     const sy = this.view.ty + p.z * this.view.scale;
-    const lit = this.litPins?.has(p.index) ?? false;
+    const lit = !p.service && !p.landmark && (this.litPins?.has(p.index) ?? false);
     const r = lit || this.hoverPin === p ? 10 : 8;
     // Rotation is about the vertical axis; 0 faces +z (down the map) and positive turns toward +x.
     const a = (p.facing * Math.PI) / 180;
     const dx = Math.sin(a);
     const dy = Math.cos(a);
-    ctx.fillStyle = TRADER_COLOR;
+    ctx.fillStyle = p.landmark ? ROUTE_COLOR : p.service ? SERVICE_COLOR : TRADER_COLOR;
     ctx.strokeStyle = lit ? '#ffffff' : 'rgba(10,14,24,0.9)';
     ctx.lineWidth = lit ? 2.5 : 1.5;
     ctx.beginPath();
     ctx.arc(sx, sy, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(sx + dx * r, sy + dy * r);
-    ctx.lineTo(sx + dx * (r + 6) - dy * 4, sy + dy * (r + 6) + dx * 4);
-    ctx.lineTo(sx + dx * (r + 6) + dy * 4, sy + dy * (r + 6) - dx * 4);
-    ctx.closePath();
-    ctx.fill();
+    if (!p.landmark) {
+      ctx.beginPath();
+      ctx.moveTo(sx + dx * r, sy + dy * r);
+      ctx.lineTo(sx + dx * (r + 6) - dy * 4, sy + dy * (r + 6) + dx * 4);
+      ctx.lineTo(sx + dx * (r + 6) + dy * 4, sy + dy * (r + 6) - dx * 4);
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.font = '600 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(10,14,24,0.85)';
     ctx.strokeText(p.label, sx, sy - r - 3);
-    ctx.fillStyle = lit ? '#ffffff' : '#e6dcff';
+    ctx.fillStyle = lit ? '#ffffff' : p.landmark ? '#ffe0bf' : p.service ? '#c3f7e3' : '#e6dcff';
     ctx.fillText(p.label, sx, sy - r - 3);
     if (lit) {
       ctx.strokeStyle = '#ffffff';
@@ -477,7 +607,9 @@ export class MapView {
       const [px, py] = this.local(e);
       const pin = this.pickPin(px, py);
       if (pin) {
-        this.events.onTrader(pin.index);
+        if (pin.landmark) return;
+        if (pin.service) this.events.onService(pin.index);
+        else this.events.onTrader(pin.index);
         return;
       }
       const m = this.pick(px, py);
@@ -495,6 +627,11 @@ export class MapView {
     this.draw();
   }
 
+  private placeTip(px: number, py: number): void {
+    this.tip.style.left = `${Math.max(8, Math.min(px + 14, this.el.clientWidth - this.tip.offsetWidth - 8))}px`;
+    this.tip.style.top = `${Math.max(8, Math.min(py + 14, this.el.clientHeight - this.tip.offsetHeight - 8))}px`;
+  }
+
   private setHoverPin(p: Pin | null, px = 0, py = 0): void {
     if (p === this.hoverPin) return;
     this.hoverPin = p;
@@ -506,11 +643,18 @@ export class MapView {
     this.canvas.style.cursor = 'pointer';
     this.tip.replaceChildren(
       h('strong', null, p.label),
-      h('span', { class: 'muted' }, `${p.trades} trades on this difficulty`),
+      h(
+        'span',
+        { class: 'muted' },
+        p.landmark
+          ? p.landmark.description
+          : p.service
+            ? `${p.service.name} · ${p.service.description}`
+            : `${p.trades} trades on this difficulty`,
+      ),
     );
     this.tip.hidden = false;
-    this.tip.style.left = `${px + 14}px`;
-    this.tip.style.top = `${py + 14}px`;
+    this.placeTip(px, py);
   }
 
   private setHover(m: Marker | null, px = 0, py = 0): void {
@@ -533,7 +677,6 @@ export class MapView {
         .map((t) => h('span', { class: 'muted' }, t)),
     );
     this.tip.hidden = false;
-    this.tip.style.left = `${px + 14}px`;
-    this.tip.style.top = `${py + 14}px`;
+    this.placeTip(px, py);
   }
 }

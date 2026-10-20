@@ -188,11 +188,11 @@ describe('traders by difficulty', () => {
 });
 
 describe('entryDifficulty', () => {
-  it('is the difficulty a shop copy is entered on, and none for rooms with spawners', () => {
+  it('is the entry difficulty for shops and rooms with spawners', () => {
     const m = model();
     const hall = m.byId.get('dng101b1')!;
     expect(m.entryDifficulty({ ...hall, variant: 'v', difficulties: {} })).toBe('veryhard');
-    expect(m.entryDifficulty({ ...hall, variant: 'v' })).toBeNull();
+    expect(m.entryDifficulty({ ...hall, variant: 'v' })).toBe('veryhard');
     expect(m.entryDifficulty({ ...hall, variant: null, difficulties: {} })).toBeNull();
   });
 });
@@ -609,6 +609,26 @@ describe('difficulty-specific dungeon copies', () => {
     raw.stages.stages.push(shared);
     return new Model(raw);
   }
+
+  it('resolves room copies and floors consistently with the selected difficulty', () => {
+    const initial = dungeonCopies();
+    const normal = initial.byId.get('dngq4b3e')!;
+    initial.raw.stages.stages.push({ ...normal, id: 'dngq4b1e', floor: 'B1' });
+    const m = new Model(initial.raw);
+    for (const [d, v] of [
+      ['normal', 'e'],
+      ['hard', 'h'],
+      ['veryhard', 'v'],
+    ] as const) {
+      expect(m.stageOn(normal, d).id).toBe(`dngq4b3${v}`);
+      expect(m.stageOn(m.byId.get('dngq4b1e')!, d).id).toBe(
+        d === 'normal' ? 'dngq4b1e' : `dngq4b3${v}`,
+      );
+      expect(m.mapDifficulties(m.byId.get(`dngq4b3${v}`)!)).toEqual(['normal', 'hard', 'veryhard']);
+      const shared = m.byId.get('stag0102')!;
+      expect(m.stageOn(shared, d)).toBe(shared);
+    }
+  });
 
   it('filters enemy drop rooms, spawn rooms and stat variants to the copy entered on each difficulty', () => {
     const m = dungeonCopies();

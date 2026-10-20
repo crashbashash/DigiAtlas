@@ -21,8 +21,8 @@ const MARGIN: f64 = 150.0;
 /// World units kept around the playable area when the picture is cropped to it.
 const TRIM_MARGIN: f64 = 20.0;
 const MIN_COLLISION_TRIANGLES: usize = 150;
-/// The collision mesh has under 1/8 of the visible terrain's triangles.
-const COLLISION_RATIO: usize = 8;
+/// The collision mesh has under 1/4 of the visible terrain's triangles.
+const COLLISION_RATIO: usize = 4;
 /// Share of points that must lie on collision floor for it to be used.
 const MIN_WALKABLE_SHARE: f64 = 0.97;
 /// Flat two-triangle meshes at one height that make up a ground plane.
@@ -38,6 +38,9 @@ pub struct StageMap {
     pub raster: Raster,
     /// Share of spawn points that land on drawn geometry.
     pub coverage: f64,
+    /// Whether the floor came from collision geometry or the visible terrain.
+    pub floor_source: &'static str,
+    pub scenery: bool,
 }
 
 impl StageMap {
@@ -58,11 +61,6 @@ fn py_max(values: impl IntoIterator<Item = f64>) -> f64 {
     let mut it = values.into_iter();
     let first = it.next().expect("max() of an empty sequence");
     it.fold(first, |m, v| if v > m { v } else { m })
-}
-
-fn sorted(mut values: Vec<f64>) -> Vec<f64> {
-    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    values
 }
 
 fn corners<'a>(tris: impl IntoIterator<Item = &'a Triangle>) -> impl Iterator<Item = &'a [f64; 3]> {
@@ -181,9 +179,6 @@ pub fn collision_floor_map(
     points: &[(f64, f64)],
     cutout: Option<render::FloorCutout>,
 ) -> Option<Raster> {
-    if points.is_empty() {
-        return None;
-    }
     let limit = scenes[terrain].triangles.len();
     let mut best: Option<(usize, usize, Raster)> = None;
     for (i, scene) in scenes.iter().enumerate() {
@@ -217,6 +212,51 @@ pub fn collision_floor_map(
     best.map(|(_, _, raster)| raster)
 }
 
+/// Keep terrain floors near known standing heights. Flat ceilings and wall caps must not
+/// become a bright rectangle over the playable floor when collision geometry is incomplete.
+fn terrain_floor_map(triangles: &[Triangle], roi: [f64; 4], levels: &[f64]) -> Raster {
+    let floors: Vec<Triangle> = triangles
+        .iter()
+        .filter(|t| {
+            if levels.is_empty() {
+                return true;
+            }
+            let low = py_min(t.iter().map(|p| p[1]));
+            let high = py_max(t.iter().map(|p| p[1]));
+            if high - low <= 1.0 {
+                levels.iter().any(|y| ((low + high) / 2.0 - y).abs() <= 3.0)
+            } else {
+                low >= py_min(levels.iter().copied()) - 3.0 && high <= py_max(levels.iter().copied()) + 3.0
+            }
+        })
+        .copied()
+        .collect();
+    render::floor_silhouette(&floors, roi)
+}
+
+/// Even an incomplete collision mesh identifies the base standing height of an empty room.
+fn base_floor_level(scenes: &[Scene], terrain: usize) -> Vec<f64> {
+    scenes
+        .iter()
+        .enumerate()
+        .filter(|(i, s)| {
+            *i != terrain
+                && s.name.is_empty()
+                && (MIN_COLLISION_TRIANGLES..=scenes[terrain].triangles.len())
+                    .contains(&(s.triangles.len() * COLLISION_RATIO))
+        })
+        .max_by_key(|(_, s)| s.triangles.len())
+        .and_then(|(_, s)| {
+            s.triangles
+                .iter()
+                .filter(|t| render::normal_y(t).abs() >= 0.35)
+                .flat_map(|t| t.iter().map(|p| p[1]))
+                .reduce(f64::min)
+        })
+        .into_iter()
+        .collect()
+}
+
 /// The scenes of an object pack, or None for packs that are not one (textures, scripts).
 fn pack_scenes(ndmw: &Afs, pack: usize) -> Result<Option<Vec<Scene>>> {
     match Graph::new(ndmw.entry(pack)?) {
@@ -238,7 +278,6 @@ pub fn build(
         return build_empty(ndmw, packs, extra);
     }
     let points: Vec<(f64, f64)> = spawns.iter().map(|p| (p[0], p[2])).collect();
-    let ys = sorted(spawns.iter().map(|p| p[1]).collect());
     // (key, pack, scenes, terrain scene index)
     type Choice = ((f64, usize), usize, Vec<Scene>, usize);
     let mut best: Option<Choice> = None;
@@ -264,14 +303,46 @@ pub fn build(
     let roi = [py_min(xs.clone()) - pad, py_max(xs) + pad, py_min(zs.clone()) - pad, py_max(zs) + pad];
     // Abyss stepping stones stand above a y=1 collision surface. Hide only that known
     // low surface; raised platforms, neighbouring paths and all other stages stay intact.
-    let cutout = (stage_id == "stag0102")
-        .then_some(render::FloorCutout { bounds: [-83.0, 43.0, -243.0, -6.0], max_height: 2.0 });
-    let raster = collision_floor_map(&scenes, s, &points, cutout).unwrap_or_else(|| {
+    let cutout = match stage_id {
+        "stag0102" => Some(render::FloorCutout { bounds: [-83.0, 43.0, -243.0, -6.0], max_height: 2.0 }),
+        // Player-entry gizmos form a white arrow at the boat's start. The route pin replaces
+        // that decorative plate and its four pyramids; real spawn positions stay protected.
+        "stag0103" => Some(render::FloorCutout { bounds: [550.0, 605.0, 374.0, 417.0], max_height: 30.0 }),
+        _ => None,
+    };
+    let collision = collision_floor_map(&scenes, s, &points, cutout);
+    let floor_source = if collision.is_some() { "collision" } else { "terrain" };
+    let raster = collision.unwrap_or_else(|| {
         let parts = terrain_parts(terrain, MIN_PART_SPAN);
-        render::render(parts.iter().copied().flatten(), roi, Some(ys[ys.len() / 2]))
+        let levels: Vec<f64> = spawns.iter().map(|p| p[1]).collect();
+        let triangles: Vec<_> = parts.iter().copied().flatten().copied().collect();
+        let filtered = terrain_floor_map(&triangles, roi, &levels);
+        // Moving-platform rooms can spawn actors above floors not present in this static scene.
+        // Keep their wider terrain context rather than removing the area beneath those markers.
+        let covered = points.iter().filter(|&&(x, z)| filtered.covered(x, z)).count();
+        if (covered as f64) < MIN_WALKABLE_SHARE * points.len() as f64 {
+            render::floor_silhouette(&triangles, roi)
+        } else {
+            filtered
+        }
     });
     let coverage = points.iter().filter(|&&(x, z)| raster.covered(x, z)).count() as f64 / points.len() as f64;
-    Ok(Some(StageMap { pack, scene: terrain.name.clone(), bounds: bounds(&raster), raster, coverage }))
+    let scenery = stage_id == "stag0103";
+    let raster = if scenery {
+        let triangles: Vec<_> = terrain_parts(terrain, MIN_PART_SPAN).iter().copied().flatten().copied().collect();
+        render::with_scenery(&raster, &triangles, 20.0)
+    } else {
+        raster
+    };
+    Ok(Some(StageMap {
+        pack,
+        scene: terrain.name.clone(),
+        bounds: bounds(&raster),
+        raster,
+        coverage,
+        floor_source,
+        scenery,
+    }))
 }
 
 /// Map of the biggest terrain scene in a stage that has nothing spawning in it.
@@ -307,29 +378,45 @@ fn build_empty(ndmw: &Afs, packs: &[usize], extra: &[(f64, f64)]) -> Result<Opti
     if inner.is_empty() {
         inner = parts.clone();
     }
+    let levels = base_floor_level(&scenes, s);
     let mut raster = None;
     for chosen in [&inner, &parts] {
         let tris = chosen.iter().copied().flatten();
         let [mut x0, mut x1, mut z0, mut z1] = bbox(tris.clone());
-        let ys = sorted(corners(tris.clone()).map(|p| p[1]).collect());
         x0 = py_min(std::iter::once(x0).chain(extra.iter().map(|e| e.0)));
         x1 = py_max(std::iter::once(x1).chain(extra.iter().map(|e| e.0)));
         z0 = py_min(std::iter::once(z0).chain(extra.iter().map(|e| e.1)));
         z1 = py_max(std::iter::once(z1).chain(extra.iter().map(|e| e.1)));
         let m = MARGIN / 3.0;
-        let r = render::render(tris, [x0 - m, x1 + m, z0 - m, z1 + m], Some(ys[ys.len() / 2]));
+        let r = render::floor_silhouette(&tris.copied().collect::<Vec<_>>(), [x0 - m, x1 + m, z0 - m, z1 + m]);
         let done = extra.iter().all(|&(x, z)| r.covered(x, z));
         raster = Some(r);
         if done {
             break;
         }
     }
-    let raster =
-        collision_floor_map(&scenes, s, extra, None).unwrap_or_else(|| raster.expect("at least one crop is rendered"));
+    let fallback = raster.expect("at least one crop is rendered");
+    // A collision-like scene must not turn a non-playable backdrop into a browsable map.
+    if fallback.fill() < 0.02 {
+        return Ok(None);
+    }
+    let collision = collision_floor_map(&scenes, s, extra, None);
+    let floor_source = if collision.is_some() { "collision" } else { "terrain" };
+    let raster = collision.unwrap_or_else(|| {
+        terrain_floor_map(&parts.iter().copied().flatten().copied().collect::<Vec<_>>(), bounds(&fallback), &levels)
+    });
     if raster.fill() < 0.02 {
         return Ok(None);
     }
-    Ok(Some(StageMap { pack, scene: terrain.name.clone(), bounds: bounds(&raster), raster, coverage: 1.0 }))
+    Ok(Some(StageMap {
+        pack,
+        scene: terrain.name.clone(),
+        bounds: bounds(&raster),
+        raster,
+        coverage: 1.0,
+        floor_source,
+        scenery: false,
+    }))
 }
 
 #[cfg(test)]
@@ -358,7 +445,30 @@ mod tests {
     fn incomplete_or_named_collision_candidates_keep_the_terrain_fallback() {
         let scenes = [scene("terrain", 200.0, 500), scene("", 10.0, 40), scene("prop", 100.0, 20)];
         assert!(collision_floor_map(&scenes, 0, &[(5.0, 5.0), (75.0, 75.0)], None).is_none());
-        assert!(collision_floor_map(&scenes, 0, &[], None).is_none());
+    }
+
+    #[test]
+    fn hubs_without_spawns_still_use_collision_floors() {
+        let scenes = [scene("terrain", 200.0, 500), scene("", 100.0, 20)];
+        let raster = collision_floor_map(&scenes, 0, &[], None).unwrap();
+        assert!(raster.covered(95.0, 95.0));
+        assert!(!raster.covered(150.0, 150.0));
+    }
+
+    #[test]
+    fn detailed_collision_meshes_are_accepted_when_they_cover_the_room() {
+        let scenes = [scene("terrain", 200.0, 500), scene("", 100.0, 100)];
+        assert!(collision_floor_map(&scenes, 0, &[(75.0, 75.0)], None).is_some());
+    }
+
+    #[test]
+    fn terrain_fallback_keeps_standing_floors_and_rejects_ceilings() {
+        let floor = scene("", 100.0, 1).triangles;
+        let ceiling: Vec<_> = floor.iter().map(|t| t.map(|[x, _, z]| [x, 40.0, z])).collect();
+        let triangles: Vec<_> = floor.iter().chain(&ceiling).copied().collect();
+        let expected = render::floor_silhouette(&floor, [-10.0, 110.0, -10.0, 110.0]);
+        let actual = terrain_floor_map(&triangles, [-10.0, 110.0, -10.0, 110.0], &[0.0]);
+        assert_eq!(actual.rgba, expected.rgba);
     }
 
     #[test]

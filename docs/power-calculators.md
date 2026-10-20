@@ -135,3 +135,20 @@ with big-endian words and UTF-16, and both version-4 mirror checksums are valida
 Complete raw GameCube cards validate header, directory and allocation checksums,
 follow fragmented chains, and reject cycles and shared blocks. A single damaged
 metadata copy can recover from its valid mirror. Disc support covers USA and Japan.
+
+### Calculator shortcuts
+
+Character setup offers **Equipment minimum** for level, **Weapon minimum** for the
+active weapon skill, and **Maximum at this level** for the displayed weapon or MP
+skill. Each action changes only its own input. Level uses the highest exported
+`equipLevel` among equipped items; weapon skill uses `requiredSkill` independently.
+Unmet equipment requirements and skills above the trainable cap are shown without
+silently changing a loaded or manually entered setup.
+
+The shared trainable cap is `30*level` through level 36, `360+20*level` through 107,
+`1430+10*level` through 227, then `1884+8*level`. Verified in USA PS2 retail
+instructions at `0x3ff268–0x3ff2c8` (skill growth gate, compared at `0x3ff410`,
+followed by an increment of one at `0x3ff638`) and `0x41f92c–0x41f98c` (skill display).
+The formula also agrees with the independent GameCube analysis in
+[Mateon1’s TASVideos research](https://tasvideos.org/Forum/Posts/User/Mateon1).
+This is a training limit, so manual entry and save loading remain available above it.

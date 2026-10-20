@@ -2053,3 +2053,21 @@ a.calculator-tile:hover {
     grid-row: auto;
   }
 }
+
+.field-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: 400;
+}
+.equipment-requirements,
+.requirement-note {
+  margin: 6px 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+.requirements-unmet,
+.requirement-note {
+  color: var(--warning, #e3b341);
+}

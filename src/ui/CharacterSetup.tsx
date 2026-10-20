@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import { characterStats, type XDataPower } from '../data/character-stats';
+import { equipmentRequirements, skillCap } from '../data/calculator-shortcuts';
 import { readPowerBoxes, type SaveBox } from '../data/power-save-file';
 import { recentSaves, rememberSave, type RecentSave } from '../data/recent-saves';
 import { emptyEquipment } from '../data/weapon-equipment';
@@ -31,6 +32,8 @@ export function CharacterSetup({
   const stats = model.raw.items.saveStats;
   const fileInput = useRef<HTMLInputElement>(null);
   const fileStatusId = useId();
+  const levelId = useId();
+  const skillId = useId();
   const [loadedName, setLoadedName] = useState('');
   const [species, setSpecies] = useState(stats?.forms[0]?.species ?? 0);
   const [level, setLevel] = useState(1);
@@ -108,6 +111,27 @@ export function CharacterSetup({
   }
   if (!stats || !form || !values)
     return <p role="alert">Re-import your disc to load character stats.</p>;
+  const requirements = equipmentRequirements(equipment, model.items);
+  const cap = skillCap(level);
+  const skillIndex = attack
+    ? values.weaponSkill
+    : mpSkill === 'blast'
+      ? 6
+      : mpSkill === 'heal'
+        ? 7
+        : 8;
+  const skillLabel = attack
+    ? `${WEAPON_SKILLS[values.weaponSkill]} skill`
+    : mpSkill === 'blast'
+      ? 'Blast skill'
+      : mpSkill === 'heal'
+        ? 'Heal skill'
+        : 'Force skill';
+  const setSkill = (value: number) =>
+    setSkills(skills.map((s, i) => (i === skillIndex ? value : s)));
+  const unmetLevel = level < requirements.level;
+  const unmetSkill =
+    requirements.weaponSkill !== null && skills[values.weaponSkill] < requirements.weaponSkill;
   return (
     <>
       <details class="character-save-loader">
@@ -180,9 +204,10 @@ export function CharacterSetup({
           onChange={(v) => chooseForm(Number(v))}
           options={stats.forms.map((f) => ({ value: String(f.species), label: f.name }))}
         />
-        <label class="power-field">
-          Level
+        <div class="power-field">
+          <label for={levelId}>Level</label>
           <input
+            id={levelId}
             type="number"
             min="1"
             max="999"
@@ -190,12 +215,39 @@ export function CharacterSetup({
             value={level}
             onInput={(e) => setLevel(e.currentTarget.valueAsNumber)}
           />
-        </label>
+          <div class="field-shortcuts">
+            <button
+              class="equipment-edit-button"
+              type="button"
+              disabled={
+                !requirements.hasEquipment ||
+                level === requirements.level ||
+                requirements.level > 999
+              }
+              title="Set level to the highest level requirement among your equipped items. Weapon skill is set separately."
+              onClick={() => setLevel(requirements.level)}
+            >
+              Equipment minimum: {requirements.level}
+            </button>
+          </div>
+        </div>
       </div>
       <div class="character-equipment">
         <p>{equipment.weapon ? model.itemLabel(equipment.weapon.key) : 'No weapon equipped'}</p>
         <WeaponEquipmentEditor equipment={equipment} onChange={setEquipment} />
       </div>
+      {requirements.hasEquipment && (
+        <p
+          class={`equipment-requirements${unmetLevel || unmetSkill ? ' requirements-unmet' : ''}`}
+          role="status"
+        >
+          Requires level {requirements.level}
+          {requirements.weaponSkill !== null &&
+            ` and ${requirements.skillType} skill ${requirements.weaponSkill}`}
+          .{unmetLevel && ' Level requirement not met.'}
+          {unmetSkill && ' Weapon skill requirement not met.'}
+        </p>
+      )}
       <details class="character-xdata">
         <summary>XData power</summary>
         <p class="muted">Permanent stat increases from XData, added before equipment.</p>
@@ -216,36 +268,59 @@ export function CharacterSetup({
         </div>
       </details>
       {(attack || force || mpSkill) && (
-        <label class="power-field">
-          {attack
-            ? `${WEAPON_SKILLS[values.weaponSkill]} skill`
-            : mpSkill === 'blast'
-              ? 'Blast skill'
-              : mpSkill === 'heal'
-                ? 'Heal skill'
-                : 'Force skill'}
+        <div class="power-field">
+          <label for={skillId}>{skillLabel}</label>
           <input
+            id={skillId}
             type="number"
             min="0"
             max="9999"
             step="1"
-            value={
-              skills[
-                attack ? values.weaponSkill : mpSkill === 'blast' ? 6 : mpSkill === 'heal' ? 7 : 8
-              ]
-            }
-            onInput={(e) => {
-              const index = attack
-                ? values.weaponSkill
-                : mpSkill === 'blast'
-                  ? 6
-                  : mpSkill === 'heal'
-                    ? 7
-                    : 8;
-              setSkills(skills.map((s, i) => (i === index ? e.currentTarget.valueAsNumber : s)));
-            }}
+            value={skills[skillIndex]}
+            onInput={(e) => setSkill(e.currentTarget.valueAsNumber)}
           />
-        </label>
+          <div class="field-shortcuts">
+            {attack && (
+              <button
+                class="equipment-edit-button"
+                type="button"
+                disabled={
+                  requirements.weaponSkill === null ||
+                  skills[skillIndex] === requirements.weaponSkill
+                }
+                title="Set this weapon skill to the selected weapon’s requirement."
+                onClick={() =>
+                  requirements.weaponSkill !== null && setSkill(requirements.weaponSkill)
+                }
+              >
+                Weapon minimum
+                {requirements.weaponSkill !== null ? `: ${requirements.weaponSkill}` : ''}
+              </button>
+            )}
+            <button
+              class="equipment-edit-button"
+              type="button"
+              disabled={cap === null || skills[skillIndex] === cap}
+              title="Set this skill to the maximum trainable at your current character level."
+              onClick={() => cap !== null && setSkill(cap)}
+            >
+              Maximum at this level{cap !== null ? `: ${cap}` : ''}
+            </button>
+          </div>
+          {cap !== null && skills[skillIndex] > cap && (
+            <p class="requirement-note" role="status">
+              Above the trainable maximum of {cap} at level {level}.
+            </p>
+          )}
+          {attack &&
+            cap !== null &&
+            requirements.weaponSkill !== null &&
+            requirements.weaponSkill > cap && (
+              <p class="requirement-note" role="status">
+                This weapon requires more skill than you can train at level {level}.
+              </p>
+            )}
+        </div>
       )}
       <dl class="character-stat-summary" aria-live="polite">
         {(attack

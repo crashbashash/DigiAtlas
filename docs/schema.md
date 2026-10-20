@@ -131,8 +131,9 @@ Players see `name`, never the internal ids.
   its floor triangles are drawn directly, without wall or decorative outlines. A light blue palette
   represents relative height within the floor: higher surfaces are brighter, ramps interpolate
   continuously, and the upper surface wins where floors overlap in the top-down projection.
-  Collision surfaces beneath stepping stones are retained; gaps can appear filled while the
-  raised platforms remain visible through height shading.
+  Abyss of Grief's known low surface beneath its stepping stones is transparent, so gaps
+  match the app background while raised platforms retain their height shading. This is scoped
+  to that section and disabled if it would hide a spawn point from a modified disc.
   Candidate scenes are ranked by actual floor coverage, then triangle count; choosing only
   the largest can select an unrelated scene (Electro Mine B4). The full collision floor bounds
   retain empty corridors and dead ends. A one-pixel edge stamp closes raster seams.

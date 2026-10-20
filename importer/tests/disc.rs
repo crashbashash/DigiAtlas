@@ -365,10 +365,15 @@ fn stage_maps_cover_their_spawn_points() {
                 }
             }
         });
-        let built = maps::build(&ndmw, &packs(st), &points, &[]).unwrap().unwrap_or_else(|| panic!("{id} has no map"));
+        let built =
+            maps::build(&ndmw, id, &packs(st), &points, &[]).unwrap().unwrap_or_else(|| panic!("{id} has no map"));
         assert!(built.coverage >= 0.95, "{id}");
         assert!(built.raster.fill() > 0.0, "{id}");
         assert!(built.png().unwrap().starts_with(b"\x89PNG"));
+        if id == "stag0102" {
+            assert!(!built.raster.covered(-70.0, -100.0), "lower surface should be transparent");
+            assert_eq!(built.coverage, 1.0, "all Abyss spawn positions must remain visible");
+        }
     }
 }
 
@@ -391,7 +396,7 @@ fn shop_and_lobby_rooms_get_a_map_without_spawn_points() {
     let all = stages();
     for id in ["dngq5b1e", "dngq5b1h", "dngq5b1v", "stagML11"] {
         let built =
-            maps::build(&ndmw, &packs(&all[id]), &[], &[]).unwrap().unwrap_or_else(|| panic!("{id} has no map"));
+            maps::build(&ndmw, id, &packs(&all[id]), &[], &[]).unwrap().unwrap_or_else(|| panic!("{id} has no map"));
         assert!(built.raster.fill() < 0.9, "{id}"); // an outline, not a flat arena
     }
 }

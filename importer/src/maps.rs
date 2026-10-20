@@ -175,7 +175,12 @@ fn bounds(r: &Raster) -> [f64; 4] {
 /// Choose an unnamed collision scene by actual floor coverage, rather than mesh size alone.
 /// Scenes whose floors do not cover nearly every point of interest leave the terrain fallback intact.
 /// Full floor bounds preserve corridors and dead ends without enemy spawn positions.
-pub fn collision_floor_map(scenes: &[Scene], terrain: usize, points: &[(f64, f64)]) -> Option<Raster> {
+pub fn collision_floor_map(
+    scenes: &[Scene],
+    terrain: usize,
+    points: &[(f64, f64)],
+    cutout: Option<render::FloorCutout>,
+) -> Option<Raster> {
     if points.is_empty() {
         return None;
     }
@@ -191,13 +196,18 @@ pub fn collision_floor_map(scenes: &[Scene], terrain: usize, points: &[(f64, f64
             continue;
         }
         let [x0, x1, z0, z1] = bbox(floors.iter().copied());
-        let raster = render::floor_silhouette(
-            &scene.triangles,
-            [x0 - TRIM_MARGIN, x1 + TRIM_MARGIN, z0 - TRIM_MARGIN, z1 + TRIM_MARGIN],
-        );
+        let roi = [x0 - TRIM_MARGIN, x1 + TRIM_MARGIN, z0 - TRIM_MARGIN, z1 + TRIM_MARGIN];
+        let mut raster = render::floor_silhouette(&scene.triangles, roi);
         let covered = points.iter().filter(|&&(x, z)| raster.covered(x, z)).count();
         if (covered as f64) < MIN_WALKABLE_SHARE * points.len() as f64 {
             continue;
+        }
+        if let Some(region) = cutout {
+            let hidden = render::floor_silhouette_with_cutout(&scene.triangles, roi, Some(region));
+            // A modified disc may use this surface for spawns. Keep it visible in that case.
+            if points.iter().all(|&(x, z)| !raster.covered(x, z) || hidden.covered(x, z)) {
+                raster = hidden;
+            }
         }
         let key = (covered, scene.triangles.len());
         if best.as_ref().is_none_or(|b| key > (b.0, b.1)) {
@@ -217,7 +227,13 @@ fn pack_scenes(ndmw: &Afs, pack: usize) -> Result<Option<Vec<Scene>>> {
 
 /// Render the map for one stage, or None when no terrain scene covers its spawn points. A stage
 /// without spawn points gets its largest terrain scene, widened to hold the `extra` (x, z) points.
-pub fn build(ndmw: &Afs, packs: &[usize], spawns: &[[f64; 3]], extra: &[(f64, f64)]) -> Result<Option<StageMap>> {
+pub fn build(
+    ndmw: &Afs,
+    stage_id: &str,
+    packs: &[usize],
+    spawns: &[[f64; 3]],
+    extra: &[(f64, f64)],
+) -> Result<Option<StageMap>> {
     if spawns.is_empty() {
         return build_empty(ndmw, packs, extra);
     }
@@ -246,7 +262,11 @@ pub fn build(ndmw: &Afs, packs: &[usize], spawns: &[[f64; 3]], extra: &[(f64, f6
         0.25 * py_max([py_max(xs.clone()) - py_min(xs.clone()), py_max(zs.clone()) - py_min(zs.clone())]),
     ]);
     let roi = [py_min(xs.clone()) - pad, py_max(xs) + pad, py_min(zs.clone()) - pad, py_max(zs) + pad];
-    let raster = collision_floor_map(&scenes, s, &points).unwrap_or_else(|| {
+    // Abyss stepping stones stand above a y=1 collision surface. Hide only that known
+    // low surface; raised platforms, neighbouring paths and all other stages stay intact.
+    let cutout = (stage_id == "stag0102")
+        .then_some(render::FloorCutout { bounds: [-83.0, 43.0, -243.0, -6.0], max_height: 2.0 });
+    let raster = collision_floor_map(&scenes, s, &points, cutout).unwrap_or_else(|| {
         let parts = terrain_parts(terrain, MIN_PART_SPAN);
         render::render(parts.iter().copied().flatten(), roi, Some(ys[ys.len() / 2]))
     });
@@ -305,7 +325,7 @@ fn build_empty(ndmw: &Afs, packs: &[usize], extra: &[(f64, f64)]) -> Result<Opti
         }
     }
     let raster =
-        collision_floor_map(&scenes, s, extra).unwrap_or_else(|| raster.expect("at least one crop is rendered"));
+        collision_floor_map(&scenes, s, extra, None).unwrap_or_else(|| raster.expect("at least one crop is rendered"));
     if raster.fill() < 0.02 {
         return Ok(None);
     }
@@ -327,7 +347,7 @@ mod tests {
     #[test]
     fn collision_selection_prioritizes_floor_coverage_over_larger_unrelated_meshes() {
         let scenes = [scene("terrain", 200.0, 500), scene("", 10.0, 40), scene("", 100.0, 20)];
-        let raster = collision_floor_map(&scenes, 0, &[(5.0, 5.0), (75.0, 75.0)]).unwrap();
+        let raster = collision_floor_map(&scenes, 0, &[(5.0, 5.0), (75.0, 75.0)], None).unwrap();
         assert!(raster.covered(75.0, 75.0));
         // Keep empty corridors and floor beyond the spawn area.
         assert!(raster.covered(95.0, 95.0));
@@ -337,7 +357,17 @@ mod tests {
     #[test]
     fn incomplete_or_named_collision_candidates_keep_the_terrain_fallback() {
         let scenes = [scene("terrain", 200.0, 500), scene("", 10.0, 40), scene("prop", 100.0, 20)];
-        assert!(collision_floor_map(&scenes, 0, &[(5.0, 5.0), (75.0, 75.0)]).is_none());
-        assert!(collision_floor_map(&scenes, 0, &[]).is_none());
+        assert!(collision_floor_map(&scenes, 0, &[(5.0, 5.0), (75.0, 75.0)], None).is_none());
+        assert!(collision_floor_map(&scenes, 0, &[], None).is_none());
+    }
+
+    #[test]
+    fn a_cutout_never_hides_a_spawn_position() {
+        let scenes = [scene("terrain", 200.0, 500), scene("", 100.0, 20)];
+        let cutout = render::FloorCutout { bounds: [20.0, 80.0, 20.0, 80.0], max_height: 2.0 };
+        let protected = collision_floor_map(&scenes, 0, &[(50.0, 50.0)], Some(cutout)).unwrap();
+        assert!(protected.covered(50.0, 50.0));
+        let hidden = collision_floor_map(&scenes, 0, &[(5.0, 5.0)], Some(cutout)).unwrap();
+        assert!(!hidden.covered(50.0, 50.0));
     }
 }

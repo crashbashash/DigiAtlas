@@ -297,6 +297,25 @@ pub fn floor_mask(triangles: &[Triangle], like: &Raster, grow: f64) -> Vec<u8> {
 /// ramps interpolate their true height continuously, without triangle or wall outlines.
 /// A one-pixel edge stamp closes raster seams without changing the floor footprint.
 pub fn floor_silhouette(triangles: &[Triangle], roi: [f64; 4]) -> Raster {
+    floor_silhouette_with_cutout(triangles, roi, None)
+}
+
+/// Hide a known lower collision surface while retaining any raised geometry above it.
+#[derive(Clone, Copy)]
+pub struct FloorCutout {
+    /// min x, max x, min z, max z; includes the one-pixel seam stamp.
+    pub bounds: [f64; 4],
+    pub max_height: f64,
+}
+
+impl FloorCutout {
+    fn contains(&self, x: f64, z: f64, height: f64) -> bool {
+        let [x0, x1, z0, z1] = self.bounds;
+        height <= self.max_height && x0 <= x && x <= x1 && z0 <= z && z <= z1
+    }
+}
+
+pub fn floor_silhouette_with_cutout(triangles: &[Triangle], roi: [f64; 4], cutout: Option<FloorCutout>) -> Raster {
     let [min_x, max_x, min_z, max_z] = roi;
     let ppu = py_min(MAX_PPU, MAX_SIDE / py_max(max_x - min_x, max_z - min_z));
     let width = ((max_x - min_x) * ppu) as usize + 1;
@@ -355,8 +374,13 @@ pub fn floor_silhouette(triangles: &[Triangle], roi: [f64; 4]) -> Raster {
             }
         }
     }
-    for (pixel, y) in raster.rgba.as_chunks_mut::<4>().0.iter_mut().zip(heights) {
+    for (index, (pixel, y)) in raster.rgba.as_chunks_mut::<4>().0.iter_mut().zip(heights).enumerate() {
         if !y.is_finite() {
+            continue;
+        }
+        let x = min_x + (index % width) as f64 / ppu;
+        let z = min_z + (index / width) as f64 / ppu;
+        if cutout.is_some_and(|region| region.contains(x, z, y)) {
             continue;
         }
         let amount = if high > low { ((y - low) / (high - low)).clamp(0.0, 1.0) } else { 1.0 };
@@ -372,6 +396,25 @@ pub fn floor_silhouette(triangles: &[Triangle], roi: [f64; 4]) -> Raster {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn floor_cutout_hides_only_the_low_surface_inside_its_bounds() {
+        let triangles = [
+            [[0.0, 1.0, 0.0], [100.0, 1.0, 0.0], [0.0, 1.0, 100.0]],
+            [[100.0, 1.0, 0.0], [100.0, 1.0, 100.0], [0.0, 1.0, 100.0]],
+            [[30.0, 50.0, 30.0], [60.0, 50.0, 30.0], [30.0, 50.0, 60.0]],
+        ];
+        let roi = [-10.0, 110.0, -10.0, 110.0];
+        let original = floor_silhouette(&triangles, roi);
+        let cutout = FloorCutout { bounds: [20.0, 80.0, 20.0, 80.0], max_height: 2.0 };
+        let hidden = floor_silhouette_with_cutout(&triangles, roi, Some(cutout));
+        assert!(!hidden.covered(75.0, 75.0));
+        assert!(hidden.covered(40.0, 40.0));
+        assert!(hidden.covered(10.0, 10.0));
+        for (a, b) in original.rgba.as_chunks::<4>().0.iter().zip(hidden.rgba.as_chunks::<4>().0) {
+            assert!(a == b || *b == [0; 4]);
+        }
+    }
 
     #[test]
     fn collision_ramps_shade_continuously_and_keep_the_upper_surface() {

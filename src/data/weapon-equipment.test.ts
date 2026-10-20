@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { equipmentRarity } from './weapon-equipment';
+import { EQUIPMENT_RARITIES, equipmentRarity, validEquipmentBonus } from './weapon-equipment';
 
 it('maps exact saved equipment bonuses to retail rarity colour bands', () => {
   for (const [bonus, color] of [
@@ -129,5 +129,14 @@ it('offers compatible chips even when they do not affect calculator stats', () =
     expect(
       canEquipChip({ ...item, description: 'Equip with WU only' }, 'board', gear, 0, items),
     ).toBe(false);
+  }
+});
+
+it('accepts only whole quality bonuses within the saved 11-bit range', () => {
+  for (const n of [0, 1, 50, 127, 1024, 2047]) expect(validEquipmentBonus(n)).toBe(true);
+  for (const n of [-1, 2048, 1.5, NaN, Infinity]) expect(validEquipmentBonus(n)).toBe(false);
+  for (const rarity of EQUIPMENT_RARITIES) {
+    expect(equipmentRarity(rarity.minimum).name).toBe(rarity.name);
+    expect(equipmentRarity(rarity.maximum).name).toBe(rarity.name);
   }
 });

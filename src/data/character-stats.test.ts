@@ -96,3 +96,83 @@ it('recalculates species, level, XData and equipment together', () => {
   expect(characterStats(form, 10, power, emptyEquipment(), items, stats).wisdom).toBe(162);
   expect(characterStats(form, 10, { ...power, wisdom: 40 }, gear, items, stats).wisdom).toBe(350);
 });
+
+it('uses exact quality values on the matching attribute without spreading core or board quality to other stats', () => {
+  const form = {
+    species: 0,
+    name: 'Test',
+    model: '',
+    wisdomInitial: 100,
+    wisdomGrowth: 0,
+    strengthInitial: 100,
+    strengthGrowth: 0,
+    speedInitial: 100,
+    speedGrowth: 0,
+  };
+  const stats: SaveStats = {
+    forms: [form],
+    strengthBoards: [3],
+    speedBoards: [0],
+    wisdomBoards: [6],
+  };
+  const items = new Map<string, Item>([
+    [
+      'weapon:0',
+      { category: 'weapon', id: 0, name: 'Weapon', description: null, stats: { strength: 143 } },
+    ],
+    [
+      'armor1:0',
+      { category: 'armor1', id: 0, name: 'Core', description: null, stats: { defense: 45 } },
+    ],
+    [
+      'armor2:3',
+      {
+        category: 'armor2',
+        id: 3,
+        name: 'Strength board',
+        description: null,
+        stats: { strength: 60 },
+      },
+    ],
+    [
+      'armor2:0',
+      { category: 'armor2', id: 0, name: 'Speed board', description: null, stats: { speed: 20 } },
+    ],
+    [
+      'armor2:6',
+      { category: 'armor2', id: 6, name: 'Wisdom board', description: null, stats: { wisdom: 10 } },
+    ],
+  ]);
+  const gear = {
+    ...emptyEquipment(),
+    weapon: { key: 'weapon:0', revision: 50 },
+    core: { key: 'armor1:0', revision: 511 },
+    subBoard: { key: 'armor2:3', revision: 37 },
+  };
+  const power = { strength: 0, speed: 0, wisdom: 0 };
+  expect(characterStats(form, 1, power, gear, items, stats)).toMatchObject({
+    strength: 390,
+    speed: 100,
+    wisdom: 100,
+  });
+  expect(
+    characterStats(
+      form,
+      1,
+      power,
+      { ...gear, subBoard: { key: 'armor2:0', revision: 17 } },
+      items,
+      stats,
+    ),
+  ).toMatchObject({ strength: 293, speed: 137, wisdom: 100 });
+  expect(
+    characterStats(
+      form,
+      1,
+      power,
+      { ...gear, subBoard: { key: 'armor2:6', revision: 55 } },
+      items,
+      stats,
+    ),
+  ).toMatchObject({ strength: 293, speed: 100, wisdom: 165 });
+});

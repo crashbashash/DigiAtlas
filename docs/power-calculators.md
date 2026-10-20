@@ -152,3 +152,17 @@ followed by an increment of one at `0x3ff638`) and `0x41f92c–0x41f98c` (skill 
 The formula also agrees with the independent GameCube analysis in
 [Mateon1’s TASVideos research](https://tasvideos.org/Forum/Posts/User/Mateon1).
 This is a training limit, so manual entry and save loading remain available above it.
+
+
+### Exact equipment quality
+
+The shared equipment editor exposes **Exact bonus (+N)** for weapons, cores and
+sub-boards. Values are whole numbers from 0 to 2047. Editing the bonus updates
+rarity automatically; selecting a rarity sets the minimum bonus in that colour's
+range. Loaded saves retain their exact values. Invalid or unfinished entries show
+an explanation and keep the last valid bonus in the calculator.
+
+The editor shows base + quality = item stat for weapons (Strength), cores
+(Defense), and boards with an imported Strength, Speed or Wisdom quality mapping.
+Other board quality values remain editable without guessing their target attribute.
+The existing calculator formulas apply quality only to the matching attribute.

@@ -69,14 +69,29 @@ export function equipmentStats(
 }
 
 // Retail item colour thresholds; docs/systems/items.md, rarity seed section.
+export const EQUIPMENT_BONUS_MAX = 2047;
 export const EQUIPMENT_RARITIES = [
-  { name: 'White', minimum: 0, color: '#c9d1d9' },
-  { name: 'Blue', minimum: 1, color: '#4c8dff' },
-  { name: 'Green', minimum: 16, color: '#3fb950' },
-  { name: 'Yellow', minimum: 128, color: '#d6b400' },
-  { name: 'Orange', minimum: 512, color: '#f0883e' },
-  { name: 'Pink', minimum: 1024, color: '#db61a2' },
+  { name: 'White', minimum: 0, maximum: 0, color: '#c9d1d9' },
+  { name: 'Blue', minimum: 1, maximum: 15, color: '#4c8dff' },
+  { name: 'Green', minimum: 16, maximum: 127, color: '#3fb950' },
+  { name: 'Yellow', minimum: 128, maximum: 511, color: '#d6b400' },
+  { name: 'Orange', minimum: 512, maximum: 1023, color: '#f0883e' },
+  { name: 'Pink', minimum: 1024, maximum: EQUIPMENT_BONUS_MAX, color: '#db61a2' },
 ] as const;
+export function validEquipmentBonus(value: number) {
+  return Number.isInteger(value) && value >= 0 && value <= EQUIPMENT_BONUS_MAX;
+}
+
+/** The quality attribute relevant to this editor; unknown board attributes stay unlabelled. */
+export function equipmentBonusStat(item: Item, stats: SaveStats | undefined): string | null {
+  if (item.category === 'weapon') return 'strength';
+  if (item.category === 'armor1') return 'defense';
+  if (item.category !== 'armor2') return null;
+  if (stats?.strengthBoards?.includes(item.id)) return 'strength';
+  if (stats?.speedBoards?.includes(item.id)) return 'speed';
+  if (stats?.wisdomBoards.includes(item.id)) return 'wisdom';
+  return null;
+}
 export function equipmentRarity(revision: number) {
   return (
     [...EQUIPMENT_RARITIES].reverse().find((r) => revision >= r.minimum) ?? EQUIPMENT_RARITIES[0]

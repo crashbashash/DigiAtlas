@@ -2,6 +2,7 @@ import { useId, useState } from 'preact/hooks';
 import {
   EQUIPMENT_RARITIES,
   equipmentRarity,
+  equipmentBonusStat,
   canEquipChip,
   type EquippedItem,
   type WeaponEquipment,
@@ -11,6 +12,8 @@ import { ChipPicker } from './ChipPicker';
 import { SearchPicker } from './SearchPicker';
 import { ItemName } from './ItemName';
 import { FormulaHelp } from './FormulaHelp';
+import { EquipmentBonusInput } from './EquipmentBonusInput';
+import { statLabel } from '../data/logic';
 
 type Group = 'weapon' | 'board' | 'sub';
 export function WeaponEquipmentEditor({
@@ -28,54 +31,75 @@ export function WeaponEquipmentEditor({
     category: string,
     value: EquippedItem | null,
     update: (item: EquippedItem | null) => void,
-  ) => (
-    <div class="equipment-row">
-      <SearchPicker
-        label={label}
-        value={value?.key ?? ''}
-        searchLabel={`Search ${label.toLowerCase()}`}
-        closeLabel="Close equipment picker"
-        onChange={(key) => update(key ? { key, revision: 0 } : null)}
-        options={[
-          { value: '', label: 'None' },
-          ...[...model.items.entries()]
-            .filter(
-              ([, item]) =>
-                item.category === category && !item.unidentified && item.name !== 'Sold Out',
-            )
-            .sort(([a], [b]) => model.itemLabel(a).localeCompare(model.itemLabel(b)))
-            .map(([key]) => ({
-              value: key,
-              label: model.itemLabel(key),
-              content: <ItemName itemKey={key} />,
-            })),
-        ]}
-      />
-      {value && (
+  ) => {
+    const item = value && model.items.get(value.key);
+    const rarity = equipmentRarity(value?.revision ?? 0);
+    const stat = item && equipmentBonusStat(item, model.raw.items.saveStats);
+    const base = item && stat ? (item.stats?.[stat] ?? 0) : null;
+    return (
+      <div class="equipment-row">
         <SearchPicker
-          label={`${label} rarity`}
-          value={equipmentRarity(value.revision).name}
-          closeLabel="Close rarity picker"
-          onChange={(name) =>
-            update({
-              ...value,
-              revision: EQUIPMENT_RARITIES.find((r) => r.name === name)!.minimum,
-            })
-          }
-          options={EQUIPMENT_RARITIES.map((r) => ({
-            value: r.name,
-            label: r.name,
-            content: (
-              <span class="rarity-choice">
-                <span class="rarity-dot" style={{ background: r.color }} aria-hidden="true" />
-                <span style={{ color: r.color }}>{r.name}</span>
-              </span>
-            ),
-          }))}
+          label={label}
+          value={value?.key ?? ''}
+          searchLabel={`Search ${label.toLowerCase()}`}
+          closeLabel="Close equipment picker"
+          onChange={(key) => update(key ? { key, revision: 0 } : null)}
+          options={[
+            { value: '', label: 'None' },
+            ...[...model.items.entries()]
+              .filter(
+                ([, item]) =>
+                  item.category === category && !item.unidentified && item.name !== 'Sold Out',
+              )
+              .sort(([a], [b]) => model.itemLabel(a).localeCompare(model.itemLabel(b)))
+              .map(([key]) => ({
+                value: key,
+                label: model.itemLabel(key),
+                content: <ItemName itemKey={key} />,
+              })),
+          ]}
         />
-      )}
-    </div>
-  );
+        {value && (
+          <>
+            <div class="equipment-rarity">
+              <SearchPicker
+                label={`${label} rarity`}
+                value={equipmentRarity(value.revision).name}
+                closeLabel="Close rarity picker"
+                onChange={(name) =>
+                  update({
+                    ...value,
+                    revision: EQUIPMENT_RARITIES.find((r) => r.name === name)!.minimum,
+                  })
+                }
+                options={EQUIPMENT_RARITIES.map((r) => ({
+                  value: r.name,
+                  label: r.name,
+                  content: (
+                    <span class="rarity-choice">
+                      <span class="rarity-dot" style={{ background: r.color }} aria-hidden="true" />
+                      <span style={{ color: r.color }}>{r.name}</span>
+                    </span>
+                  ),
+                }))}
+              />
+              <p class="equipment-bonus-hint">
+                {rarity.name}: +{rarity.minimum}
+                {rarity.maximum !== rarity.minimum ? `–${rarity.maximum}` : ''}
+              </p>
+            </div>
+            <EquipmentBonusInput key={value.key} label={label} value={value} onChange={update} />
+            {stat && base !== null && (
+              <p class="equipment-bonus-total" aria-live="polite">
+                {statLabel(stat)}: {base} + {value.revision} ={' '}
+                <strong>{base + value.revision}</strong>
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
   const chips = (slot: 'weapon' | 'board') => {
     const key = slot === 'weapon' ? 'weaponChips' : 'boardChips';
     const label = slot === 'weapon' ? 'Weapon' : 'Core';
@@ -135,8 +159,9 @@ export function WeaponEquipmentEditor({
                 chips that do not affect this calculator.
               </p>
               <p>
-                New rarity selections use the lowest bonus for that colour. Loaded saves keep their
-                exact bonus.
+                Enter an exact quality bonus from +0 to +2047; the rarity colour updates to match.
+                Choosing a rarity sets its minimum bonus. Loaded saves keep their exact values.
+                Quality increases the item’s matching attribute, rather than every stat.
               </p>
             </FormulaHelp>
           </div>

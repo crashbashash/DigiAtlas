@@ -1483,15 +1483,23 @@ a.calculator-tile:hover {
   margin-block: 0.75rem;
 }
 .equipment-row {
-  display: flex;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1rem;
 }
 .equipment-row > :first-child {
-  flex: 1;
+  grid-column: 1 / -1;
   min-width: 0;
 }
-.equipment-row > :nth-child(2) {
-  width: 8rem;
+.equipment-row .equipment-bonus-hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.equipment-bonus-total {
+  grid-column: 1 / -1;
+  margin: 0 0 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .item-name {

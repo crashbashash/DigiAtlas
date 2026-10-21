@@ -65,6 +65,12 @@ DIGIATLAS_PS2_EUROPE_ISO="/path/to/europe.iso" DIGIATLAS_PS2_JAPAN_ISO="/path/to
 
 GameCube imports use the disc header, FST and boot DOL. ISO/GCM and NKit ISO are
 read directly; RVZ, WIA, GCZ and CISO are streamed through [nod](https://docs.rs/nod/1.4.4/nod/)
-without a whole-disc temporary extraction. Authored AFS/IGB/Lua data is decoded by
+without a whole-disc temporary extraction. The pinned reader has a small
+[local compatibility patch](vendor/nod/DIGIATLAS.md) for extended mod images whose
+last processing sector is shorter than 32 KiB. The partial range must end exactly
+at the declared logical EOF; missing data and misaligned interior ranges still
+fail. Logical disc size and source bytes are preserved. Synthetic `tests/rvz.rs`
+checks compressed/uncompressed tails, backward seeks, footer reads and failures.
+Authored AFS/IGB/Lua data is decoded by
 the same importer as PS2. Set `DIGIATLAS_GC_USA_ISO` and/or
 `DIGIATLAS_GC_JAPAN_ISO` to run the regional map/schema tests against those discs.

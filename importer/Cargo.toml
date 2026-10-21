@@ -20,9 +20,10 @@ encoding_rs = "0.8"
 flate2 = "1"
 crc32fast = "1"
 sha1_smol = "1"
-nod = "=1.4.4"
+nod = { version = "=1.4.4", path = "vendor/nod" }
 
 [dev-dependencies]
+zstd = "0.13"
 jsonschema = { version = "0.30", default-features = false }
 png = "0.17"
 

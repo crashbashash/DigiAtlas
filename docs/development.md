@@ -88,6 +88,12 @@ Game images, saves and generated exports stay outside version control. The impor
 same [data schema](schema.md) for each supported platform; the manifest records the platform,
 region, frame rate, source fingerprint and extracted counts.
 
+RVZ/WIA decoding uses a pinned local copy of nod 1.4.4. Its narrow final-sector
+compatibility patch and upstream provenance are documented in
+[`importer/vendor/nod/DIGIATLAS.md`](../importer/vendor/nod/DIGIATLAS.md). Both CLI
+and desktop builds use that same dependency. No full-image conversion is needed
+for Crown Mod RVZ imports.
+
 The desktop app retains its original `data/ps2-usa` folder name for all supported discs:
 
 | System | Data folder |

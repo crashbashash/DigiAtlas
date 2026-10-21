@@ -40,7 +40,7 @@ jobs:
           $msi = @(Get-ChildItem src-tauri/target/release/bundle/msi -Filter *.msi)
           if ($msi.Count -ne 1) { throw "Expected one MSI" }
           Copy-Item $msi[0].FullName "release-assets/digiatlas-$version-windows-x86_64.msi"
-          Compress-Archive -Path src-tauri/target/release/digiatlas.exe,LICENSE,README.md -DestinationPath "release-assets/digiatlas-$env:RELEASE_TAG-windows-x86_64.zip"
+          Compress-Archive -Path src-tauri/target/release/digiatlas.exe,LICENSE,README.md,THIRD-PARTY-NOTICES.txt -DestinationPath "release-assets/digiatlas-$env:RELEASE_TAG-windows-x86_64.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: windows-assets
@@ -81,7 +81,7 @@ jobs:
           files=(src-tauri/target/release/bundle/deb/*.deb)
           test "${#files[@]}" -eq 1
           cp "${files[0]}" "release-assets/digiatlas-${RELEASE_TAG}-linux-x86_64.deb"
-          tar -czf "release-assets/digiatlas-${RELEASE_TAG}-linux-x86_64.tar.gz" -C src-tauri/target/release digiatlas -C "$GITHUB_WORKSPACE" LICENSE README.md
+          tar -czf "release-assets/digiatlas-${RELEASE_TAG}-linux-x86_64.tar.gz" -C src-tauri/target/release digiatlas -C "$GITHUB_WORKSPACE" LICENSE README.md THIRD-PARTY-NOTICES.txt
       - uses: actions/upload-artifact@v4
         with:
           name: linux-assets

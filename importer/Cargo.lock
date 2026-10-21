@@ -269,6 +269,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1_smol",
+ "zstd",
 ]
 
 [[package]]
@@ -724,8 +725,6 @@ checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
 [[package]]
 name = "nod"
 version = "1.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fbe592a5e74ed882c6d7373b4cc6beca6e84cf6b7f9fe5cba5d600255d965b5"
 dependencies = [
  "adler",
  "aes",

@@ -908,7 +908,7 @@ dependencies = [
 
 [[package]]
 name = "digiatlas"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "digiatlas-importer",
  "reqwest",
@@ -2475,8 +2475,6 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 [[package]]
 name = "nod"
 version = "1.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fbe592a5e74ed882c6d7373b4cc6beca6e84cf6b7f9fe5cba5d600255d965b5"
 dependencies = [
  "adler",
  "aes",

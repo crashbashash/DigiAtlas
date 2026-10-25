@@ -4,6 +4,7 @@ import {
   formatPercent,
   groupByEnemy,
   isUnused,
+  isInactiveOn,
   itemMatchesQuery,
   scriptRefText,
   startModeText,
@@ -133,5 +134,30 @@ describe('itemMatchesQuery', () => {
     expect(itemMatchesQuery(item, 'unidentified')).toBe(true);
     expect(itemMatchesQuery(item, 'unid')).toBe(true);
     expect(itemMatchesQuery(item, 'core')).toBe(false);
+  });
+});
+
+describe('script difficulty guards', () => {
+  const spawn = (conditions: string[][]): Generator => ({
+    name: 'Chest',
+    row: 1,
+    count: 1,
+    maxCount: 1,
+    spawns: [],
+    rotations: [],
+    startMode: 'direct',
+    fillMode: 'wipeout',
+    script: { status: 'dynamic', refs: conditions.map((when) => ({ verb: 'START', when })) },
+  });
+  it('only hides a group when every start excludes the chosen difficulty', () => {
+    expect(isInactiveOn(spawn([['be:SYSgetDifficulty() == 0']]), 'hard')).toBe(true);
+    expect(isInactiveOn(spawn([['be:SYSgetDifficulty() < 2']]), 'hard')).toBe(false);
+    expect(isInactiveOn(spawn([['be:SYSgetDifficulty() < 2']]), 'veryhard')).toBe(true);
+    expect(isInactiveOn(spawn([['be:SYSgetDifficulty() == 0'], []]), 'hard')).toBe(false);
+    expect(isInactiveOn(spawn([['unknown()']]), 'hard')).toBe(false);
+    expect(isInactiveOn(spawn([]), 'hard')).toBe(false);
+    const radar = spawn([['be:SYSgetDifficulty() == 0']]);
+    radar.startMode = 'radar';
+    expect(isInactiveOn(radar, 'hard')).toBe(false);
   });
 });

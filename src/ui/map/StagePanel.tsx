@@ -289,8 +289,8 @@ function Overview({ stage, difficulty: d, reveal, select }: PanelProps) {
           )}
           {hidden.size > 0 && (
             <p class="note">
-              {hidden.size} spawner{hidden.size === 1 ? ' is' : 's are'} left out because no game
-              script starts {hidden.size === 1 ? 'it' : 'them'}.{' '}
+              {hidden.size} spawner{hidden.size === 1 ? ' is' : 's are'} left out because
+              {hidden.size === 1 ? ' it is' : ' they are'} unused or inactive on this difficulty.{' '}
               <button type="button" class="link" onClick={() => setSettings({ showUnused: true })}>
                 Show them
               </button>

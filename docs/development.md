@@ -46,6 +46,18 @@ cargo run --release --manifest-path importer/Cargo.toml -- "/path/to/game.iso" -
 npm run dev
 ```
 
+Quest dungeon suffixes describe copies of a particular floor, not an unconditional difficulty
+restriction. Floors with only an `e` copy (including both Item Road floors) are shared across
+all difficulties. Where an `h` copy exists without a `v` copy, it serves Hard and Very Hard.
+The map and item-source searches use the selected difficulty's data column. Scripted spawner
+groups whose start conditions exclude that difficulty are hidden with unused spawners.
+
+Check Item Road's active chest groups and difficulty-specific loot against an existing export:
+
+```sh
+DIGIATLAS_TEST_EXPORT=data/generated/ps2 npm test -- tests/item-road-real.test.js
+```
+
 The server listens at `http://127.0.0.1:5175`. Set `DIGIATLAS_DATA` to serve another exported
 folder instead of `data/generated/ps2`.
 

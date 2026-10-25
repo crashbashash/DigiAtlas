@@ -86,14 +86,16 @@ export function SettingsBar(props: {
       {(props.unused === true || (props.unused ?? 0) > 0) && (
         <label
           class="check"
-          title="Spawners that no game script starts. They most likely never appear, so they are hidden unless you ask."
+          title="Spawners that are unused or whose script conditions exclude this difficulty. Hidden unless you ask."
         >
           <input
             type="checkbox"
             checked={settings.showUnused}
             onChange={(e) => setSettings({ showUnused: (e.target as HTMLInputElement).checked })}
           />
-          {props.unused === true ? 'Include unused spawners' : `Show ${props.unused} unused`}
+          {props.unused === true
+            ? 'Include unused or inactive spawners'
+            : `Show ${props.unused} unused or inactive`}
         </label>
       )}
     </div>

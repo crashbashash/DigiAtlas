@@ -455,7 +455,7 @@ describe('Model', () => {
   it('titles stages with floor and variant', () => {
     const m = model();
     expect(m.stageTitle({ ...m.byId.get('dng101b1')!, floor: 'B2', variant: 'h' })).toBe(
-      'Humid Cave B2 (Hard)',
+      'Humid Cave B2 (Hard / Very Hard)',
     );
   });
 });
@@ -621,12 +621,63 @@ describe('difficulty-specific dungeon copies', () => {
       ['veryhard', 'v'],
     ] as const) {
       expect(m.stageOn(normal, d).id).toBe(`dngq4b3${v}`);
-      expect(m.stageOn(m.byId.get('dngq4b1e')!, d).id).toBe(
-        d === 'normal' ? 'dngq4b1e' : `dngq4b3${v}`,
-      );
+      expect(m.stageOn(m.byId.get('dngq4b1e')!, d).id).toBe('dngq4b1e');
       expect(m.mapDifficulties(m.byId.get(`dngq4b3${v}`)!)).toEqual(['normal', 'hard', 'veryhard']);
       const shared = m.byId.get('stag0102')!;
       expect(m.stageOn(shared, d)).toBe(shared);
+    }
+  });
+
+  it('keeps shared floors on all difficulties and uses an h copy on Very Hard without a v copy', () => {
+    const raw = model().raw;
+    const shared = stage('dngq7b1e', 'Machine Pit', 'Item Road', 'dungeon', [
+      gen('Chest', 9, { normal: 'nB', hard: 'nB', veryhard: 'nB' }),
+    ]);
+    shared.variant = 'e';
+    shared.floor = 'B1';
+    shared.difficulties.veryhard = shared.difficulties.hard;
+    const second = { ...shared, id: 'dngq7b2e', floor: 'B2' };
+    raw.stages.stages = [shared, second];
+    let m = new Model(raw);
+    for (const d of ['normal', 'hard', 'veryhard'] as const) {
+      expect(m.stagesOn(d).map((s) => s.id)).toEqual(['dngq7b1e', 'dngq7b2e']);
+      expect(m.stageOn(shared, d)).toBe(shared);
+      expect(m.mapsFor('weapon:0', d).some((x) => x.stage.id === shared.id)).toBe(true);
+    }
+    expect(m.entryDifficulty(shared)).toBeNull();
+    expect(m.stageTitle(shared)).toBe('Item Road B1');
+    expect(m.mapDifficulties(shared)).toEqual(['normal', 'hard', 'veryhard']);
+    expect(m.chipLabel(m.worlds[0].rooms[0], shared)).toBe('B1');
+
+    const hard = { ...second, id: 'dngq7b2h', variant: 'h' as const };
+    raw.stages.stages.push(hard);
+    m = new Model(raw);
+    expect(m.stageOn(second, 'hard')).toBe(hard);
+    expect(m.stageOn(second, 'veryhard')).toBe(hard);
+    expect(m.stageOn(shared, 'veryhard')).toBe(shared);
+    expect(m.stagesOn('veryhard').map((s) => s.id)).toEqual(['dngq7b1e', 'dngq7b2h']);
+  });
+
+  it('uses script difficulty guards for chest pins, counts and item sources', () => {
+    const raw = model().raw;
+    const chests = ['normal', 'hard', 'veryhard'].map((d, i) => ({
+      ...gen(`Chest-${d}`, 9, { normal: 'nB', hard: 'nB', veryhard: 'nB' }),
+      script: {
+        status: 'dynamic' as const,
+        refs: [{ verb: 'START', when: [`be:SYSgetDifficulty() == ${i}`, 'event not done yet'] }],
+      },
+    }));
+    const shared = stage('dngq7b1e', 'Machine Pit', 'Item Road', 'dungeon', chests);
+    shared.variant = 'e';
+    shared.difficulties.veryhard = shared.difficulties.hard;
+    raw.stages.stages = [shared];
+    const m = new Model(raw);
+    for (const [i, d] of ['normal', 'hard', 'veryhard'].entries()) {
+      const difficulty = d as 'normal' | 'hard' | 'veryhard';
+      expect([...m.hidden(shared, difficulty)]).toEqual([0, 1, 2].filter((n) => n !== i));
+      expect(m.sourcesOf('weapon:0', difficulty)[0].generators).toEqual([i]);
+      expect(m.rowSpawns(9, difficulty)[0].spawners).toBe(1);
+      expect(m.hidden(shared, difficulty, { players: 1, hideUnused: false }).size).toBe(0);
     }
   });
 

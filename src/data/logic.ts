@@ -1,4 +1,4 @@
-import type { DropEntry, DropPool, Enemy, Generator, Item, ScriptRef } from './types';
+import type { Difficulty, DropEntry, DropPool, Enemy, Generator, Item, ScriptRef } from './types';
 
 export const itemKey = (category: string, id: number): string => `${category}:${id}`;
 
@@ -172,6 +172,41 @@ export function isUnused(g: Generator, enemy: Enemy | undefined): boolean {
     enemy?.kind !== 'object' &&
     (g.startMode === 'direct' || g.startMode === 'timer') &&
     g.script?.status === 'none'
+  );
+}
+
+/** Hide a scripted group only when every known start rules out this difficulty.
+ * Unknown conditions remain possible; radar spawners can start independently.
+ */
+export function isInactiveOn(g: Generator, difficulty: Difficulty): boolean {
+  if (g.startMode === 'radar') return false;
+  const starts = g.script?.refs?.filter((r) => r.verb === 'START' || r.verb === 'RESTART') ?? [];
+  const value = { normal: 0, hard: 1, veryhard: 2 }[difficulty];
+  return (
+    starts.length > 0 &&
+    starts.every((r) =>
+      r.when.some((condition) => {
+        const match = /^be:SYSgetDifficulty\(\)\s*(==|~=|<=|>=|<|>)\s*([012])$/.exec(condition);
+        if (!match) return false;
+        const expected = Number(match[2]);
+        switch (match[1]) {
+          case '==':
+            return value !== expected;
+          case '~=':
+            return value === expected;
+          case '<=':
+            return value > expected;
+          case '>=':
+            return value < expected;
+          case '<':
+            return value >= expected;
+          case '>':
+            return value <= expected;
+          default:
+            return false;
+        }
+      }),
+    )
   );
 }
 

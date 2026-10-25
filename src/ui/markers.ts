@@ -1,5 +1,6 @@
 import { isUnused, startSummary } from '../data/logic';
-import type { Enemy, EnemyKind, Generator } from '../data/types';
+import type { Difficulty, Enemy, EnemyKind, Generator, Stage } from '../data/types';
+import type { Model, Scope } from '../data/model';
 
 /** One thing drawn on the map. A badge above 1 means that many enemies spawn there. */
 export interface Marker {
@@ -16,6 +17,21 @@ export interface Marker {
   others: [number, number][] | null;
   /** For a radar spawner: how close you must get for it to start (world units). */
   trigger: { x: number; z: number; radius: number } | null;
+}
+
+/** Use the same active groups and stable generator indices as the map's side panel. */
+export function stageMarkers(
+  model: Model,
+  stage: Stage,
+  difficulty: Difficulty,
+  scope: Scope,
+): Marker[] {
+  const inactive = model.hidden(stage, difficulty, { ...scope, hideUnused: true });
+  return makeMarkers(model.generators(stage, difficulty, scope), model.enemies, false, (g) =>
+    model.isBossFight(g),
+  )
+    .filter((m) => !scope.hideUnused || !inactive.has(m.gi))
+    .map((m) => ({ ...m, unused: m.unused || inactive.has(m.gi) }));
 }
 
 /**

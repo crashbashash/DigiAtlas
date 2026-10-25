@@ -2,7 +2,7 @@ import type { DataSource } from '../data/source';
 import { traderLabel, type Model, type Scope } from '../data/model';
 import type { Difficulty, Enemy, EnemyKind, ServiceNpc, Stage } from '../data/types';
 import { h } from './dom';
-import { makeMarkers, type Marker } from './markers';
+import { stageMarkers, type Marker } from './markers';
 import { hasHeightVariation } from './map-legend';
 
 export const KIND_COLOR: Record<EnemyKind, string> = {
@@ -169,12 +169,7 @@ export class MapView {
     this.route = stage.boatRoute ?? [];
     this.selected = selected;
     this.litPins = litPins;
-    this.markers = makeMarkers(
-      this.model.generators(stage, d, scope),
-      this.model.enemies,
-      scope.hideUnused,
-      (g) => this.model.isBossFight(g),
-    );
+    this.markers = stageMarkers(this.model, stage, d, scope);
     for (const [kind, key] of this.markerKeys)
       key.hidden = !this.markers.some((m) => m.kind === kind);
     this.numberKey.hidden = !this.markers.some((m) => m.badge > 1);

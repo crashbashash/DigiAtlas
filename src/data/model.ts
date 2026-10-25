@@ -1,6 +1,6 @@
 import type { DataSource } from './source';
 import { presentPickup } from './item-presentation';
-import { dropTable, isUnused, itemKey, type DropRow } from './logic';
+import { dropTable, isUnused, isInactiveOn, itemKey, type DropRow } from './logic';
 import type {
   DropPool,
   Difficulty,
@@ -322,14 +322,14 @@ export class Model {
     const out = new Set<number>();
     if (!scope.hideUnused) return out;
     this.generators(stage, d, scope).forEach((g, i) => {
-      if (isUnused(g, this.enemies.get(g.row))) out.add(i);
+      if (isUnused(g, this.enemies.get(g.row)) || isInactiveOn(g, d)) out.add(i);
     });
     return out;
   }
 
-  /** How many spawners no script starts in a stage, whether or not they are hidden. */
+  /** How many spawners are unused or inactive on this difficulty. */
   unusedCount(stage: Stage, d: Difficulty): number {
-    return this.generators(stage, d).filter((g) => isUnused(g, this.enemies.get(g.row))).length;
+    return this.hidden(stage, d).size;
   }
 
   /** A spawner as it behaves for a number of players. */
@@ -352,36 +352,43 @@ export class Model {
     return raw.map((g) => this.forPlayers(g, scope.players));
   }
 
-  /** Dungeon e/h/v copies contain all three data columns, but only one copy is entered per difficulty. */
-  stagesOn(d: Difficulty): Stage[] {
-    return this.stages.filter((stage) => !stage.variant || VARIANT_DIFFICULTY[stage.variant] === d);
+  /** Copies of the same floor; other floors can be shared across difficulties. */
+  private floorCopies(stage: Stage): Stage[] {
+    return this.stages.filter(
+      (s) => s.area === stage.area && s.room === stage.room && s.floor === stage.floor && s.variant,
+    );
   }
 
-  /** Choose this room's copy for a difficulty, retaining its floor when possible. */
+  /** An e-only floor is shared; an h copy also serves Very Hard when there is no v copy. */
+  private copyDifficulties(stage: Stage): Difficulty[] {
+    if (!stage.variant) return DIFFICULTIES;
+    const first = DIFFICULTIES.indexOf(VARIANT_DIFFICULTY[stage.variant]);
+    const next = Math.min(
+      ...this.floorCopies(stage)
+        .map((s) => DIFFICULTIES.indexOf(VARIANT_DIFFICULTY[s.variant!]))
+        .filter((i) => i > first),
+      DIFFICULTIES.length,
+    );
+    return DIFFICULTIES.slice(first, next);
+  }
+
+  stagesOn(d: Difficulty): Stage[] {
+    return this.stages.filter((stage) => this.copyDifficulties(stage).includes(d));
+  }
+
+  /** Choose this floor's copy without redirecting a shared floor to another floor. */
   stageOn(stage: Stage, d: Difficulty): Stage {
     if (!stage.variant) return stage;
-    const copies = this.stages.filter(
-      (s) =>
-        s.area === stage.area &&
-        s.room === stage.room &&
-        s.variant &&
-        VARIANT_DIFFICULTY[s.variant] === d,
-    );
-    return copies.find((s) => s.floor === stage.floor) ?? copies[0] ?? stage;
+    return this.floorCopies(stage).find((s) => this.copyDifficulties(s).includes(d)) ?? stage;
   }
 
-  /** The difficulty choices for a room, including its other dungeon copies. */
+  /** The difficulty choices for this floor, including its other copies. */
   mapDifficulties(stage: Stage): Difficulty[] {
     if (!stage.variant) return this.available(stage);
-    return DIFFICULTIES.filter((d) =>
-      this.stages.some(
-        (s) =>
-          s.area === stage.area &&
-          s.room === stage.room &&
-          s.variant &&
-          VARIANT_DIFFICULTY[s.variant] === d,
-      ),
-    );
+    return DIFFICULTIES.filter((d) => {
+      const copy = this.stageOn(stage, d);
+      return this.copyDifficulties(copy).includes(d) && this.available(copy).includes(d);
+    });
   }
 
   /** Difficulties a stage actually has data for. */
@@ -417,13 +424,14 @@ export class Model {
     const index = new Map<string, ItemSource[]>();
     for (const stage of this.stagesOn(d)) {
       const gens = this.generators(stage, d, scope);
+      const hidden = this.hidden(stage, d, scope);
       // A stage's spawners often share a pool, and several stat rows can be one enemy (crown ranks);
       // collapse them to one row per stage, enemy name and chance.
       const seen = new Map<string, ItemSource>();
       const rows = new Map<string, Set<number>>();
       gens.forEach((g, gi) => {
         const enemy = this.enemies.get(g.row);
-        if (scope.hideUnused && isUnused(g, enemy)) return;
+        if (hidden.has(gi)) return;
         const name = enemy?.name ?? `Row ${g.row}`;
         for (const row of this.tableFor(g, d).rows as DropRow[]) {
           const k = `${row.key}|${stage.id}|${name}|${row.rate}`;
@@ -573,7 +581,9 @@ export class Model {
 
   /** The difficulty an e/h/v dungeon copy is entered on. */
   entryDifficulty(stage: Stage): Difficulty | null {
-    return stage.variant ? VARIANT_DIFFICULTY[stage.variant] : null;
+    if (!stage.variant) return null;
+    const difficulties = this.copyDifficulties(stage);
+    return difficulties.length === 1 ? difficulties[0] : null;
   }
 
   /** Whether anything spawns in the room on any difficulty. */
@@ -583,10 +593,12 @@ export class Model {
 
   /** Short label for one of a room's stages: its floor and difficulty, or "Map N" when it has neither. */
   chipLabel(room: Room, s: Stage): string {
-    const parts = [
-      s.floor,
-      s.variant ? DIFFICULTY_LABEL[VARIANT_DIFFICULTY[s.variant]] : null,
-    ].filter(Boolean);
+    const difficulties = this.copyDifficulties(s);
+    const label =
+      s.variant && difficulties.length < DIFFICULTIES.length
+        ? difficulties.map((d) => DIFFICULTY_LABEL[d]).join(' / ')
+        : null;
+    const parts = [s.floor, label].filter(Boolean);
     return parts.length ? parts.join(' ') : `Map ${room.stages.indexOf(s) + 1}`;
   }
 
@@ -702,9 +714,12 @@ export class Model {
 
   stageTitle(s: Stage): string {
     const base = s.room ?? s.id;
+    const difficulties = this.copyDifficulties(s);
     const extra = [
       s.floor,
-      s.variant ? `(${DIFFICULTY_LABEL[VARIANT_DIFFICULTY[s.variant]]})` : null,
+      s.variant && difficulties.length < DIFFICULTIES.length
+        ? `(${difficulties.map((d) => DIFFICULTY_LABEL[d]).join(' / ')})`
+        : null,
     ]
       .filter(Boolean)
       .join(' ');

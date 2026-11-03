@@ -31,7 +31,7 @@ const PLAYER_LAST_ITEMS: usize = 3;
 const ITEM_NAME: usize = 0;
 const ITEM_ONES: usize = 1;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DropEntry {
     pub category: String,
     pub id: i64,
@@ -39,7 +39,7 @@ pub struct DropEntry {
     pub rate: i64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DropPool {
     pub name: String,
     pub entries: Vec<DropEntry>,
@@ -230,12 +230,8 @@ impl Pack {
                 lua: v[GENE_LUA].clone(),
                 gene_count: first.map(|s| s.count.clone()),
                 gene_max_count: first.map(|s| s.max_count.clone()),
-                pools: slots.iter().find(|s| !s.pools.is_empty()).map(|s| s.pools.clone()).unwrap_or_default(),
-                last_pools: slots
-                    .iter()
-                    .find(|s| !s.last_pools.is_empty())
-                    .map(|s| s.last_pools.clone())
-                    .unwrap_or_default(),
+                pools: first.map(|s| s.pools.clone()).unwrap_or_default(),
+                last_pools: first.map(|s| s.last_pools.clone()).unwrap_or_default(),
                 slots,
             });
         }

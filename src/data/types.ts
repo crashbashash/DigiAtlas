@@ -28,7 +28,10 @@ export interface Manifest {
 export type EnemyKind = 'enemy' | 'boss' | 'object';
 
 export interface Enemy {
+  /** Import-local identity; stage-local variants can have IDs beyond the physical table. */
   row: number;
+  /** Original AREA.AFS database entry and physical row for a stage-local variant. */
+  database?: { entry: number; row: number };
   name: string;
   kind: EnemyKind;
   /** Tells apart rows that share a name, such as a boss's forms ("Form 1"). */
@@ -86,6 +89,8 @@ export interface DropEntry {
 export interface DropPool {
   entries: DropEntry[];
   totalRate: number;
+  /** Retail roll selects when the remaining value is <= 0. Absent on legacy exports. */
+  roll?: 'inclusive';
   difficulty?: Difficulty;
 }
 

@@ -25,18 +25,27 @@ stages[].difficulties.<d>.generators[]  --row-->  enemies.rows[].row
 drops.pools.*.entries[] (category, id)  ------------> items[] (category, id)
 ```
 
-- **Rows are platform-specific.** A `row` is an index into that platform's stat table. Keep
-  `manifest.platform` alongside any row you store.
+- **Rows identify enemies within one import.** Global rows retain their platform's stat-table
+  index. Stage-local variants get distinct IDs beyond `enemies.rowCount` (the physical table
+  size), with `database.entry` and `database.row` recording their original AREA.AFS location.
+  Generators resolve through the database in their virtual filesystem directory. This keeps
+  Crown Mod replacements distinct when multiple stages reuse the same physical row for
+  different models or stats. Keep the source import alongside any row you store.
 - **Difficulty is a first-class axis.** A stage's generator pack exists once per difficulty and
   usually points the same spawner at a stronger row (Guard Room goblins: rows 2 / 6 / 10 on
   Normal / Hard / Very Hard). Five stages even differ in which generators exist, so the
   difficulties are stored separately and are not merged.
-- **Pools are shared by name.** Pool names never conflict across stages (checked on all 344), so
-  `drops.json` stores each once. Names read `<n|h|v><zone><family><variant>`, e.g. `nZ1gobr3` =
-  Normal / zone Z1 / goblins / variant 3. A generator's `drops` map holds one pool per difficulty,
-  because the engine indexes the list by the player's difficulty.
-- **Drop rates** are out of 10000 (`RNG() % 10000`), so `P(nothing) = 1 - totalRate / 10000`.
-  Boss pools often total exactly 10000.
+- **Pools have import-local keys.** Identical named tables share one record; different contents
+  with the same name receive distinct keys (`name@1`, etc.). Crown Drops clones enemy loot while
+  preserving original prop and special reward tables, so the name alone cannot identify a pool.
+  Original names usually read `<n|h|v><zone><family><variant>`, e.g. `nZ1gobr3`. Generator links
+  follow the outer list's Normal/Hard/Very Hard order, including common reward tables whose
+  names have no difficulty prefix. Explicit empty party-profile maps clear inherited drops.
+- **Drop rates** retain their stored weights. New imports carry `roll: "inclusive"`: the engine
+  rolls 0–9999, subtracts each weight in order and selects when the remainder is <= 0. The first
+  entry receives the extra zero outcome; cumulative totals above 10000 are truncated. The viewer
+  calculates these probabilities before merging an item's rank variants. `totalRate` remains
+  the raw weight sum. Legacy exports without `roll` retain their supplied probabilities.
 
 ## Names and text
 

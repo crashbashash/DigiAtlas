@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Enemy, Generator } from '../data/types';
-import { makeMarkers } from './markers';
+import { makeMarkers, markersAtSpot, nextMarkerAtSpot, pickMarker } from './markers';
 import { startSummary } from '../data/logic';
 
 const enemy = (row: number, kind: Enemy['kind'] = 'enemy'): Enemy => ({
@@ -28,6 +28,72 @@ const enemies = new Map([
   [1, enemy(1)],
   [9, enemy(9, 'object')],
 ]);
+
+describe('overlapping spawn groups', () => {
+  const project = (m: ReturnType<typeof makeMarkers>[number]): [number, number] => [m.x, m.z];
+  const shared = () =>
+    makeMarkers(
+      [
+        gen(1, 4, [
+          [345, -25],
+          [365, -35],
+          [335, -55],
+          [405, -85],
+        ]),
+        gen(2, 4, [
+          [405, -85],
+          [425, -105],
+          [435, -85],
+          [395, -115],
+        ]),
+      ],
+      new Map([
+        [1, { ...enemy(1), name: 'Numemon' }],
+        [2, { ...enemy(2), name: 'Kokatorimon' }],
+      ]),
+    );
+
+  it('exposes both Goblin Pass groups at the shared position without shifting their spawns', () => {
+    const markers = shared();
+    const hit = pickMarker(markers, project, 405, -85, null, 12)!;
+    expect(hit.label).toBe('Kokatorimon');
+    expect(markersAtSpot(markers, hit).map((m) => m.label)).toEqual(['Numemon', 'Kokatorimon']);
+    expect(markersAtSpot(markers, markers[0])).toEqual([markers[0]]);
+    expect(hit.x).toBe(405);
+    expect(hit.z).toBe(-85);
+  });
+
+  it('cycles every overlapping group and keeps hover aligned with the selected marker', () => {
+    const markers = shared();
+    let hit = pickMarker(markers, project, 405, -85, null, 12)!;
+    expect(nextMarkerAtSpot(markers, hit, null).gi).toBe(hit.gi);
+    const visited: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      visited.push(hit.label);
+      expect(pickMarker(markers, project, 405, -85, hit.gi, 12)).toBe(hit);
+      hit = nextMarkerAtSpot(markers, hit, hit.gi);
+    }
+    expect(visited).toEqual(['Kokatorimon', 'Numemon', 'Kokatorimon']);
+  });
+
+  it('does not mix nearby markers into a shared point or repeat one group with duplicate spots', () => {
+    const markers = makeMarkers(
+      [
+        gen(1, 3, [
+          [0, 0],
+          [0, 0],
+          [2, 0],
+        ]),
+        gen(2, 1, [[0, 0]]),
+      ],
+      enemies,
+    );
+    expect(markersAtSpot(markers, markers[0]).map((m) => m.gi)).toEqual([0, 1]);
+    expect(markersAtSpot(markers, markers[2])).toEqual([markers[2]]);
+    expect(pickMarker(markers, project, 2, 0, null, 12)).toBe(markers[2]);
+    expect(pickMarker(markers, project, 50, 50, null, 12)).toBeNull();
+  });
+});
 
 describe('start text and triggers', () => {
   const radar: Generator = {

@@ -63,21 +63,26 @@ export interface DropTable {
 }
 
 /**
- * One roll picks at most one entry (`RNG() % 10000`), so P(item) = rate / 10000 and
- * P(nothing) = 1 - sum / 10000. The same item can appear on several rows (one per rank); the game
- * does not read the rank, so the rows are one item with the summed chance.
+ * Retail subtracts each weight from a roll in 0..9999 and selects when the remainder is <= 0.
+ * The first entry therefore owns the zero roll too; cumulative totals beyond 10000 are clipped.
+ * Legacy exports without a roll rule retain their supplied probabilities. Rank variants of the
+ * same item merge only after each ordered entry's actual probability is calculated.
  */
 export function dropTable(pool: DropPool | null | undefined): DropTable {
   const merged = new Map<string, DropRow>();
   let total = 0;
+  let cumulative = 0;
   for (const e of pool?.entries ?? ([] as DropEntry[])) {
-    total += e.rate;
+    cumulative += e.rate;
+    const rate =
+      pool?.roll === 'inclusive' ? Math.max(0, Math.min(10000, cumulative + 1) - total) : e.rate;
+    total += rate;
     const key = itemKey(e.category, e.id);
     const row = merged.get(key);
     if (row) {
-      row.rate += e.rate;
+      row.rate += rate;
     } else {
-      merged.set(key, { key, category: e.category, id: e.id, rate: e.rate, percent: 0 });
+      merged.set(key, { key, category: e.category, id: e.id, rate, percent: 0 });
     }
   }
   const rows = [...merged.values()].filter((r) => r.rate > 0);

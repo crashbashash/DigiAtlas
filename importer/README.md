@@ -74,3 +74,34 @@ checks compressed/uncompressed tails, backward seeks, footer reads and failures.
 Authored AFS/IGB/Lua data is decoded by
 the same importer as PS2. Set `DIGIATLAS_GC_USA_ISO` and/or
 `DIGIATLAS_GC_JAPAN_ISO` to run the regional map/schema tests against those discs.
+
+Enemy spawns use the localized database in the generator pack's virtual directory, including
+Crown Mod's stage-local replacement models and stats. Local variants receive distinct export
+IDs so different stages can reuse a physical row without confusing maps or enemy searches.
+GameCube indexed geometry is decoded through its vertex index buffers for complete map floors.
+
+Run the Crown Mod regression checks with randomized images from either platform:
+
+```sh
+DIGIATLAS_CROWN_GC_ISO="/path/to/randomized-gc.iso" DIGIATLAS_CROWN_PS2_ISO="/path/to/randomized-ps2.iso" cargo test --test crown_mod -- --nocapture
+```
+
+These compare every live generator's model, name, stats and positions against its local disc
+database on all three difficulties, check Goblin Pass and Abyss of Grief map coverage, and
+validate the exported JSON schemas.
+
+For Crown Drops, the importer keeps different tables with the same name distinct, follows
+the actual difficulty-list order for common rewards, and preserves empty party profiles.
+Stored weights are retained with the retail roll rule so the UI includes the zero outcome
+and clips overfull tables before merging item variants.
+
+```sh
+DIGIATLAS_CROWN_DROPS_GC_ISO="/path/to/drops-gc.iso" DIGIATLAS_CROWN_DROPS_PS2_ISO="/path/to/drops-ps2.iso" cargo test --test crown_drops -- --nocapture
+```
+
+This checks every ordinary/final loot reference for all four party sizes and all three
+drop difficulties against the patched disc. Set `DIGIATLAS_CROWN_DROPS_OUT` to retain exports.
+From the repository root, `DIGIATLAS_CROWN_DROPS_EXPORT=/path/to/export npm test --
+tests/crown-drops-real.test.js` checks the UI against all 10,000 outcomes of each pool.
+`DIGIATLAS_TEST_EXPORT=/path/to/export npm test -- tests/map-overlaps-real.test.js` checks
+that all groups sharing a map position remain selectable across party sizes and filters.

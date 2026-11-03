@@ -10,7 +10,7 @@
   "properties": {
     "pools": {
       "type": "object",
-      "description": "Keyed by pool name, e.g. nZ1gobr3 = Normal / zone Z1 / goblins / variant 3.",
+      "description": "Keyed by import-local pool identity. Original names are retained when contents match; conflicting tables receive distinct keys.",
       "additionalProperties": {
         "type": "object",
         "required": [
@@ -46,14 +46,18 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 10000,
-                  "description": "Out of 10000; the engine rolls RNG() % 10000."
+                  "description": "Stored weight. Use the pool's roll rule to calculate its actual probability."
                 }
               }
             }
           },
           "totalRate": {
             "type": "integer",
-            "description": "Sum of rates. P(nothing drops) = 1 - totalRate/10000."
+            "description": "Sum of stored weights; actual no-drop probability depends on the roll rule."
+          },
+          "roll": {
+            "const": "inclusive",
+            "description": "Roll 0..9999, subtract each weight in order and select on <= 0. Includes the extra zero roll and cumulative truncation."
           },
           "difficulty": {
             "enum": [

@@ -6,6 +6,8 @@
 //! nodes as `igGeometryAttr1_5` attributes: a vertex array whose position stream is
 //! `12 * numVerts` bytes, drawn as triangle lists (type 3) or strips (type 4, with a
 //! primitive-length array).
+//! Indexed meshes (used extensively by GameCube) first map primitive corners through an
+//! `igIndexArray`; its element count can exceed the number of unique vertices.
 //!
 //! Field positions are indices into a record's decoded fields (see `igb`).
 
@@ -22,6 +24,7 @@ const GEOMETRY_ATTRS: usize = 4;
 /// igSceneInfo._sceneGraph (an igNode reference).
 const SCENE_ROOT: usize = 2;
 const ATTR_VERTEX_ARRAY: usize = 1;
+const ATTR_INDEX_ARRAY: usize = 2;
 const ATTR_PRIM_TYPE: usize = 3;
 const ATTR_NUM_PRIMS: usize = 4;
 const ATTR_STRIP_LENGTHS: usize = 10;
@@ -96,6 +99,48 @@ fn field(vals: &[&Value], i: usize) -> Option<i64> {
     vals.get(i).and_then(|v| v.int())
 }
 
+fn index_order(bytes: &[u8], count: usize, vertex_count: usize) -> Option<Vec<usize>> {
+    if count == 0 {
+        return Some(Vec::new());
+    }
+    if !bytes.len().is_multiple_of(count) {
+        return None;
+    }
+    let width = bytes.len() / count;
+    if !matches!(width, 2 | 4) {
+        return None;
+    }
+    bytes
+        .chunks_exact(width)
+        .map(|b| {
+            let i = if width == 2 {
+                u16::from_le_bytes(b.try_into().unwrap()) as usize
+            } else {
+                u32::from_le_bytes(b.try_into().unwrap()) as usize
+            };
+            (i < vertex_count).then_some(i)
+        })
+        .collect()
+}
+
+fn triangle_indices(ptype: i64, nprims: usize, order: &[usize], lengths: &[usize]) -> Vec<[usize; 3]> {
+    let mut triangles = Vec::new();
+    if ptype == LIST_PRIM_TYPE && nprims <= order.len() / 3 {
+        triangles.extend(order.as_chunks::<3>().0.iter().take(nprims).copied());
+    } else if ptype == STRIP_PRIM_TYPE && lengths.iter().try_fold(0usize, |n, l| n.checked_add(*l)) == Some(order.len())
+    {
+        let mut off = 0;
+        for &length in lengths {
+            for j in 0..length.saturating_sub(2) {
+                let t = [order[off + j], order[off + j + 1], order[off + j + 2]];
+                triangles.push(if j % 2 == 0 { t } else { [t[1], t[0], t[2]] });
+            }
+            off += length;
+        }
+    }
+    triangles
+}
+
 /// Reads and caches meshes (local-space triangles) from one pack's graph.
 struct Geometry<'g> {
     g: &'g Graph,
@@ -140,33 +185,39 @@ impl<'g> Geometry<'g> {
         let g = self.g;
         let v = g.vals(attr);
         let (ptype, nprims) = (field(&v, ATTR_PRIM_TYPE), field(&v, ATTR_NUM_PRIMS).unwrap_or(0));
-        let mut idx = Vec::new();
-        if ptype == Some(LIST_PRIM_TYPE) && vertex_count as i64 >= 3 * nprims {
-            idx.extend((0..nprims.max(0) as usize).map(|i| [3 * i, 3 * i + 1, 3 * i + 2]));
-        } else if ptype == Some(STRIP_PRIM_TYPE) {
-            let Some(pl) = v.get(ATTR_STRIP_LENGTHS).and_then(|r| g.r#ref(r)) else { return idx };
+        let order = match v.get(ATTR_INDEX_ARRAY).and_then(|r| g.r#ref(r)) {
+            Some(array) => {
+                if g.class(array) != "igIndexArray" {
+                    return Vec::new();
+                }
+                let vals = g.vals(array);
+                let (Some(block), Some(count)) = (field(&vals, 0), field(&vals, 1)) else { return Vec::new() };
+                let Some(block) = usize::try_from(block).ok() else { return Vec::new() };
+                let Some(size) = g.block_size(block) else { return Vec::new() };
+                let Some(order) =
+                    g.block(block, size).ok().and_then(|b| index_order(b, count.max(0) as usize, vertex_count))
+                else {
+                    return Vec::new();
+                };
+                order
+            }
+            None => (0..vertex_count).collect(),
+        };
+        let mut lengths = Vec::new();
+        if ptype == Some(STRIP_PRIM_TYPE) {
+            let Some(pl) = v.get(ATTR_STRIP_LENGTHS).and_then(|r| g.r#ref(r)) else { return Vec::new() };
             if g.class(pl) != "igPrimLengthArray1_1" {
-                return idx;
+                return Vec::new();
             }
             let pv = g.vals(pl);
-            let (Some(block), Some(count)) = (field(&pv, 0), field(&pv, 1)) else { return idx };
-            let Some(start) = usize::try_from(block).ok().and_then(|b| g.block_start(b)) else { return idx };
-            let lengths: Option<Vec<usize>> =
+            let (Some(block), Some(count)) = (field(&pv, 0), field(&pv, 1)) else { return Vec::new() };
+            let Some(start) = usize::try_from(block).ok().and_then(|b| g.block_start(b)) else { return Vec::new() };
+            let decoded: Option<Vec<usize>> =
                 (0..count.max(0) as usize).map(|j| u32_at(&g.b, start + 4 * j).map(|l| l as usize)).collect();
-            let Some(lengths) = lengths else { return idx };
-            if lengths.iter().sum::<usize>() != vertex_count {
-                return idx;
-            }
-            let mut off = 0;
-            for length in lengths {
-                for j in 0..length.saturating_sub(2) {
-                    let t = [off + j, off + j + 1, off + j + 2];
-                    idx.push(if j % 2 == 0 { t } else { [t[1], t[0], t[2]] });
-                }
-                off += length;
-            }
+            let Some(decoded) = decoded else { return Vec::new() };
+            lengths = decoded;
         }
-        idx
+        triangle_indices(ptype.unwrap_or(-1), nprims.max(0) as usize, &order, &lengths)
     }
 
     fn mesh(&mut self, attr: usize) -> &[Triangle] {
@@ -241,6 +292,24 @@ fn walk(graph: &Graph, geometry: &mut Geometry, node: usize, matrix: &Matrix, sc
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indexed_strips_reuse_vertices_and_reset_winding_for_each_strip() {
+        let bytes: Vec<_> = [3u16, 2, 1, 0, 1, 2, 4].into_iter().flat_map(u16::to_le_bytes).collect();
+        let order = index_order(&bytes, 7, 5).unwrap();
+        assert_eq!(triangle_indices(STRIP_PRIM_TYPE, 2, &order, &[4, 3]), [[3, 2, 1], [1, 2, 0], [1, 2, 4]]);
+        assert!(triangle_indices(STRIP_PRIM_TYPE, 2, &order, &[4, 4]).is_empty());
+    }
+
+    #[test]
+    fn indexed_lists_follow_the_index_buffer_and_reject_invalid_vertices() {
+        let bytes: Vec<_> = [2u32, 0, 1, 1, 0, 3].into_iter().flat_map(u32::to_le_bytes).collect();
+        let order = index_order(&bytes, 6, 4).unwrap();
+        assert_eq!(triangle_indices(LIST_PRIM_TYPE, 2, &order, &[]), [[2, 0, 1], [1, 0, 3]]);
+        assert!(index_order(&bytes, 6, 3).is_none());
+        assert!(index_order(&bytes[..23], 6, 4).is_none());
+        assert_eq!(triangle_indices(LIST_PRIM_TYPE, 1, &[0, 1, 2], &[]), [[0, 1, 2]]);
+    }
 
     #[test]
     fn sums_floats_like_python() {

@@ -19,6 +19,57 @@ export interface Marker {
   trigger: { x: number; z: number; radius: number } | null;
 }
 
+/** Distinct spawn groups at the same world position, including different enemies sharing a spot. */
+export function markersAtSpot(markers: Marker[], spot: Marker): Marker[] {
+  const seen = new Set<number>();
+  return markers.filter((m) => {
+    if (m.x !== spot.x || m.z !== spot.z || seen.has(m.gi)) return false;
+    seen.add(m.gi);
+    return true;
+  });
+}
+
+/** Match drawing order: selected groups sit on top, then bosses, enemies and objects. */
+export function markerRank(marker: Marker, selected: number | null): number {
+  return (
+    (marker.gi === selected ? 100 : 0) +
+    (marker.kind === 'object' ? 0 : marker.kind === 'enemy' ? 1 : 2)
+  );
+}
+
+/** Equal-distance hits choose the last drawn marker, so hover and clicks agree with the picture. */
+export function pickMarker(
+  markers: Marker[],
+  project: (m: Marker) => [number, number],
+  px: number,
+  py: number,
+  selected: number | null,
+  radius: number,
+): Marker | null {
+  let best: Marker | null = null;
+  let bestD = radius * radius;
+  for (const m of markers) {
+    const [sx, sy] = project(m);
+    const distance = (sx - px) ** 2 + (sy - py) ** 2;
+    if (
+      distance <= bestD &&
+      (distance < bestD || !best || markerRank(m, selected) >= markerRank(best, selected))
+    ) {
+      best = m;
+      bestD = distance;
+    }
+  }
+  return best;
+}
+
+/** Repeated clicks on a shared point reach every group without moving their real spawn positions. */
+export function nextMarkerAtSpot(markers: Marker[], hit: Marker, selected: number | null): Marker {
+  if (hit.gi !== selected) return hit;
+  const groups = markersAtSpot(markers, hit);
+  const index = groups.findIndex((m) => m.gi === selected);
+  return groups[(index + 1) % groups.length] ?? hit;
+}
+
 /** Use the same active groups and stable generator indices as the map's side panel. */
 export function stageMarkers(
   model: Model,

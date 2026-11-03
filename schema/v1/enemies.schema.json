@@ -32,7 +32,17 @@
           "row": {
             "type": "integer",
             "minimum": 0,
-            "description": "Row in the platform's stat table. Spawn generators reference this."
+            "description": "Import-local enemy ID referenced by spawn generators. Global rows retain their physical table index; local variants have distinct IDs."
+          },
+          "database": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entry", "row"],
+            "properties": {
+              "entry": { "type": "integer", "minimum": 0 },
+              "row": { "type": "integer", "minimum": 0 }
+            },
+            "description": "Original AREA.AFS entry and physical row for a stage-local enemy variant."
           },
           "model": {
             "type": "string",

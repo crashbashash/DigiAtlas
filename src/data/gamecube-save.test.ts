@@ -123,7 +123,7 @@ it('reads big-endian character stats from GCI, raw saves and fragmented full car
       force: 1000,
       xdata: { strength: 50, speed: 10, wisdom: 20 },
     });
-    expect(new Uint8Array(buffer)).toEqual(before);
+    expect(new Uint8Array(buffer).every((value, index) => value === before[index])).toBe(true);
   }
 });
 it('rejects damaged GCI wrappers and game checksums', () => {

@@ -12,6 +12,54 @@ import {
 import type { Enemy, Generator } from './types';
 
 describe('dropTable', () => {
+  it('shows Crown Drops category probabilities exactly after the retail zero-roll adjustment', () => {
+    for (const [xdata, plugs, consumables, nothing] of [
+      [1500, 100, 2300, 11],
+      [2000, 200, 1600, 12],
+      [2500, 300, 1400, 8],
+    ]) {
+      const table = dropTable({
+        roll: 'inclusive',
+        totalRate: 4999 + xdata + plugs + consumables,
+        entries: [
+          { category: 'weapon', id: 0, rank: 0, rate: 4999 },
+          { category: 'insItem', id: 1, rank: 0, rate: xdata },
+          { category: 'insItem', id: 4, rank: 0, rate: plugs },
+          { category: 'conItem', id: 0, rank: 0, rate: consumables },
+        ],
+      });
+      expect(table.rows.find((r) => r.key === 'weapon:0')?.percent).toBe(50);
+      expect(table.rows.find((r) => r.key === 'insItem:1')?.percent).toBe(xdata / 100);
+      expect(table.rows.find((r) => r.key === 'insItem:4')?.percent).toBe(plugs / 100);
+      expect(table.nothingPercent).toBe(nothing);
+    }
+  });
+
+  it('matches all 10000 retail outcomes, including zero weights, shared items and overfull tables', () => {
+    for (const weights of [[0, 2, 10000, 0], [6000, 6000, 100], [10000], [0], []]) {
+      const entries = weights.map((rate, i) => ({ category: 'weapon', id: i % 2, rank: i, rate }));
+      const counts = new Map<number, number>();
+      let nothing = 0;
+      for (let roll = 0; roll < 10000; roll++) {
+        let remaining = roll;
+        const entry = entries.find((e) => {
+          remaining -= e.rate;
+          return remaining <= 0;
+        });
+        if (entry) counts.set(entry.id, (counts.get(entry.id) ?? 0) + 1);
+        else nothing++;
+      }
+      const table = dropTable({
+        roll: 'inclusive',
+        entries,
+        totalRate: weights.reduce((n, r) => n + r, 0),
+      });
+      expect(new Map(table.rows.map((r) => [r.id, r.rate]))).toEqual(counts);
+      expect(table.nothingPercent).toBe(nothing / 100);
+      expect(table.rows.reduce((n, r) => n + r.rate, 0) + nothing).toBe(10000);
+    }
+  });
+
   it('turns rates out of 10000 into percentages and a nothing chance', () => {
     const t = dropTable({
       totalRate: 4330,

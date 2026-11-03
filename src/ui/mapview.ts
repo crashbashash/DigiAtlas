@@ -2,7 +2,14 @@ import type { DataSource } from '../data/source';
 import { traderLabel, type Model, type Scope } from '../data/model';
 import type { Difficulty, Enemy, EnemyKind, ServiceNpc, Stage } from '../data/types';
 import { h } from './dom';
-import { stageMarkers, type Marker } from './markers';
+import {
+  markerRank,
+  markersAtSpot,
+  nextMarkerAtSpot,
+  pickMarker,
+  stageMarkers,
+  type Marker,
+} from './markers';
 import { hasHeightVariation } from './map-legend';
 
 export const KIND_COLOR: Record<EnemyKind, string> = {
@@ -118,6 +125,7 @@ export class MapView {
   private pendingFit = false;
   private drag: { x: number; y: number; moved: boolean } | null = null;
   private hover: Marker | null = null;
+  private pointer: [number, number] | null = null;
   private pins: Pin[] = [];
   private litPins: Set<number> | null = null;
   private hoverPin: Pin | null = null;
@@ -134,7 +142,11 @@ export class MapView {
     this.canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     this.canvas.addEventListener('pointermove', (e) => this.onMove(e));
     this.canvas.addEventListener('pointerup', (e) => this.onUp(e));
-    this.canvas.addEventListener('pointerleave', () => this.setHover(null));
+    this.canvas.addEventListener('pointerleave', () => {
+      this.pointer = null;
+      this.setHover(null);
+      this.setHoverPin(null);
+    });
     this.canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     this.canvas.addEventListener('dblclick', () => this.fit());
     // The browser's own menu (back, reload, inspect) has nothing to offer on the map.
@@ -207,6 +219,7 @@ export class MapView {
     this.routeKey.hidden = !stage.landmarks?.length && this.route.length < 2;
     this.serviceKey.hidden = !stage.services?.length;
     if (stageChanged) {
+      this.pointer = null;
       this.setHover(null);
       this.setHoverPin(null);
       this.image = null;
@@ -243,6 +256,9 @@ export class MapView {
         });
       }
     }
+    // Marker objects are rebuilt when difficulty, party size, filters or selection change.
+    // Re-hit the pointer so the tooltip cannot retain a different group's old name or stats.
+    if (this.pointer && !this.drag) this.hoverAt(...this.pointer);
     this.updateLegendVisibility();
     this.draw();
   }
@@ -420,9 +436,7 @@ export class MapView {
   }
 
   private rank(m: Marker): number {
-    return (
-      (m.gi === this.selected ? 100 : 0) + (m.kind === 'object' ? 0 : m.kind === 'enemy' ? 1 : 2)
-    );
+    return markerRank(m, this.selected);
   }
 
   private drawGrid(ctx: CanvasRenderingContext2D, v: View): void {
@@ -551,17 +565,7 @@ export class MapView {
   }
 
   private pick(px: number, py: number): Marker | null {
-    let best: Marker | null = null;
-    let bestD = HIT_RADIUS * HIT_RADIUS;
-    for (const m of this.markers) {
-      const [sx, sy] = this.toScreen(m);
-      const d = (sx - px) ** 2 + (sy - py) ** 2;
-      if (d <= bestD && (d < bestD || (best && this.rank(m) > this.rank(best)))) {
-        best = m;
-        bestD = d;
-      }
-    }
-    return best;
+    return pickMarker(this.markers, (m) => this.toScreen(m), px, py, this.selected, HIT_RADIUS);
   }
 
   private local(e: PointerEvent | WheelEvent): [number, number] {
@@ -576,6 +580,7 @@ export class MapView {
 
   private onMove(e: PointerEvent): void {
     const [px, py] = this.local(e);
+    this.pointer = [px, py];
     if (this.drag) {
       const dx = e.clientX - this.drag.x;
       const dy = e.clientY - this.drag.y;
@@ -589,6 +594,10 @@ export class MapView {
       }
       return;
     }
+    this.hoverAt(px, py);
+  }
+
+  private hoverAt(px: number, py: number): void {
     const pin = this.pickPin(px, py);
     this.setHoverPin(pin, px, py);
     if (pin) this.setHover(null);
@@ -600,6 +609,7 @@ export class MapView {
     this.drag = null;
     if (wasClick) {
       const [px, py] = this.local(e);
+      this.pointer = [px, py];
       const pin = this.pickPin(px, py);
       if (pin) {
         if (pin.landmark) return;
@@ -607,7 +617,9 @@ export class MapView {
         else this.events.onTrader(pin.index);
         return;
       }
-      const m = this.pick(px, py);
+      const hit = this.pick(px, py);
+      const m = hit ? nextMarkerAtSpot(this.markers, hit, this.selected) : null;
+      this.setHover(m, px, py);
       this.events.onSelect(m ? m.gi : null);
     }
   }
@@ -619,6 +631,8 @@ export class MapView {
     const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.view.scale * factor));
     const k = scale / this.view.scale;
     this.view = { scale, tx: px - (px - this.view.tx) * k, ty: py - (py - this.view.ty) * k };
+    this.pointer = [px, py];
+    this.hoverAt(px, py);
     this.draw();
   }
 
@@ -664,12 +678,25 @@ export class MapView {
       if (!this.hoverPin) this.tip.hidden = true;
       return;
     }
+    const others = markersAtSpot(this.markers, m).filter((other) => other.gi !== m.gi);
+    const groups = [m, ...others];
     this.tip.replaceChildren(
-      h('strong', null, m.label),
-      ...m.detail
-        .split('\n')
-        .filter(Boolean)
-        .map((t) => h('span', { class: 'muted' }, t)),
+      ...groups.slice(0, 4).flatMap((group) => [
+        h('strong', null, group.label),
+        ...group.detail
+          .split('\n')
+          .filter(Boolean)
+          .map((t) => h('span', { class: 'muted' }, t)),
+      ]),
+      ...(others.length
+        ? [
+            h(
+              'span',
+              { class: 'muted' },
+              `${groups.length} groups share this point${groups.length > 4 ? ` (${groups.length - 4} more)` : ''} · Click again to select another group`,
+            ),
+          ]
+        : []),
     );
     this.tip.hidden = false;
     this.placeTip(px, py);

@@ -25,7 +25,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
 pub const STACK_SIZE: usize = 64 << 20;
 
-pub const IMPORTER_VERSION: &str = "1.16.0";
+pub const IMPORTER_VERSION: &str = "1.18.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
     "enemies[].name: Mecha Rogue names follow Wikipedia and Wikimon; object names are not in the game text",
@@ -78,6 +78,7 @@ fn pool_record(pool: &DropPool) -> Value {
     let mut rec = Map::new();
     rec.insert("entries".into(), Value::Array(entries));
     rec.insert("totalRate".into(), json!(total));
+    rec.insert("roll".into(), json!("inclusive"));
     if let Some(m) = re.captures(&pool.name) {
         let difficulty = match &m["d"] {
             "n" => "normal",
@@ -93,23 +94,52 @@ fn pool_record(pool: &DropPool) -> Value {
     Value::Object(rec)
 }
 
-fn drop_map(pools: &[DropPool]) -> Map<String, Value> {
+/// Names are labels, not identities: Crown Drops can clone one name with different weights
+/// while preserving a prop's original table. Only identical contents may share an export key.
+#[derive(Default)]
+struct DropCatalog {
+    pools: Map<String, Value>,
+    keys: HashMap<(String, String), String>,
+}
+
+impl DropCatalog {
+    fn insert(&mut self, pool: &DropPool) -> String {
+        let record = pool_record(pool);
+        let identity = (pool.name.clone(), record.to_string());
+        if let Some(key) = self.keys.get(&identity) {
+            return key.clone();
+        }
+        let mut key = pool.name.clone();
+        let mut variant = 1;
+        while self.pools.contains_key(&key) {
+            key = format!("{}@{variant}", pool.name);
+            variant += 1;
+        }
+        self.pools.insert(key.clone(), record);
+        self.keys.insert(identity, key.clone());
+        key
+    }
+}
+
+fn drop_map(pools: &[DropPool], catalog: &mut DropCatalog) -> Map<String, Value> {
     let mut out = Map::new();
     for (i, pool) in pools.iter().enumerate() {
-        let key = pool.difficulty().map(str::to_string).unwrap_or_else(|| format!("slot{i}"));
-        out.insert(key, json!(pool.name));
+        // The engine indexes the outer list by difficulty; common rewards and cloned lists
+        // can use the same pool name in all three slots.
+        let difficulty = DIFFICULTIES.get(i).map(|d| d.to_string()).unwrap_or_else(|| format!("slot{i}"));
+        out.insert(difficulty, json!(catalog.insert(pool)));
     }
     out
 }
 
 /// Per-player-count numbers, only when they differ from the one-player case.
-fn player_slots(g: &Generator) -> Option<Vec<Value>> {
+fn player_slots(g: &Generator, catalog: &mut DropCatalog) -> Option<Vec<Value>> {
     let first = g.slots.first()?;
     let same = |sl: &PlayerSlot| {
         sl.count == first.count
             && sl.max_count == first.max_count
-            && drop_map(&sl.pools) == drop_map(&first.pools)
-            && drop_map(&sl.last_pools) == drop_map(&first.last_pools)
+            && sl.pools == first.pools
+            && sl.last_pools == first.last_pools
     };
     if g.slots.iter().all(same) {
         return None;
@@ -121,12 +151,8 @@ fn player_slots(g: &Generator) -> Option<Vec<Value>> {
                 let mut entry = Map::new();
                 entry.insert("count".into(), field_json(&sl.count));
                 entry.insert("maxCount".into(), field_json(&sl.max_count));
-                if !sl.pools.is_empty() {
-                    entry.insert("drops".into(), Value::Object(drop_map(&sl.pools)));
-                }
-                if !sl.last_pools.is_empty() {
-                    entry.insert("lastDrops".into(), Value::Object(drop_map(&sl.last_pools)));
-                }
+                entry.insert("drops".into(), Value::Object(drop_map(&sl.pools, catalog)));
+                entry.insert("lastDrops".into(), Value::Object(drop_map(&sl.last_pools, catalog)));
                 Value::Object(entry)
             })
             .collect(),
@@ -157,7 +183,12 @@ fn script_info(name: &str, stage_scripts: Option<&scripts::StageScripts>) -> Opt
 }
 
 /// `boss_bar`: the stage shows a boss health bar for this spawner's enemy.
-fn generator_record(g: &Generator, stage_scripts: Option<&scripts::StageScripts>, boss_bar: bool) -> Value {
+fn generator_record(
+    g: &Generator,
+    stage_scripts: Option<&scripts::StageScripts>,
+    boss_bar: bool,
+    catalog: &mut DropCatalog,
+) -> Value {
     let round3 = |p: &[f64; 3]| Value::Array(p.iter().map(|v| float(pyfmt::round(*v, 3))).collect());
     let mut rec = Map::new();
     rec.insert("name".into(), json!(g.name));
@@ -175,12 +206,12 @@ fn generator_record(g: &Generator, stage_scripts: Option<&scripts::StageScripts>
         rec.insert("lua".into(), field_json(&g.lua));
     }
     if !g.pools.is_empty() {
-        rec.insert("drops".into(), Value::Object(drop_map(&g.pools)));
+        rec.insert("drops".into(), Value::Object(drop_map(&g.pools, catalog)));
     }
     if !g.last_pools.is_empty() {
-        rec.insert("lastDrops".into(), Value::Object(drop_map(&g.last_pools)));
+        rec.insert("lastDrops".into(), Value::Object(drop_map(&g.last_pools, catalog)));
     }
-    if let Some(players) = player_slots(g) {
+    if let Some(players) = player_slots(g, catalog) {
         rec.insert("players".into(), Value::Array(players));
     }
     if let Some(info) = script_info(&g.name, stage_scripts) {
@@ -241,6 +272,77 @@ fn enemy_naming(model: &str) -> Result<Map<String, Value>> {
     Ok(out)
 }
 
+fn enemy_records(tables: &database::Tables, random_crowns: bool) -> Result<Vec<Value>> {
+    let enemy_rows = tables.get("enemy").ok_or_else(|| Error("database 'enemy' missing".into()))?;
+    let models = database::enemy_models(tables)?;
+    let mut rows = Vec::new();
+    for r in stats::from_database(enemy_rows)? {
+        let Some(model) = models.get(&r.row) else { continue };
+        if r.is_empty() {
+            continue;
+        }
+        let mut rec = Map::new();
+        rec.insert("row".into(), json!(r.row));
+        rec.extend(enemy_naming(model)?);
+        rec.insert("model".into(), json!(model));
+        rec.insert("hp".into(), json!(r.hp));
+        rec.insert("stats".into(), json!({"strength": r.strength, "defense": r.defense, "wisdom": r.wisdom, "spirit": r.spirit, "speed": r.speed, "exp": r.exp}));
+        let resist: Map<String, Value> = r.resist.iter().map(|(k, v)| ((*k).to_string(), json!(v))).collect();
+        rec.insert("resist".into(), Value::Object(resist));
+        rec.insert("rates".into(), json!({"crit": r.crit_rate, "paralysis": r.paralysis_rate}));
+        rec.insert("rarity".into(), json!(r.rarity));
+        if r.rarity == 127 && random_crowns {
+            rec.insert("crownStyle".into(), json!("random"));
+        }
+        rows.push(Value::Object(rec));
+    }
+    Ok(rows)
+}
+
+/// The same physical row can name different enemies in different AREA databases. Give each
+/// local variant its own export ID so every consumer (maps, searches, drops and calculators)
+/// uses the same identity, while keeping the original database/row for traceability.
+struct EnemyCatalog {
+    rows: Vec<Value>,
+    base: HashMap<usize, usize>,
+    local: HashMap<usize, HashMap<usize, usize>>,
+    next: usize,
+}
+
+impl EnemyCatalog {
+    fn new(rows: Vec<Value>, row_count: usize) -> Self {
+        let base = rows.iter().enumerate().map(|(i, r)| (r["row"].as_u64().unwrap() as usize, i)).collect();
+        Self { rows, base, local: HashMap::new(), next: row_count }
+    }
+
+    fn add_database(&mut self, entry: usize, rows: Vec<Value>) {
+        let mut remap = HashMap::new();
+        for mut rec in rows {
+            let source = rec["row"].as_u64().unwrap() as usize;
+            let index = match self.base.get(&source).copied().filter(|&i| self.rows[i] == rec) {
+                Some(i) => i,
+                None => {
+                    rec["row"] = json!(self.next);
+                    rec["database"] = json!({"entry": entry, "row": source});
+                    self.next += 1;
+                    self.rows.push(rec);
+                    self.rows.len() - 1
+                }
+            };
+            remap.insert(source, index);
+        }
+        self.local.insert(entry, remap);
+    }
+
+    fn get(&self, entry: Option<usize>, source: usize) -> Option<&Value> {
+        let index = match entry.and_then(|entry| self.local.get(&entry)) {
+            Some(rows) => rows.get(&source),
+            None => self.base.get(&source),
+        }?;
+        self.rows.get(*index)
+    }
+}
+
 /// Seconds since 1970 as an ISO 8601 UTC timestamp (`2026-10-17T16:05:00+00:00`).
 fn utc_timestamp(secs: u64) -> String {
     let days = (secs / 86_400) as i64;
@@ -299,7 +401,6 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     let power_spells = crate::power_spells::extract(&tables)?;
     let mp_techs = crate::mp_techs::extract(&tables, &executable, gamecube)?;
     let save_stats = crate::power_spells::save_stats(&tables)?;
-    let models = database::enemy_models(&tables)?;
     let flag_names = scripts::load_flag_names();
     let mut player_digimon: HashMap<String, String> = HashMap::new();
     for r in tables.get("shinka").map(Vec::as_slice).unwrap_or(&[]) {
@@ -316,35 +417,13 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     let enemy_rows = tables.get("enemy").ok_or_else(|| Error("database 'enemy' missing".into()))?;
     let table = stats::from_database(enemy_rows)?;
     let anchors_ok = stats::anchors_match(&table);
-    let mut rows = Vec::new();
-    for r in &table {
-        let Some(model) = models.get(&r.row) else { continue };
-        if r.is_empty() {
-            continue;
-        }
-        let mut rec = Map::new();
-        rec.insert("row".into(), json!(r.row));
-        rec.extend(enemy_naming(model)?);
-        rec.insert("model".into(), json!(model));
-        rec.insert("hp".into(), json!(r.hp));
-        rec.insert(
-            "stats".into(),
-            json!({"strength": r.strength, "defense": r.defense, "wisdom": r.wisdom, "spirit": r.spirit, "speed": r.speed, "exp": r.exp}),
-        );
-        let resist: Map<String, Value> = r.resist.iter().map(|(k, v)| ((*k).to_string(), json!(v))).collect();
-        rec.insert("resist".into(), Value::Object(resist));
-        rec.insert("rates".into(), json!({"crit": r.crit_rate, "paralysis": r.paralysis_rate}));
-        rec.insert("rarity".into(), json!(r.rarity));
-        if r.rarity == 127 && crown_mod.as_ref().is_some_and(|m| m["options"]["randomCrownColours"] == true) {
-            rec.insert("crownStyle".into(), json!("random"));
-        }
-        rows.push(Value::Object(rec));
-    }
-    let enemies = json!({"rowCount": table.len(), "rows": rows});
+    let random_crowns = crown_mod.as_ref().is_some_and(|m| m["options"]["randomCrownColours"] == true);
+    let mut catalog = EnemyCatalog::new(enemy_records(&tables, random_crowns)?, table.len());
 
     // --- stages, generators, drop pools --------------------------------------------------
     let manifest_bytes = src("NDMW.IGB")?.read_all()?;
     let archive_names = archive_manifest::read_names(&manifest_bytes)?;
+    let archive_files = archive_manifest::read_files(manifest_bytes)?;
     let normal_hits = crate::attack_profiles::extract(&ndmw, &archive_names, &tables)?;
     let map_dir = out_dir.join("maps");
     let banner_dir = out_dir.join("banners");
@@ -358,7 +437,7 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         fail!("no name entry for stages {unnamed:?}; add them to importer/names/stages.json");
     }
     let mut stage_records: Vec<Value> = Vec::new();
-    let mut pools = Map::new();
+    let mut pools = DropCatalog::default();
     let total = all_stages.len() + 2;
     for (n, st) in all_stages.iter().enumerate() {
         let label = &stage_names[&st.id];
@@ -396,35 +475,30 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
         let mut difficulties = Map::new();
         for difficulty in DIFFICULTIES {
             let Some(idx) = st.generator_pack(difficulty) else { continue };
+            let database = archive_manifest::stage_database(&archive_files, idx)?;
+            if let Some(entry) = database.filter(|entry| !catalog.local.contains_key(entry)) {
+                if entry >= area.count() {
+                    fail!("local enemy database {entry} is outside AREA.AFS");
+                }
+                let local = database::read_tables(area.entry(entry)?)?;
+                catalog.add_database(entry, enemy_records(&local, random_crowns)?);
+            }
             let gens = Pack::new(ndmw.entry(idx)?)?.generators()?;
             map_points.extend(gens.iter().flat_map(|g| g.spawns()));
-            for g in &gens {
-                let fallback = [PlayerSlot {
-                    count: Field::Int(0),
-                    max_count: Field::Int(0),
-                    pools: g.pools.clone(),
-                    last_pools: g.last_pools.clone(),
-                }];
-                let slots: &[PlayerSlot] = if g.slots.is_empty() { &fallback } else { &g.slots };
-                for slot in slots {
-                    for pool in slot.pools.iter().chain(&slot.last_pools) {
-                        if !pools.contains_key(&pool.name) {
-                            pools.insert(pool.name.clone(), pool_record(pool));
-                        }
-                    }
-                }
-            }
             let records: Vec<Value> = gens
                 .iter()
                 .map(|g| {
-                    let boss_bar = match (
-                        &stage_scripts,
-                        g.row.int().and_then(|r| usize::try_from(r).ok()).and_then(|r| models.get(&r)),
-                    ) {
+                    let enemy =
+                        g.row.int().and_then(|r| usize::try_from(r).ok()).and_then(|r| catalog.get(database, r));
+                    let boss_bar = match (&stage_scripts, enemy.and_then(|e| e["model"].as_str())) {
                         (Some(ss), Some(model)) => ss.boss_models.contains(model),
                         _ => false,
                     };
-                    generator_record(g, stage_scripts.as_ref(), boss_bar)
+                    let mut rec = generator_record(g, stage_scripts.as_ref(), boss_bar, &mut pools);
+                    if let Some(enemy) = enemy {
+                        rec["row"] = enemy["row"].clone();
+                    }
+                    rec
                 })
                 .collect();
             difficulties.insert(difficulty.into(), json!({"generators": records}));
@@ -525,6 +599,8 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
                 .unwrap_or(0)
         })
         .sum();
+    let enemies = json!({"rowCount": table.len(), "rows": catalog.rows});
+    let pools = pools.pools;
     let manifest = json!({
         "schemaVersion": SCHEMA_VERSION,
         "platform": release.platform,
@@ -581,6 +657,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn local_rows_keep_distinct_names_and_stats_across_stages_and_difficulties() {
+        let original = json!({"row": 1, "name": "Goburimon", "hp": 58});
+        let mut catalog = EnemyCatalog::new(vec![original.clone()], 649);
+        catalog.add_database(
+            422,
+            vec![
+                original.clone(),
+                json!({"row": 87, "name": "Mecha Rogue 02", "hp": 702}),
+                json!({"row": 88, "name": "Mecha Rogue 02", "hp": 1404}),
+            ],
+        );
+        catalog.add_database(429, vec![json!({"row": 87, "name": "Ogremon", "hp": 900})]);
+        assert_eq!(catalog.get(Some(422), 1), Some(&original));
+        let normal = catalog.get(Some(422), 87).unwrap();
+        let hard = catalog.get(Some(422), 88).unwrap();
+        let other = catalog.get(Some(429), 87).unwrap();
+        assert_eq!(normal["name"], "Mecha Rogue 02");
+        assert_eq!(hard["hp"], 1404);
+        assert_eq!(other["name"], "Ogremon");
+        assert_ne!(normal["row"], hard["row"]);
+        assert_ne!(normal["row"], other["row"]);
+        assert_eq!(normal["database"], json!({"entry": 422, "row": 87}));
+        assert!(catalog.get(None, 87).is_none());
+        assert!(catalog.get(Some(429), 1).is_none());
+    }
+
+    #[test]
     fn formats_utc_timestamps() {
         assert_eq!(utc_timestamp(0), "1970-01-01T00:00:00+00:00");
         assert_eq!(utc_timestamp(1_792_253_100), "2026-10-17T16:05:00+00:00");
@@ -596,12 +699,21 @@ mod tests {
 
     #[test]
     fn a_record_carries_the_trigger() {
-        let rec =
-            generator_record(&generator([1.0, 2.0, 3.0], vec![[1.0, 2.0, 3.0]], true, "radar", 625.0), None, false);
+        let rec = generator_record(
+            &generator([1.0, 2.0, 3.0], vec![[1.0, 2.0, 3.0]], true, "radar", 625.0),
+            None,
+            false,
+            &mut DropCatalog::default(),
+        );
         assert_eq!(rec["trigger"], json!({"center": [1.0, 2.0, 3.0], "radius": 25.0}));
-        assert!(generator_record(&generator([1.0, 2.0, 3.0], vec![], true, "direct", 0.0), None, false)
-            .get("trigger")
-            .is_none());
+        assert!(generator_record(
+            &generator([1.0, 2.0, 3.0], vec![], true, "direct", 0.0),
+            None,
+            false,
+            &mut DropCatalog::default()
+        )
+        .get("trigger")
+        .is_none());
     }
 
     fn slots(rows: &[(i64, i64, &str)]) -> Vec<PlayerSlot> {
@@ -619,15 +731,15 @@ mod tests {
     fn identical_player_entries_collapse_to_the_plain_fields() {
         let mut g = generator([0.0; 3], vec![], true, "", 0.0);
         g.slots = slots(&[(1, 1, "nA"); 4]);
-        assert_eq!(player_slots(&g), None);
-        assert_eq!(player_slots(&generator([0.0; 3], vec![], true, "", 0.0)), None);
+        assert_eq!(player_slots(&g, &mut DropCatalog::default()), None);
+        assert_eq!(player_slots(&generator([0.0; 3], vec![], true, "", 0.0), &mut DropCatalog::default()), None);
     }
 
     #[test]
     fn differing_player_entries_are_exported_in_order() {
         let mut g = generator([0.0; 3], vec![], true, "", 0.0);
         g.slots = slots(&[(2, 2, "nA"), (3, 3, "nA"), (4, 4, "nB"), (4, 4, "nB")]);
-        let out = player_slots(&g).unwrap();
+        let out = player_slots(&g, &mut DropCatalog::default()).unwrap();
         assert_eq!(out.iter().map(|e| e["count"].as_i64().unwrap()).collect::<Vec<_>>(), [2, 3, 4, 4]);
         assert_eq!(out[2]["drops"], json!({"normal": "nB"}));
     }
@@ -647,13 +759,46 @@ mod tests {
             (&rec["difficulty"], &rec["zone"], &rec["family"], &rec["variant"]),
             (&json!("hard"), &json!("Z1"), &json!("gobr"), &json!("3"))
         );
-        assert_eq!(pool_record(&pool("comonNOTG01")), json!({"entries": [], "totalRate": 0}));
+        assert_eq!(pool_record(&pool("comonNOTG01")), json!({"entries": [], "totalRate": 0, "roll": "inclusive"}));
     }
 
     #[test]
     fn drop_maps_are_keyed_by_difficulty() {
         let pools = ["nZ1a1", "hZ1a1", "vZ1a1"].map(pool);
-        assert_eq!(Value::Object(drop_map(&pools)), json!({"normal": "nZ1a1", "hard": "hZ1a1", "veryhard": "vZ1a1"}));
+        assert_eq!(
+            Value::Object(drop_map(&pools, &mut DropCatalog::default())),
+            json!({"normal": "nZ1a1", "hard": "hZ1a1", "veryhard": "vZ1a1"})
+        );
+    }
+
+    #[test]
+    fn cloned_loot_names_keep_distinct_contents_and_common_tables_follow_difficulty_slots() {
+        let mut catalog = DropCatalog::default();
+        let original = DropPool {
+            name: "nZ1gobr1".into(),
+            entries: vec![crate::generators::DropEntry { category: "weapon".into(), id: 0, rank: 0, rate: 100 }],
+        };
+        let mut changed = original.clone();
+        changed.entries[0].rate = 4999;
+        let a = drop_map(&[original.clone(), changed.clone(), original.clone()], &mut catalog);
+        assert_ne!(a["normal"], a["hard"]);
+        assert_eq!(a["normal"], a["veryhard"]);
+        assert_eq!(catalog.pools[a["normal"].as_str().unwrap()]["totalRate"], 100);
+        assert_eq!(catalog.pools[a["hard"].as_str().unwrap()]["totalRate"], 4999);
+        let common = pool("comonEPIC01");
+        let common = drop_map(&[common.clone(), common.clone(), common], &mut catalog);
+        assert_eq!(
+            common,
+            json!({"normal":"comonEPIC01","hard":"comonEPIC01","veryhard":"comonEPIC01"}).as_object().unwrap().clone()
+        );
+        let mut g = generator([0.0; 3], vec![], true, "", 0.0);
+        g.slots = slots(&[(1, 1, ""), (1, 1, "")]);
+        g.slots[0].pools = vec![original];
+        g.slots[1].pools = vec![changed];
+        assert!(player_slots(&g, &mut catalog).is_some());
+        g.slots[1].pools.clear();
+        let slots = player_slots(&g, &mut catalog).unwrap();
+        assert_eq!(slots[1]["drops"], json!({}), "empty profiles must not inherit another party size's loot");
     }
 
     #[test]

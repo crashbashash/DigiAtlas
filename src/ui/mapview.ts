@@ -256,7 +256,6 @@ export class MapView {
   ): void {
     const stageChanged = stage.id !== this.stageId;
     const showTrainRoute = selectedTrain === 'route' && this.selectedTrain !== 'route';
-    const trainSelectionChanged = selectedTrain !== this.selectedTrain;
     this.selectedTrain = selectedTrain;
     this.trainSteps = new Map(
       (stage.train?.steps ?? []).map((step, index) => [step.controlId, index + 1]),
@@ -472,7 +471,7 @@ export class MapView {
     // Re-hit the pointer so the tooltip cannot retain a different group's old name or stats.
     if (this.pointer && !this.drag) this.hoverAt(...this.pointer);
     this.updateLegendVisibility();
-    if (showTrainRoute || (trainSelectionChanged && !!stage.train)) this.fit();
+    if (showTrainRoute) this.fit();
     this.draw();
   }
 

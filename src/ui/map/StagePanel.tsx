@@ -11,15 +11,27 @@ import {
 } from '../../data/logic';
 import { traderLabel } from '../../data/model';
 import {
+  doorActivations,
+  doorEnemyGroups,
+  doorLabel,
+  doorSummary,
+  platformLabel,
+  platformMovements,
+  platformSummary,
+  visibleDoors,
+  visiblePlatforms,
+} from '../../data/doors';
+import {
   DIFFICULTY_LABEL,
   type Difficulty,
   type Enemy,
   type Generator,
   type Stage,
+  type Platform,
 } from '../../data/types';
 import { Empty, KindDot, Link, settingsText } from '../common';
 import { useApp } from '../context';
-import { KIND_LABEL, SERVICE_COLOR } from '../mapview';
+import { DOOR_COLOR, PLATFORM_COLOR, KIND_LABEL, SERVICE_COLOR } from '../mapview';
 import { DropTableView, EnemyStats, ItemLink, variantLabel } from '../pieces';
 
 const fmt = (n: number): string => n.toLocaleString('en-US');
@@ -28,6 +40,9 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** A selection after the spawner's name has been matched to its index on this difficulty. */
 export type Resolved =
   | { kind: 'none' }
+  | { kind: 'door'; id: string }
+  | { kind: 'platform'; id: string }
+  | { kind: 'train'; id: string }
   | { kind: 'generator'; index: number }
   | { kind: 'group'; row: number }
   | { kind: 'item'; key: string }
@@ -60,6 +75,9 @@ export function StagePanel(props: PanelProps) {
       {sel.kind === 'generator' && <SpawnerView {...props} index={sel.index} />}
       {sel.kind === 'group' && <GroupView {...props} row={sel.row} />}
       {sel.kind === 'species' && <SpeciesView {...props} name={sel.name} />}
+      {sel.kind === 'door' && <DoorView {...props} id={sel.id} />}
+      {sel.kind === 'platform' && <DoorView {...props} id={sel.id} platform />}
+      {sel.kind === 'train' && <TrainView {...props} id={sel.id} />}
       {(sel.kind === 'none' || sel.kind === 'item') && <Overview {...props} />}
     </aside>
   );
@@ -257,14 +275,55 @@ function SpeciesRow({ s, select }: { s: Species; select: PanelProps['select'] })
 }
 
 function Overview({ stage, difficulty: d, reveal, select }: PanelProps) {
-  const { model, scope, setSettings } = useApp();
+  const { model, scope, settings, setSettings } = useApp();
   const gens = model.generators(stage, d, scope);
   const hidden = model.hidden(stage, d, scope);
   const species = bySpecies(groupByEnemy(gens, model.enemies, hidden));
   const fights = species.filter((s) => s.enemy?.kind !== 'object');
   const objects = species.filter((s) => s.enemy?.kind === 'object');
+  const doors = visibleDoors(stage);
+  const platforms = visiblePlatforms(stage, d, settings.players);
   return (
     <>
+      {stage.train && <TrainOverview stage={stage} select={select} />}
+      {doors.length > 0 && (
+        <section aria-label="Doors and gates">
+          <h3 class="sub">Doors and gates ({doors.length})</h3>
+          <p class="note">Select a door to see what opens it and highlight its linked triggers.</p>
+          {doors.map((door) => (
+            <button
+              type="button"
+              class="row"
+              onClick={() => select({ kind: 'door', id: door.id })}
+              key={door.id}
+            >
+              <i class="dot" style={{ background: DOOR_COLOR }} aria-hidden="true" />
+              <span class="grow">{doorLabel(door, stage)}</span>
+              <span class="detail muted">{doorSummary(door, stage, d, settings.players)}</span>
+            </button>
+          ))}
+        </section>
+      )}
+      {platforms.length > 0 && (
+        <section aria-label="Moving platforms">
+          <h3 class="sub">Moving platforms ({platforms.length})</h3>
+          <p class="note">Select a platform to see its movements and linked triggers.</p>
+          {platforms.map((platform) => (
+            <button
+              type="button"
+              class="row"
+              key={platform.id}
+              onClick={() => select({ kind: 'platform', id: platform.id })}
+            >
+              <i class="dot" style={{ background: PLATFORM_COLOR }} aria-hidden="true" />
+              <span class="grow">{platformLabel(platform, stage)}</span>
+              <span class="detail muted">
+                {platformSummary(platform, stage, d, settings.players)}
+              </span>
+            </button>
+          ))}
+        </section>
+      )}
       {model.tradersAt(stage, d).length > 0 && (
         <Traders stage={stage} difficulty={d} reveal={reveal} />
       )}
@@ -302,6 +361,340 @@ function Overview({ stage, difficulty: d, reveal, select }: PanelProps) {
         <p class="note">No map is available for this stage; markers are plotted on a plain grid.</p>
       )}
     </>
+  );
+}
+
+function TrainOverview({ stage, select }: Pick<PanelProps, 'stage' | 'select'>) {
+  const train = stage.train!;
+  return (
+    <section aria-label="Train controls and route">
+      <h3>Train route</h3>
+      <p>
+        Choose the train’s direction by hitting the arrow signs. Straight is selected by default at
+        each junction.
+      </p>
+      <button type="button" class="row" onClick={() => select({ kind: 'train', id: 'route' })}>
+        <span class="grow">Fastest route directions to Power Plant</span>
+        <span class="detail muted">{train.steps.length} steps</span>
+      </button>
+      <details>
+        <summary>All train controls ({train.controls.length})</summary>
+        {[...train.controls]
+          .sort((a, b) => a.junction - b.junction || a.label.localeCompare(b.label))
+          .map((control) => (
+            <button
+              type="button"
+              class="row"
+              key={control.id}
+              onClick={() => select({ kind: 'train', id: control.id })}
+            >
+              <span class="grow">{control.label}</span>
+            </button>
+          ))}
+      </details>
+    </section>
+  );
+}
+
+function TrainView({ stage, id, select }: PanelProps & { id: string }) {
+  const train = stage.train!;
+  const control = train.controls.find((c) => c.id === id);
+  if (id !== 'route' && !control)
+    return (
+      <>
+        <Back select={select} />
+        <Empty>This train control is not in the imported data.</Empty>
+      </>
+    );
+  if (control) {
+    const visit = train.steps.findIndex((s) => s.controlId === control.id);
+    const best = train.steps
+      .map((s) => train.controls.find((c) => c.id === s.controlId)!)
+      .find((c) => c.junction === control.junction);
+    return (
+      <section class="train-details" aria-label="Train control">
+        <Back select={select} />
+        <h2>{control.label}</h2>
+        <p>
+          The purple branch leads toward {control.previewDestination}. The orange line continues to
+          show the fastest route.
+        </p>
+        {control.choice === 'gate' ? (
+          <p>Hit this post before the barrier to open the gate and continue along the route.</p>
+        ) : (
+          <>
+            <p>
+              Hit this arrow while its junction’s controls are active. The choice takes effect when
+              the train leaves that junction’s trigger area.
+            </p>
+            <p>
+              Selecting one arrow deselects its opposite. The next junction starts with straight
+              selected. All players share the choice.
+            </p>
+          </>
+        )}
+        <p>
+          {visit >= 0
+            ? `Fastest route: step ${visit + 1}. ${train.steps[visit].instruction}.`
+            : best
+              ? `Fastest route here: ${best.choice === 'straight' ? 'continue straight' : `turn ${best.choice}`}.`
+              : 'The fastest route bypasses this junction.'}
+        </p>
+        <button type="button" class="link" onClick={() => select({ kind: 'train', id: 'route' })}>
+          Show the full fastest route
+        </button>
+      </section>
+    );
+  }
+  return (
+    <section class="train-details" aria-label="Fastest train route">
+      <Back select={select} />
+      <h2>Fastest train route</h2>
+      <p>
+        Follow these choices in order from departure to Power Plant. The numbered controls and
+        orange line match the steps below.
+      </p>
+      <p class="note">
+        Optimises rail travel time. Hit the required arrows before their junction passes, and hit
+        both gate posts.
+      </p>
+      <ol class="train-steps">
+        {train.steps.map((step, index) => {
+          const control = train.controls.find((c) => c.id === step.controlId)!;
+          return (
+            <li key={step.controlId} class="card">
+              <button
+                type="button"
+                class="link"
+                onClick={() => select({ kind: 'train', id: control.id })}
+              >
+                {index + 1}. {step.instruction}
+              </button>
+              <p class="sub">{control.label}</p>
+              {control.choice === 'straight' && <p class="note">Leave straight selected.</p>}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function DoorView({
+  stage,
+  difficulty,
+  id,
+  select,
+  platform = false,
+}: PanelProps & { id: string; platform?: boolean }) {
+  const { model, settings, scope } = useApp();
+  const door = platform
+    ? visiblePlatforms(stage).find((p) => p.id === id)
+    : visibleDoors(stage).find((door) => door.id === id);
+  if (!door)
+    return (
+      <>
+        <Back select={select} />
+        <Empty>This {platform ? 'platform' : 'door'} is not in the imported data.</Empty>
+      </>
+    );
+  const movements = platform
+    ? platformMovements(door as Platform, difficulty, settings.players)
+    : [
+        {
+          id: 'door',
+          label: 'Opens when',
+          activations: doorActivations(door, difficulty, settings.players),
+        },
+      ];
+  const generators = model.generators(stage, difficulty, scope);
+  const groupNumbers = new Map(
+    [
+      ...doorEnemyGroups(
+        movements.flatMap((m) => m.activations),
+        generators,
+        model.enemies,
+      ),
+    ]
+      .sort((a, b) => a - b)
+      .map((index, n) => [index, n + 1]),
+  );
+  return (
+    <section
+      class="door-details"
+      aria-label={platform ? 'Platform movement conditions' : 'Door opening conditions'}
+    >
+      <Back select={select} />
+      <h2>
+        <i
+          class="dot"
+          style={{ background: platform ? PLATFORM_COLOR : DOOR_COLOR }}
+          aria-hidden="true"
+        />
+        {platform ? platformLabel(door as Platform, stage) : doorLabel(door, stage)}
+      </h2>
+      <p class="note">
+        {platform
+          ? 'The marker shows the platform’s starting position. Each movement has an identified trigger.'
+          : 'The selected door is outlined on the map.'}{' '}
+        Linked controls and enemy groups are highlighted.
+      </p>
+      {groupNumbers.size > 1 && (
+        <p class="note">
+          Group numbers match the map. Groups that share a spawn location share a map label.
+        </p>
+      )}
+      {!movements.length && <p>No movement is available for these settings.</p>}
+      {movements.map((movement) => {
+        const activations = movement.activations;
+        return (
+          <section key={movement.id} aria-label={movement.label}>
+            <h3>{movement.label}</h3>
+            {!activations.length && (
+              <p>Opening condition has not been identified for these settings.</p>
+            )}
+            {activations.map((activation, index) => {
+              const groups = [
+                ...doorEnemyGroups([{ ...activation, enemyModels: [] }], generators, model.enemies),
+              ];
+              const deathNames = [
+                ...new Set(
+                  activation.enemyModels.flatMap((modelName) => {
+                    const names = [...model.enemies.values()]
+                      .filter((enemy) => enemy.model === modelName)
+                      .map((enemy) => enemy.name);
+                    return names.length ? names : ['the linked enemy'];
+                  }),
+                ),
+              ];
+              return (
+                <div class="card door-activation" key={index}>
+                  {activations.length > 1 && (
+                    <div class="sub">
+                      {index === 0 ? 'Either' : 'Or'} · Option {index + 1}
+                    </div>
+                  )}
+                  {activation.description && <p>{activation.description}</p>}
+                  {activation.areas?.map((area) => (
+                    <p key={area.id}>
+                      {area.event === 'leave'
+                        ? area.allPlayers
+                          ? 'Move at least one player out of'
+                          : 'Leave'
+                        : area.allPlayers
+                          ? 'Move all players into'
+                          : 'Enter'}{' '}
+                      <strong>{area.label}</strong>.
+                    </p>
+                  ))}
+                  {activation.switches.some((s) => !s.action || s.action === 'activate') && (
+                    <p>
+                      Activate{' '}
+                      {activation.switches
+                        .filter((s) => !s.action || s.action === 'activate')
+                        .map((s) => s.label)
+                        .join(' and ')}
+                      . Follow the dashed lines to their map markers.
+                    </p>
+                  )}
+                  {activation.switches.some((s) => s.action === 'break') && (
+                    <p>
+                      Break{' '}
+                      {activation.switches
+                        .filter((s) => s.action === 'break')
+                        .map((s) => s.label)
+                        .join(' and ')}
+                      . Follow the dashed lines to their map markers.
+                    </p>
+                  )}
+                  {activation.switches.some((s) => s.action === 'hold') && (
+                    <p>
+                      Stand on{' '}
+                      {activation.switches
+                        .filter((s) => s.action === 'hold')
+                        .map((s) => s.label)
+                        .join(' and ')}
+                      {activation.switches.filter((s) => s.action === 'hold').length > 1
+                        ? ' at the same time'
+                        : ''}
+                      . Keep the required buttons held until the gate opens.
+                    </p>
+                  )}
+                  {activation.switches.some((s) => s.action === 'destroy') && (
+                    <p>
+                      Destroy{' '}
+                      {activation.switches
+                        .filter((s) => s.action === 'destroy')
+                        .map((s) => s.label)
+                        .join(' and ')}{' '}
+                      at the highlighted marker.
+                    </p>
+                  )}
+                  {activation.items.length > 0 && (
+                    <div>
+                      <p>Carry all of these key items:</p>
+                      <ul>
+                        {activation.items.map((item) => (
+                          <li key={itemKey(item.category, item.id)}>
+                            <ItemLink itemKey={itemKey(item.category, item.id)} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {groups.length > 0 && (
+                    <div>
+                      <p>Defeat the enemies in all linked groups:</p>
+                      <ul>
+                        {groups.map((i) => {
+                          const g = generators[i];
+                          const enemy = model.enemies.get(g.row);
+                          return (
+                            <li key={g.name}>
+                              <button
+                                type="button"
+                                class="link"
+                                onClick={() => select({ kind: 'spawner', name: g.name })}
+                              >
+                                Group {groupNumbers.get(i)} · {enemy?.name ?? 'Enemy group'}
+                                {g.count !== null
+                                  ? ` · ${g.count} ${enemy?.kind === 'object' ? 'objects' : g.count === 1 ? 'enemy' : 'enemies'}`
+                                  : ''}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                  {deathNames.length > 0 && (
+                    <p>
+                      Defeat {deathNames.join(' and ')}. Matching spawn locations are highlighted on
+                      the map.
+                    </p>
+                  )}
+                  {activation.generators.length > 0 && groups.length === 0 && (
+                    <p>The linked enemy group is not present on this difficulty.</p>
+                  )}
+                  {activation.conditions.map((condition) => (
+                    <p class="note" key={condition}>
+                      {condition}
+                    </p>
+                  ))}
+                  {activation.unresolved && (
+                    <p class="note">
+                      {platform
+                        ? 'The movement has a linked trigger; some additional scripted conditions are only partly identified.'
+                        : 'The opening condition is only partly identified from the game scripts.'}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        );
+      })}
+    </section>
   );
 }
 

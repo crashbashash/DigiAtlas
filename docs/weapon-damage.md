@@ -185,7 +185,7 @@ modifying or claiming newly matched decompilation code.
 ## Picker UI
 
 Equipment, chips, rarity, save boxes, Digimon, weapon skills, targets, enemy
-variants and player counts use the shared `SearchPicker`. Long lists provide a
+variants use the shared `SearchPicker`. Player counts use a compact dropdown. Long lists provide a
 text filter; short lists retain the same menu styling. Arrow keys navigate
 options, buttons support ordinary keyboard activation, and Escape/light-dismiss
 use the browser popover behavior. Selection always calls the existing state

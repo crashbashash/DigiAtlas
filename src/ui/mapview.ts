@@ -1,6 +1,27 @@
 import type { DataSource } from '../data/source';
 import { traderLabel, type Model, type Scope } from '../data/model';
-import type { Difficulty, Enemy, EnemyKind, ServiceNpc, Stage } from '../data/types';
+import type {
+  Difficulty,
+  Door,
+  DoorSwitch,
+  Enemy,
+  EnemyKind,
+  ServiceNpc,
+  Stage,
+  Platform,
+  TriggerArea,
+  TrainControl,
+} from '../data/types';
+import {
+  doorActivations,
+  doorLabel,
+  doorSummary,
+  platformLabel,
+  platformMovements,
+  platformSummary,
+  visibleDoors,
+  visiblePlatforms,
+} from '../data/doors';
 import { h } from './dom';
 import {
   markerRank,
@@ -34,14 +55,26 @@ export interface MapEvents {
   /** A trader's pin was clicked; `index` is its place in `Model.tradersAt`. */
   onTrader(index: number): void;
   onService(index: number): void;
+  onDoor(id: string): void;
+  onPlatform(id: string): void;
+  onTrain(id: string): void;
 }
 
 export const TRADER_COLOR = '#b98cff';
 export const SERVICE_COLOR = '#73dfb5';
+export const DOOR_COLOR = '#ffd166';
+export const DOOR_TRIGGER_COLOR = '#73dfd5';
+export const PLATFORM_COLOR = '#b8e986';
 const ROUTE_COLOR = '#ffb46b';
 
 /** A trader standing in a shop room. */
 interface Pin {
+  train?: TrainControl;
+  platform?: Platform;
+  area?: TriggerArea;
+  detail?: string;
+  door?: Door;
+  trigger?: DoorSwitch;
   service?: ServiceNpc;
   landmark?: ServiceNpc;
   index: number;
@@ -113,6 +146,45 @@ export class MapView {
     h('i', { style: `background:${SERVICE_COLOR}` }),
     'Service NPC',
   );
+  private readonly doorKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: `background:${DOOR_COLOR}` }),
+    'Door / gate',
+  );
+  private readonly switchKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: `background:${DOOR_TRIGGER_COLOR}` }),
+    'Activation trigger',
+  );
+  private focusedDoor: Door | null = null;
+  private selectedTrain: string | null = null;
+  private trainSteps = new Map<string, number>();
+  private deviation: [number, number, number][] = [];
+  private readonly deviationKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: 'background:#c396ff' }),
+    'Selected train branch',
+  );
+  private pinLabels: { left: number; right: number; top: number; bottom: number }[] = [];
+  private readonly trainKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: `background:${DOOR_TRIGGER_COLOR}` }),
+    'Train controls',
+  );
+  private focusedPlatform: Platform | null = null;
+  private triggerAreas: TriggerArea[] = [];
+  private groupNumbers = new Map<number, number>();
+  private readonly platformKey = h(
+    'span',
+    { hidden: true },
+    h('i', { style: `background:${PLATFORM_COLOR}` }),
+    'Moving platform',
+  );
+  private doorPoints: { x: number; y: number; z: number }[] = [];
   private readonly tip = h('div', { class: 'tip', hidden: true });
   private view: View = { tx: 0, ty: 0, scale: 1 };
   private bounds = { minX: -100, maxX: 100, minZ: -100, maxZ: 100 };
@@ -148,7 +220,6 @@ export class MapView {
       this.setHoverPin(null);
     });
     this.canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
-    this.canvas.addEventListener('dblclick', () => this.fit());
     // The browser's own menu (back, reload, inspect) has nothing to offer on the map.
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
@@ -161,6 +232,11 @@ export class MapView {
       this.traderKey,
       this.numberKey,
       this.serviceKey,
+      this.doorKey,
+      this.platformKey,
+      this.switchKey,
+      this.trainKey,
+      this.deviationKey,
       this.routeKey,
       this.heightKey,
       this.sceneryKey,
@@ -174,11 +250,24 @@ export class MapView {
     highlight: Set<number> | null,
     selected: number | null,
     litPins: Set<number> | null = null,
+    selectedDoor: string | null = null,
+    selectedPlatform: string | null = null,
+    selectedTrain: string | null = null,
   ): void {
     const stageChanged = stage.id !== this.stageId;
+    const showTrainRoute = selectedTrain === 'route' && this.selectedTrain !== 'route';
+    const trainSelectionChanged = selectedTrain !== this.selectedTrain;
+    this.selectedTrain = selectedTrain;
+    this.trainSteps = new Map(
+      (stage.train?.steps ?? []).map((step, index) => [step.controlId, index + 1]),
+    );
     this.stageId = stage.id;
     this.highlight = highlight;
-    this.route = stage.boatRoute ?? [];
+    this.route = stage.train?.points ?? stage.boatRoute ?? [];
+    this.deviation = stage.train?.controls.find((c) => c.id === selectedTrain)?.preview ?? [];
+    this.deviationKey.hidden = this.deviation.length < 2;
+    this.routeKey.lastChild!.textContent = stage.train ? 'Fastest train route' : 'Boat route';
+    this.trainKey.hidden = !stage.train?.controls.length;
     this.selected = selected;
     this.litPins = litPins;
     this.markers = stageMarkers(this.model, stage, d, scope);
@@ -216,6 +305,129 @@ export class MapView {
         facing: landmark.facing,
       })),
     );
+    const doors = visibleDoors(stage);
+    const platforms = visiblePlatforms(stage, d, scope.players);
+    this.focusedDoor = doors.find((door) => door.id === selectedDoor) ?? null;
+    this.focusedPlatform = platforms.find((p) => p.id === selectedPlatform) ?? null;
+    this.groupNumbers = new Map(
+      (this.focusedDoor || this.focusedPlatform
+        ? [...(highlight ?? [])].sort((a, b) => a - b)
+        : []
+      ).map((index, n) => [index, n + 1]),
+    );
+    this.doorPoints = [...doors, ...platforms].flatMap((door) => [
+      door.position,
+      ...door.activations.flatMap((a) => a.switches.map((s) => s.position)),
+      ...door.activations.flatMap((a) =>
+        (a.areas ?? []).flatMap((area) => [
+          area.position,
+          { x: area.bounds.minX, y: area.position.y, z: area.bounds.minZ },
+          { x: area.bounds.maxX, y: area.position.y, z: area.bounds.maxZ },
+        ]),
+      ),
+    ]);
+    this.doorPoints.push(
+      ...(stage.train?.controls.map((c) => c.position) ?? []),
+      ...(stage.train?.points.map(([x, y, z]) => ({ x, y, z })) ?? []),
+    );
+    this.doorPoints.push(...this.deviation.map(([x, y, z]) => ({ x, y, z })));
+    this.pins.push(
+      ...(stage.train?.controls.map((train, index) => ({
+        train,
+        index,
+        x: train.position.x,
+        z: train.position.z,
+        facing: train.facing,
+        trades: 0,
+        label: train.label,
+        detail:
+          train.choice === 'gate'
+            ? 'Hit this post to open the barrier and continue.'
+            : `Select ${train.choice}. The choice applies when the train leaves this junction; the next junction resets to straight.`,
+      })) ?? []),
+    );
+    if (stage.train) {
+      const points = stage.train.points;
+      for (const [index, point] of [points[0], points[points.length - 1]].entries()) {
+        const [x, y, z] = point;
+        const label = index === 0 ? 'Train start' : 'Power Plant exit';
+        const landmark = {
+          id: `train-endpoint-${index}`,
+          name: 'Train route',
+          label,
+          description: label,
+          position: { x, y, z },
+          facing: 0,
+        };
+        this.pins.push({ landmark, index, x, z, label, trades: 0, facing: 0 });
+      }
+    }
+    this.pins.push(
+      ...doors.map((door, index) => ({
+        door,
+        index,
+        x: door.position.x,
+        z: door.position.z,
+        label: doorLabel(door, stage),
+        detail: doorSummary(door, stage, d, scope.players),
+        trades: 0,
+        facing: door.facing,
+      })),
+    );
+    this.pins.push(
+      ...platforms.map((platform, index) => ({
+        platform,
+        index,
+        x: platform.position.x,
+        z: platform.position.z,
+        label: platformLabel(platform, stage),
+        detail: platformSummary(platform, stage, d, scope.players),
+        trades: 0,
+        facing: platform.facing,
+      })),
+    );
+    const activations = this.focusedPlatform
+      ? platformMovements(this.focusedPlatform, d, scope.players).flatMap((m) => m.activations)
+      : this.focusedDoor
+        ? doorActivations(this.focusedDoor, d, scope.players)
+        : [];
+    const switches = new Map(activations.flatMap((a) => a.switches).map((s) => [s.id, s]));
+    this.pins.push(
+      ...[...switches.values()].map((trigger, index) => ({
+        trigger,
+        index,
+        x: trigger.position.x,
+        z: trigger.position.z,
+        label: trigger.label,
+        trades: 0,
+        facing: trigger.facing,
+      })),
+    );
+    this.triggerAreas = [
+      ...new Map(activations.flatMap((a) => a.areas ?? []).map((area) => [area.id, area])).values(),
+    ];
+    this.pins.push(
+      ...this.triggerAreas.map((area, index) => ({
+        area,
+        index,
+        x: area.position.x,
+        z: area.position.z,
+        label: area.label,
+        detail:
+          area.event === 'leave'
+            ? area.allPlayers
+              ? 'At least one player must leave this area.'
+              : 'Leave this area to rearm the platform.'
+            : area.allPlayers
+              ? 'All players must enter this trigger area.'
+              : 'Enter this trigger area.',
+        trades: 0,
+        facing: 0,
+      })),
+    );
+    this.doorKey.hidden = doors.length === 0;
+    this.platformKey.hidden = platforms.length === 0;
+    this.switchKey.hidden = switches.size === 0 && this.triggerAreas.length === 0;
     this.routeKey.hidden = !stage.landmarks?.length && this.route.length < 2;
     this.serviceKey.hidden = !stage.services?.length;
     if (stageChanged) {
@@ -260,6 +472,7 @@ export class MapView {
     // Re-hit the pointer so the tooltip cannot retain a different group's old name or stats.
     if (this.pointer && !this.drag) this.hoverAt(...this.pointer);
     this.updateLegendVisibility();
+    if (showTrainRoute || (trainSelectionChanged && !!stage.train)) this.fit();
     this.draw();
   }
 
@@ -289,7 +502,17 @@ export class MapView {
   zoomTo(generators: Set<number>, pins: Set<number> | null = null): void {
     const ms: { x: number; z: number }[] = [
       ...this.markers.filter((m) => generators.has(m.gi)),
-      ...this.pins.filter((p) => !p.service && !p.landmark && pins?.has(p.index)),
+      ...this.pins.filter(
+        (p) =>
+          !p.service &&
+          !p.landmark &&
+          !p.door &&
+          !p.platform &&
+          !p.train &&
+          !p.area &&
+          !p.trigger &&
+          pins?.has(p.index),
+      ),
     ];
     const w = this.canvas.clientWidth;
     const hgt = this.canvas.clientHeight;
@@ -314,7 +537,14 @@ export class MapView {
       this.pendingFit = true;
       return;
     }
-    const b = this.bounds;
+    // Frame mechanisms outside the extracted floor too (for example a train gate),
+    // while keeping the floor image's original world coordinates intact.
+    const b = {
+      minX: Math.min(this.bounds.minX, ...this.doorPoints.map((p) => p.x)),
+      maxX: Math.max(this.bounds.maxX, ...this.doorPoints.map((p) => p.x)),
+      minZ: Math.min(this.bounds.minZ, ...this.doorPoints.map((p) => p.z)),
+      maxZ: Math.max(this.bounds.maxZ, ...this.doorPoints.map((p) => p.z)),
+    };
     const scale = Math.min(w / (b.maxX - b.minX), hgt / (b.maxZ - b.minZ)) * 0.94;
     this.view = {
       scale,
@@ -352,6 +582,8 @@ export class MapView {
     ctx.restore();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.drawRoute(ctx);
+    this.drawTriggerAreas(ctx);
+    this.drawDoorLinks(ctx);
     const order = [...this.markers].sort((a, c) => this.rank(a) - this.rank(c));
     const triggered = new Set<number>();
     for (const m of order) {
@@ -367,15 +599,30 @@ export class MapView {
         this.drawOthers(ctx, m);
       }
     }
-    for (const m of order) this.drawMarker(ctx, m);
+    const labelledGroups = new Set<number>();
+    for (const m of order) {
+      const label = this.groupNumbers.has(m.gi) && !labelledGroups.has(m.gi);
+      this.drawMarker(ctx, m, label);
+      if (label) for (const other of markersAtSpot(order, m)) labelledGroups.add(other.gi);
+    }
+    this.pinLabels = [];
     for (const p of this.pins) this.drawPin(ctx, p);
   }
 
   private drawRoute(ctx: CanvasRenderingContext2D): void {
-    if (this.route.length < 2) return;
+    this.drawPath(ctx, this.route, ROUTE_COLOR);
+    if (this.deviation.length > 1) this.drawPath(ctx, this.deviation, '#c396ff');
+  }
+
+  private drawPath(
+    ctx: CanvasRenderingContext2D,
+    points: [number, number, number][],
+    color: string,
+  ): void {
+    if (points.length < 2) return;
     ctx.save();
     ctx.beginPath();
-    this.route.forEach(([x, , z], i) => {
+    points.forEach(([x, , z], i) => {
       const px = this.view.tx + x * this.view.scale;
       const py = this.view.ty + z * this.view.scale;
       if (i === 0) ctx.moveTo(px, py);
@@ -386,10 +633,40 @@ export class MapView {
     ctx.strokeStyle = 'rgba(10, 14, 24, 0.75)';
     ctx.lineWidth = 5;
     ctx.stroke();
-    ctx.strokeStyle = ROUTE_COLOR;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 2.5;
     ctx.setLineDash([8, 5]);
     ctx.stroke();
+    if (this.trainSteps.size) {
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      let untilArrow = 45;
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1],
+          b = points[i];
+        const dx = (b[0] - a[0]) * this.view.scale,
+          dy = (b[2] - a[2]) * this.view.scale;
+        const distance = Math.hypot(dx, dy);
+        if (distance < 0.01) continue;
+        for (; untilArrow < distance; untilArrow += 80) {
+          const x = this.view.tx + a[0] * this.view.scale + (dx * untilArrow) / distance;
+          const y = this.view.ty + a[2] * this.view.scale + (dy * untilArrow) / distance;
+          ctx.beginPath();
+          ctx.moveTo(x + (dx / distance) * 5, y + (dy / distance) * 5);
+          ctx.lineTo(
+            x - (dx / distance) * 5 - (dy / distance) * 4,
+            y - (dy / distance) * 5 + (dx / distance) * 4,
+          );
+          ctx.lineTo(
+            x - (dx / distance) * 5 + (dy / distance) * 4,
+            y - (dy / distance) * 5 - (dx / distance) * 4,
+          );
+          ctx.closePath();
+          ctx.fill();
+        }
+        untilArrow -= distance;
+      }
+    }
     ctx.restore();
   }
 
@@ -397,6 +674,10 @@ export class MapView {
   private drawPin(ctx: CanvasRenderingContext2D, p: Pin): void {
     const sx = this.view.tx + p.x * this.view.scale;
     const sy = this.view.ty + p.z * this.view.scale;
+    if (p.door || p.trigger || p.platform || p.area || p.train) {
+      this.drawDoorPin(ctx, p, sx, sy);
+      return;
+    }
     const lit = !p.service && !p.landmark && (this.litPins?.has(p.index) ?? false);
     const r = lit || this.hoverPin === p ? 10 : 8;
     // Rotation is about the vertical axis; 0 faces +z (down the map) and positive turns toward +x.
@@ -423,9 +704,10 @@ export class MapView {
     ctx.textBaseline = 'bottom';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(10,14,24,0.85)';
-    ctx.strokeText(p.label, sx, sy - r - 3);
+    const labelPosition = this.placePinLabel(ctx, p.label, sx, sy - r - 3);
+    ctx.strokeText(p.label, ...labelPosition);
     ctx.fillStyle = lit ? '#ffffff' : p.landmark ? '#ffe0bf' : p.service ? '#c3f7e3' : '#e6dcff';
-    ctx.fillText(p.label, sx, sy - r - 3);
+    ctx.fillText(p.label, ...labelPosition);
     if (lit) {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
@@ -433,6 +715,173 @@ export class MapView {
       ctx.arc(sx, sy, r + 4, 0, Math.PI * 2);
       ctx.stroke();
     }
+  }
+
+  private drawDoorLinks(ctx: CanvasRenderingContext2D): void {
+    const focus = this.focusedPlatform ?? this.focusedDoor;
+    if (!focus) return;
+    const targets: { x: number; z: number }[] = [
+      ...this.pins.filter((p) => p.trigger || p.area),
+      ...this.markers.filter((m) => this.highlight?.has(m.gi)),
+    ];
+    const door = focus.position;
+    ctx.save();
+    ctx.strokeStyle = this.focusedPlatform ? '#b8e986aa' : '#ffd16690';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 5]);
+    for (const target of targets) {
+      ctx.beginPath();
+      ctx.moveTo(this.view.tx + door.x * this.view.scale, this.view.ty + door.z * this.view.scale);
+      ctx.lineTo(
+        this.view.tx + target.x * this.view.scale,
+        this.view.ty + target.z * this.view.scale,
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawDoorPin(ctx: CanvasRenderingContext2D, p: Pin, x: number, y: number): void {
+    const selected = !!(
+      (p.door && p.door.id === this.focusedDoor?.id) ||
+      (p.platform && p.platform.id === this.focusedPlatform?.id) ||
+      (p.train && p.train.id === this.selectedTrain)
+    );
+    const hovered = this.hoverPin === p;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = p.door ? DOOR_COLOR : p.platform ? PLATFORM_COLOR : DOOR_TRIGGER_COLOR;
+    ctx.strokeStyle = selected || hovered ? '#fff' : '#101723';
+    ctx.lineWidth = selected ? 2.5 : 1.5;
+    ctx.beginPath();
+    if (p.platform) {
+      ctx.moveTo(-10, -3);
+      ctx.lineTo(6, -3);
+      ctx.lineTo(11, 2);
+      ctx.lineTo(-5, 2);
+      ctx.closePath();
+      ctx.moveTo(-5, 2);
+      ctx.lineTo(-5, 6);
+      ctx.lineTo(11, 6);
+      ctx.lineTo(11, 2);
+    } else if (p.door) {
+      ctx.rotate((p.facing * Math.PI) / 180);
+      ctx.rect(-11, -4, 22, 8);
+    } else {
+      ctx.moveTo(0, -8);
+      ctx.lineTo(8, 0);
+      ctx.lineTo(0, 8);
+      ctx.lineTo(-8, 0);
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    const step = p.train ? this.trainSteps.get(p.train.id) : undefined;
+    if (p.train) {
+      ctx.font = '700 11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#101723';
+      ctx.fillText(
+        step
+          ? String(step)
+          : p.train.choice === 'left'
+            ? '‹'
+            : p.train.choice === 'right'
+              ? '›'
+              : p.train.choice === 'gate'
+                ? '!'
+                : '↑',
+        x,
+        y,
+      );
+    }
+    if (selected || hovered || p.trigger || p.area || step) {
+      ctx.font = '600 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#101723';
+      const label =
+        step && p.train
+          ? `${step}. ${p.train.choice === 'gate' ? p.train.label : p.train.choice[0].toUpperCase() + p.train.choice.slice(1)}`
+          : p.label;
+      const labelPosition = this.placePinLabel(ctx, label, x, y - 12);
+      ctx.strokeText(label, ...labelPosition);
+      ctx.fillStyle = p.door ? '#ffe6ac' : p.platform ? '#e4ffca' : '#bffaf0';
+      ctx.fillText(label, ...labelPosition);
+    }
+    if (selected) {
+      ctx.beginPath();
+      ctx.arc(x, y, 16, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  private placePinLabel(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+  ): [number, number] {
+    if (x < 0 || x > this.canvas.clientWidth || y < 0 || y > this.canvas.clientHeight)
+      return [x, y];
+    const half = ctx.measureText(text).width / 2 + 3;
+    const left = Math.max(half + 4, Math.min(x, this.canvas.clientWidth - half - 4));
+    let baseline = y;
+    for (let row = 0; row < 12; row++) {
+      baseline = Math.max(16, y - row * 18);
+      const box = {
+        left: left - half,
+        right: left + half,
+        top: baseline - 15,
+        bottom: baseline + 3,
+      };
+      if (
+        !this.pinLabels.some(
+          (other) =>
+            box.left < other.right &&
+            box.right > other.left &&
+            box.top < other.bottom &&
+            box.bottom > other.top,
+        )
+      ) {
+        this.pinLabels.push(box);
+        break;
+      }
+    }
+    if (Math.abs(baseline - y) > 4 || Math.abs(left - x) > 4) {
+      ctx.save();
+      ctx.strokeStyle = '#bffaf080';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 5);
+      ctx.lineTo(left, baseline + 3);
+      ctx.stroke();
+      ctx.restore();
+    }
+    return [left, baseline];
+  }
+
+  private drawTriggerAreas(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    ctx.strokeStyle = DOOR_TRIGGER_COLOR;
+    ctx.fillStyle = '#73dfd518';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    for (const area of this.triggerAreas) {
+      const b = area.bounds;
+      const x = this.view.tx + b.minX * this.view.scale;
+      const z = this.view.ty + b.minZ * this.view.scale;
+      const width = (b.maxX - b.minX) * this.view.scale;
+      const height = (b.maxZ - b.minZ) * this.view.scale;
+      ctx.fillRect(x, z, width, height);
+      ctx.strokeRect(x, z, width, height);
+    }
+    ctx.restore();
   }
 
   private rank(m: Marker): number {
@@ -509,7 +958,7 @@ export class MapView {
     return [this.view.tx + m.x * this.view.scale, this.view.ty + m.z * this.view.scale];
   }
 
-  private drawMarker(ctx: CanvasRenderingContext2D, m: Marker): void {
+  private drawMarker(ctx: CanvasRenderingContext2D, m: Marker, groupLabel = false): void {
     const [sx, sy] = this.toScreen(m);
     const lit = this.highlight !== null && this.highlight.has(m.gi);
     // Everything the current search or item matches is drawn as selected; the rest is left as it was.
@@ -543,6 +992,27 @@ export class MapView {
       ctx.beginPath();
       ctx.arc(sx, sy, r + 4, 0, Math.PI * 2);
       ctx.stroke();
+    }
+    if (groupLabel) {
+      const groups = [
+        ...new Set(
+          markersAtSpot(this.markers, m)
+            .map((other) => this.groupNumbers.get(other.gi))
+            .filter((n): n is number => n !== undefined),
+        ),
+      ].sort((a, b) => a - b);
+      const text =
+        groups.length > 1 ? `Groups ${groups.join(', ')}` : `Group ${this.groupNumbers.get(m.gi)}`;
+      ctx.font = '600 11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(10,14,24,0.95)';
+      const width = ctx.measureText(text).width;
+      const labelX = Math.max(width / 2 + 5, Math.min(sx, this.canvas.clientWidth - width / 2 - 5));
+      ctx.strokeText(text, labelX, sy - r - 4);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(text, labelX, sy - r - 4);
     }
     ctx.globalAlpha = 1;
   }
@@ -612,6 +1082,20 @@ export class MapView {
       this.pointer = [px, py];
       const pin = this.pickPin(px, py);
       if (pin) {
+        if (pin.train) {
+          this.events.onTrain(pin.train.id);
+          return;
+        }
+        if (pin.door) {
+          this.events.onDoor(pin.door.id);
+          return;
+        }
+        if (pin.platform) {
+          this.events.onPlatform(pin.platform.id);
+          return;
+        }
+        if (pin.area) return;
+        if (pin.trigger) return;
         if (pin.landmark) return;
         if (pin.service) this.events.onService(pin.index);
         else this.events.onTrader(pin.index);
@@ -657,9 +1141,19 @@ export class MapView {
         { class: 'muted' },
         p.landmark
           ? p.landmark.description
-          : p.service
-            ? `${p.service.name} · ${p.service.description}`
-            : `${p.trades} trades on this difficulty`,
+          : p.door || p.platform || p.area || p.train
+            ? (p.detail ?? 'Select to see what opens this door.')
+            : p.trigger
+              ? p.trigger.action === 'destroy'
+                ? 'Destroy this object to complete the requirement.'
+                : p.trigger.action === 'break'
+                  ? 'Break this object to complete the requirement.'
+                  : p.trigger.action === 'hold'
+                    ? 'Stand on this button and keep it held.'
+                    : 'Activates the selected mechanism.'
+              : p.service
+                ? `${p.service.name} · ${p.service.description}`
+                : `${p.trades} trades on this difficulty`,
       ),
     );
     this.tip.hidden = false;

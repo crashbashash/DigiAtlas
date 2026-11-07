@@ -9,6 +9,15 @@ the readers and never in the UI. JSON Schema files are in [`schema/v1/`](../sche
 when they are `digiatlas-importer` and the version built into the app (`IMPORTER_VERSION`, bumped
 whenever the data changes); otherwise it asks for the disc again.
 
+Imports prepare stages concurrently using eight CPU workers by default, limited by available CPUs.
+`DIGIATLAS_IMPORT_WORKERS` can select one to eight workers; additional workers use more memory.
+Each worker has its own disc reader. Results are merged in original disc order to retain stable
+enemy IDs and drop-pool keys. Progress counts completed stages. Failed jobs abort the import,
+and the desktop app keeps its previous complete cache until the replacement finishes successfully.
+Pack readers use the header's section sizes and record counts to decode directory and object
+records once. Raw geometry and bytecode blocks are excluded from record discovery; overlapping
+record candidates in those blocks must not be expanded into temporary object graphs.
+
 | File | Contents |
 |---|---|
 | `manifest.json` | Platform, region, serial, frame rate, source fingerprint, counts, and `knownGaps` |
@@ -292,8 +301,62 @@ still depend on game progress. Older imports can omit `services`.
 `landmarks` uses the same spatial fields for navigation markers. Numenume River's boat start
 and end come from the first and last translation keys of `r_boatz01`'s `route00` transform.
 `boatRoute` contains all world-space translation keys, joined in order for the route overlay.
+
+## Doors and activation requirements
+
+Stages may include `doors`, with stable model/instance IDs, world positions, facing and readable
+labels. `activations` contains alternative opening routes. Within one route, all listed switches,
+enemy groups, enemy death callbacks and key items are required. Switches include their own map
+positions; generator names refer to the selected difficulty's generators so modded enemy
+replacements stay linked. `enemyModels` identifies death callbacks rather than a requirement to
+clear every group of that species. Key items use ordinary item references (`impItem`).
+
+Each activation records the difficulties and actual party sizes it applies to. Flag prerequisites
+are followed back to the actions that set them, including links through called scripts. Numeric
+door-instance loops are expanded; alternative branches remain separate. `unresolved` marks
+partly understood conditions, and an empty activation list means no opening condition was found.
+These are authored requirements, not the current open/closed state of a running game or save.
+Older imports may omit `doors`.
+
+Map labels combine the model's known role with its activation requirements, such as a boss
+entrance or numbered button door. Identical roles within a room receive numbers. The map,
+details and room list use the same name. Train-door models are excluded.
+
+`platforms` contains lifts, moving bridges, movable cells and rising platforms. Each record has
+one or more `movements`, each with a label, optional authored destination and nonempty activation
+requirements. The importer and schema require an assigned trigger for every movement: a placed
+control, mapped floor volume, linked enemy callback or explicit key item. Startup animations and
+unlocated or unidentified triggers do not produce platform markers. Attached wall meshes at the
+same position are treated as part of their moving platform.
+
+Activation `areas` identify `beMatCtrlData` volumes, retaining their world bounds, whether all
+players are required, and whether entering or leaving the area activates/rearms the movement.
+Controls distinguish `activate`, `hold`, `break` and `destroy`; pressure buttons must remain occupied,
+and tower break callbacks are linked to their placed objects. Controls inherit the conditions that
+power them on. Four-slot joined-player counting loops supply the actual party-size restrictions,
+including buttons completed automatically for unused player slots. A Dark Tower destruction callback
+is not shown as a button press. Co-located button model variants are one physical control. Boolean completion-flag
+sums requiring every flag are combined into one collective enemy-clear requirement. Equivalent
+requirements are consolidated after difficulty and party filtering; distinct groups remain linked
+and receive matching group labels in the map and details.
 Height shading uses a wider dark-to-light palette; single-height floors retain the original
 flat-floor brightness. The app's height key uses the same palette.
+
+Train Line exports `train`: its eighteen arrow controls and two gate posts, plus the fastest
+successful route to Power Plant. Stable control IDs retain model and instance; positions come
+from the scripts that place the controls. `steps` names the required controls in visit order,
+and `points` follows the train's world-space position over the selected rail animations. The
+`route01` child translation is rotated by `route00`'s normalized interpolated quaternion and added
+to the parent's translation. This retains the train's sideways offset while its parent pivot turns.
+Both tracks' key times are retained, with curved intervals subdivided to a quarter-unit tolerance.
+The same composition is used for branch previews. `railFrames` uses the game's 60-frame animation time base; it excludes briefing,
+loading and delays caused by player damage. The route minimises summed rail-animation time,
+rejects terminal failure branches and loops, and validates its choices against the original
+entry, hit and exit Lua bytecode. Introductory control windows and their route changes are kept
+separate even where a decompiled text view obscures that branch boundary.
+Each control also has a `preview` rail path and `previewDestination`. These follow the selected
+branch to its next control window or endpoint. The fastest route remains visible while selecting
+a control overlays that branch in a different colour.
 
 Numenume River additionally draws non-collision banks and walls from its visible terrain.
 These are a uniform muted-grey scenery silhouette behind the collision floors (`map.scenery`),

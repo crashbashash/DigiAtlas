@@ -1,5 +1,5 @@
-import { SearchPicker } from './SearchPicker';
 import type { ComponentChildren, JSX } from 'preact';
+import { SearchPicker } from './SearchPicker';
 import { formatHash, type Route } from '../app/route';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty, type EnemyKind } from '../data/types';
 import { useApp } from './context';
@@ -64,6 +64,7 @@ export function SettingsBar(props: {
     <div class="settings">
       {props.players !== false && (
         <SearchPicker
+          compact
           label="Players"
           value={String(settings.players)}
           onChange={(value) => setSettings({ players: Number(value) })}

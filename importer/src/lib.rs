@@ -22,6 +22,7 @@ pub mod textures;
 pub mod appraisal;
 pub mod attack_profiles;
 pub mod crown_signature;
+pub mod doors;
 pub mod landmarks;
 pub mod luadec;
 pub mod maps;
@@ -33,9 +34,11 @@ pub mod scene;
 pub mod scripts;
 pub mod services;
 pub mod trades;
+pub mod train;
 
 pub mod export;
 pub mod names;
+mod parallel;
 
 pub use error::{Error, Result};
 pub use export::{export, Progress, IMPORTER_VERSION, STACK_SIZE};

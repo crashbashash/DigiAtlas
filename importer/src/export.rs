@@ -25,7 +25,7 @@ pub const SCHEMA_VERSION: i64 = 1;
 /// Stack an import thread should have: deeply nested scripts recurse in the Lua decompiler.
 pub const STACK_SIZE: usize = 64 << 20;
 
-pub const IMPORTER_VERSION: &str = "1.18.0";
+pub const IMPORTER_VERSION: &str = "1.25.0";
 const DIFFICULTIES: [&str; 3] = ["normal", "hard", "veryhard"];
 const KNOWN_GAPS: [&str; 5] = [
     "enemies[].name: Mecha Rogue names follow Wikipedia and Wikimon; object names are not in the game text",
@@ -368,6 +368,114 @@ fn write_json(path: &Path, value: &Value) -> Result<()> {
     std::fs::write(path, buf).map_err(|e| Error(format!("{}: {e}", path.display())))
 }
 
+struct StageGenerators {
+    difficulty: &'static str,
+    entry: usize,
+    records: Vec<Generator>,
+}
+
+struct PreparedStage {
+    base: Map<String, Value>,
+    details: Map<String, Value>,
+    scripts: Option<scripts::StageScripts>,
+    generators: Vec<StageGenerators>,
+}
+
+struct StageOptions<'a> {
+    archive_names: &'a HashMap<String, Vec<(String, i64)>>,
+    player_digimon: &'a HashMap<String, String>,
+    flag_names: &'a HashMap<i64, String>,
+    stage_names: &'a Value,
+    out_dir: &'a Path,
+    with_maps: bool,
+}
+
+fn prepare_stage(readers: &(Afs, Afs), st: &stages::Stage, options: &StageOptions<'_>) -> Result<PreparedStage> {
+    let (area, ndmw) = readers;
+    let StageOptions { archive_names, player_digimon, flag_names, stage_names, out_dir, with_maps } = options;
+    let with_maps = *with_maps;
+    let label = &stage_names[&st.id];
+    let banner_dir = out_dir.join("banners");
+    let map_dir = out_dir.join("maps");
+    let tex = banners::load(area, archive_names, &st.id)?;
+    if let Some(t) = &tex {
+        std::fs::write(banner_dir.join(format!("{}.png", st.id)), png::encode_rgba(t.width, t.height, &t.rgba)?)?;
+    }
+    let mut rec = Map::new();
+    rec.insert("id".into(), json!(st.id));
+    rec.insert("area".into(), label["area"].clone());
+    rec.insert("room".into(), label["room"].clone());
+    rec.extend(stages::describe(&st.id));
+    rec.insert("banner".into(), if tex.is_some() { json!(format!("banners/{}.png", st.id)) } else { Value::Null });
+    rec.insert("manifestEntry".into(), json!(st.manifest_entry));
+    rec.insert("packs".into(), json!(st.packs));
+    let gen_packs: Map<String, Value> = st.generator_packs.iter().map(|(d, e)| ((*d).to_string(), json!(e))).collect();
+    rec.insert("generatorPacks".into(), if gen_packs.is_empty() { Value::Null } else { Value::Object(gen_packs) });
+    let pack_data: Vec<Vec<u8>> = st.packs.iter().map(|&pk| ndmw.entry(pk)).collect::<Result<_>>()?;
+    let stage_scripts = if st.generator_packs.is_empty() {
+        None
+    } else {
+        Some(scripts::analyse(&pack_data, player_digimon, flag_names))
+    };
+
+    let generators: Vec<StageGenerators> = DIFFICULTIES
+        .into_iter()
+        .filter_map(|difficulty| st.generator_pack(difficulty).map(|entry| (difficulty, entry)))
+        .map(|(difficulty, entry)| {
+            Ok(StageGenerators { difficulty, entry, records: Pack::new(ndmw.entry(entry)?)?.generators()? })
+        })
+        .collect::<Result<_>>()?;
+    let map_points: Vec<[f64; 3]> =
+        generators.iter().flat_map(|batch| batch.records.iter().flat_map(Generator::spawns)).collect();
+    let links: Map<String,Value>=generators.iter().map(|batch|(batch.difficulty.into(),json!({"generators":batch.records.iter().map(|g|json!({"name":g.name,"lua":g.lua.str()})).collect::<Vec<_>>()}))).collect();
+    let links = Value::Object(links);
+    let mut details = Map::new();
+    let mechanisms = crate::doors::extract_mechanisms(&pack_data, &links);
+    details.insert("doors".into(), json!(mechanisms.doors));
+    details.insert("platforms".into(), json!(mechanisms.platforms));
+    if let Some(train) = crate::train::extract(&pack_data) {
+        details.insert("train".into(), json!(train));
+    }
+    let placed = trades::extract(&pack_data, player_digimon);
+    details.insert("trades".into(), trades_json(&placed));
+    if rec["kind"] == "hub" {
+        details.insert("services".into(), json!(crate::services::extract(&pack_data)));
+    }
+    if st.id == "stag0103" {
+        if let Some((markers, points)) = crate::landmarks::boat_route(&pack_data) {
+            details.insert("landmarks".into(), json!(markers));
+            details.insert("boatRoute".into(), json!(points));
+        }
+    }
+    details.insert("map".into(), Value::Null);
+    let system = rec["kind"] == "system";
+    if with_maps && !(system && map_points.is_empty()) {
+        let extra: Vec<(f64, f64)> = placed.iter().map(|t| (t.position[0], t.position[2])).collect();
+        if let Some(built) = maps::build(ndmw, &st.id, &st.packs, &map_points, &extra)? {
+            std::fs::create_dir_all(&map_dir)?;
+            std::fs::write(map_dir.join(format!("{}.png", st.id)), built.png()?)?;
+            let [min_x, max_x, min_z, max_z] = built.bounds;
+            details.insert(
+                "map".into(),
+                json!({
+                    "image": format!("maps/{}.png", st.id),
+                    "bounds": {"minX": float(min_x), "maxX": float(max_x), "minZ": float(min_z), "maxZ": float(max_z)},
+                    "width": built.raster.width,
+                    "height": built.raster.height,
+                    "pixelsPerUnit": float(pyfmt::round(built.raster.pixels_per_unit, 4)),
+                    "shading": "height",
+                    "floorSource": built.floor_source,
+                    "scenery": built.scenery,
+                    "coverage": float(pyfmt::round(built.coverage, 3)),
+                    "fill": float(pyfmt::round(built.raster.fill(), 3)),
+                }),
+            );
+        }
+    }
+
+    Ok(PreparedStage { base: rec, details, scripts: stage_scripts, generators })
+}
+
 /// Read the disc at `iso_path` and write its data into `out_dir`. Returns the manifest.
 pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut dyn FnMut(Progress)) -> Result<Value> {
     let disc = Source::open(iso_path)?;
@@ -425,7 +533,6 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     let archive_names = archive_manifest::read_names(&manifest_bytes)?;
     let archive_files = archive_manifest::read_files(manifest_bytes)?;
     let normal_hits = crate::attack_profiles::extract(&ndmw, &archive_names, &tables)?;
-    let map_dir = out_dir.join("maps");
     let banner_dir = out_dir.join("banners");
     std::fs::create_dir_all(&banner_dir)?;
     let all_stages = stages::list_stages(&ndmw)?;
@@ -436,45 +543,48 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
     if !unnamed.is_empty() {
         fail!("no name entry for stages {unnamed:?}; add them to importer/names/stages.json");
     }
+    let total = all_stages.len() + 2;
+    let options = StageOptions {
+        archive_names: &archive_names,
+        player_digimon: &player_digimon,
+        flag_names: &flag_names,
+        stage_names,
+        out_dir,
+        with_maps,
+    };
+    let prepared = crate::parallel::map_ordered(
+        &all_stages,
+        crate::parallel::workers(all_stages.len()),
+        || {
+            let reader = Source::open(iso_path)?;
+            Ok((
+                Afs::open(iso::open_disc_file(&reader, &files, "AREA.AFS")?)?,
+                Afs::open(iso::open_disc_file(&reader, &files, "NDMW.AFS")?)?,
+            ))
+        },
+        |readers, stage| prepare_stage(readers, stage, &options),
+        |done, stage| {
+            let label = &stage_names[&stage.id];
+            progress(Progress {
+                done,
+                total,
+                message: format!(
+                    "{} · {}",
+                    label["area"].as_str().unwrap_or("Stages"),
+                    label["room"].as_str().unwrap_or(&stage.id)
+                ),
+            });
+        },
+    )?;
+    // Merge in disc order so local enemy row IDs and colliding drop-pool names stay stable.
     let mut stage_records: Vec<Value> = Vec::new();
     let mut pools = DropCatalog::default();
-    let total = all_stages.len() + 2;
-    for (n, st) in all_stages.iter().enumerate() {
-        let label = &stage_names[&st.id];
-        progress(Progress {
-            done: n + 1,
-            total,
-            message: format!(
-                "{} · {}",
-                label["area"].as_str().unwrap_or("Stages"),
-                label["room"].as_str().unwrap_or(&st.id)
-            ),
-        });
-        let tex = banners::load(&area, &archive_names, &st.id)?;
-        if let Some(t) = &tex {
-            std::fs::write(banner_dir.join(format!("{}.png", st.id)), png::encode_rgba(t.width, t.height, &t.rgba)?)?;
-        }
-        let mut rec = Map::new();
-        rec.insert("id".into(), json!(st.id));
-        rec.insert("area".into(), label["area"].clone());
-        rec.insert("room".into(), label["room"].clone());
-        rec.extend(stages::describe(&st.id));
-        rec.insert("banner".into(), if tex.is_some() { json!(format!("banners/{}.png", st.id)) } else { Value::Null });
-        rec.insert("manifestEntry".into(), json!(st.manifest_entry));
-        rec.insert("packs".into(), json!(st.packs));
-        let gen_packs: Map<String, Value> =
-            st.generator_packs.iter().map(|(d, e)| ((*d).to_string(), json!(e))).collect();
-        rec.insert("generatorPacks".into(), if gen_packs.is_empty() { Value::Null } else { Value::Object(gen_packs) });
-        let pack_data: Vec<Vec<u8>> = st.packs.iter().map(|&pk| ndmw.entry(pk)).collect::<Result<_>>()?;
-        let stage_scripts = if st.generator_packs.is_empty() {
-            None
-        } else {
-            Some(scripts::analyse(&pack_data, &player_digimon, &flag_names))
-        };
-        let mut map_points: Vec<[f64; 3]> = Vec::new();
+    for prepared in prepared {
+        let PreparedStage { base: mut rec, details, scripts: stage_scripts, generators } = prepared;
         let mut difficulties = Map::new();
-        for difficulty in DIFFICULTIES {
-            let Some(idx) = st.generator_pack(difficulty) else { continue };
+        for batch in generators {
+            let difficulty = batch.difficulty;
+            let idx = batch.entry;
             let database = archive_manifest::stage_database(&archive_files, idx)?;
             if let Some(entry) = database.filter(|entry| !catalog.local.contains_key(entry)) {
                 if entry >= area.count() {
@@ -483,8 +593,7 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
                 let local = database::read_tables(area.entry(entry)?)?;
                 catalog.add_database(entry, enemy_records(&local, random_crowns)?);
             }
-            let gens = Pack::new(ndmw.entry(idx)?)?.generators()?;
-            map_points.extend(gens.iter().flat_map(|g| g.spawns()));
+            let gens = batch.records;
             let records: Vec<Value> = gens
                 .iter()
                 .map(|g| {
@@ -503,43 +612,9 @@ pub fn export(iso_path: &Path, out_dir: &Path, with_maps: bool, progress: &mut d
                 .collect();
             difficulties.insert(difficulty.into(), json!({"generators": records}));
         }
+
         rec.insert("difficulties".into(), Value::Object(difficulties));
-        let placed = trades::extract(&pack_data, &player_digimon);
-        rec.insert("trades".into(), trades_json(&placed));
-        if rec["kind"] == "hub" {
-            rec.insert("services".into(), json!(crate::services::extract(&pack_data)));
-        }
-        if st.id == "stag0103" {
-            if let Some((markers, points)) = crate::landmarks::boat_route(&pack_data) {
-                rec.insert("landmarks".into(), json!(markers));
-                rec.insert("boatRoute".into(), json!(points));
-            }
-        }
-        rec.insert("map".into(), Value::Null);
-        let system = rec["kind"] == "system";
-        if with_maps && !(system && map_points.is_empty()) {
-            let extra: Vec<(f64, f64)> = placed.iter().map(|t| (t.position[0], t.position[2])).collect();
-            if let Some(built) = maps::build(&ndmw, &st.id, &st.packs, &map_points, &extra)? {
-                std::fs::create_dir_all(&map_dir)?;
-                std::fs::write(map_dir.join(format!("{}.png", st.id)), built.png()?)?;
-                let [min_x, max_x, min_z, max_z] = built.bounds;
-                rec.insert(
-                    "map".into(),
-                    json!({
-                        "image": format!("maps/{}.png", st.id),
-                        "bounds": {"minX": float(min_x), "maxX": float(max_x), "minZ": float(min_z), "maxZ": float(max_z)},
-                        "width": built.raster.width,
-                        "height": built.raster.height,
-                        "pixelsPerUnit": float(pyfmt::round(built.raster.pixels_per_unit, 4)),
-                        "shading": "height",
-                        "floorSource": built.floor_source,
-                        "scenery": built.scenery,
-                        "coverage": float(pyfmt::round(built.coverage, 3)),
-                        "fill": float(pyfmt::round(built.raster.fill(), 3)),
-                    }),
-                );
-            }
-        }
+        rec.extend(details);
         stage_records.push(Value::Object(rec));
     }
 

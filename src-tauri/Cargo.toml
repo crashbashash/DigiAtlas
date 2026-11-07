@@ -24,6 +24,6 @@ tempfile = "3"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_System_ApplicationInstallationAndServicing", "Win32_System_SystemInformation"] }
 
-# The importer walks every byte of the disc; unoptimised it would take many minutes in debug builds.
+# Geometry processing and Lua analysis need optimisation even in development builds.
 [profile.dev.package.digiatlas-importer]
 opt-level = 2

@@ -210,8 +210,8 @@ async fn choose_disc_image(window: tauri::Window) -> Result<Option<String>, Stri
     .map_err(|e| e.to_string())?
 }
 
-/// Starts importing `path` on its own thread (the importer is synchronous and not `Send` inside)
-/// and returns at once; progress and the outcome arrive on `events`.
+/// Starts importing `path` on a background thread and returns at once. Stage workers own their
+/// disc readers; progress and the outcome arrive on `events` from the coordinating thread.
 #[tauri::command]
 fn import_disc(cache: State<Cache>, path: String, events: Channel<ImportEvent>) -> Result<(), String> {
     let iso = PathBuf::from(&path);

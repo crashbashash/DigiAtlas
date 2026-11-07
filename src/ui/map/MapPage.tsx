@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { lastMap, rememberMap } from '../../app/navigation';
 import { routes, type MapSelection } from '../../app/route';
 import { itemKey } from '../../data/logic';
-import type { Difficulty, Stage } from '../../data/types';
+import {
+  doorActivations,
+  doorEnemyGroups,
+  platformMovements,
+  visibleDoors,
+  visiblePlatforms,
+} from '../../data/doors';
+import type { Difficulty, Stage, Platform } from '../../data/types';
 import { Empty, SettingsBar } from '../common';
 import { useApp } from '../context';
 import { MapView } from '../mapview';
@@ -67,16 +74,46 @@ function StageMap({
 
   // Spawners are named in the address; find this difficulty's index for the map and the panel.
   const resolved: Resolved = useMemo(() => {
+    if (
+      selection.kind === 'train' &&
+      (!stage.train ||
+        (selection.id !== 'route' && !stage.train.controls.some((c) => c.id === selection.id)))
+    )
+      return { kind: 'none' };
+    if (selection.kind === 'door' && !visibleDoors(stage).some((d) => d.id === selection.id))
+      return { kind: 'none' };
+    if (
+      selection.kind === 'platform' &&
+      !visiblePlatforms(stage).some((p) => p.id === selection.id)
+    )
+      return { kind: 'none' };
     if (selection.kind !== 'spawner') return selection;
     const index = gens.findIndex((g) => g.name === selection.name);
     return index >= 0 ? { kind: 'generator', index } : { kind: 'none' };
-  }, [selection, gens]);
+  }, [selection, gens, stage]);
 
   const select = (sel: MapSelection) =>
     go(routes.map(stage.id, sel), sel.kind !== 'none' && selection.kind === sel.kind);
 
   // What to highlight: the selected group, species or item droppers; and traders who deal in the item.
   const matches = useMemo(() => {
+    if (resolved.kind === 'door' || resolved.kind === 'platform') {
+      const door =
+        resolved.kind === 'door'
+          ? visibleDoors(stage).find((door) => door.id === resolved.id)
+          : visiblePlatforms(stage).find((platform) => platform.id === resolved.id);
+      return door
+        ? doorEnemyGroups(
+            resolved.kind === 'platform'
+              ? platformMovements(door as Platform, d, settings.players).flatMap(
+                  (m) => m.activations,
+                )
+              : doorActivations(door, d, settings.players),
+            gens,
+            model.enemies,
+          )
+        : null;
+    }
     if (resolved.kind !== 'group' && resolved.kind !== 'species' && resolved.kind !== 'item')
       return null;
     const out = new Set<number>();
@@ -92,7 +129,7 @@ function StageMap({
         out.add(i);
     });
     return out;
-  }, [resolved, gens, hidden, d, model]);
+  }, [resolved, gens, hidden, d, model, stage, settings.players]);
   const litPins = useMemo(() => {
     if (resolved.kind !== 'item') return null;
     const has = (o: { category: string; id: number }) => itemKey(o.category, o.id) === resolved.key;
@@ -124,10 +161,20 @@ function StageMap({
         onSelect: (gi) => {
           const { select: pick, gens: list, selection: current } = handlers.current;
           if (gi !== null && list[gi]) pick({ kind: 'spawner', name: list[gi].name });
-          else if (current.kind === 'spawner' || current.kind === 'group') pick({ kind: 'none' });
+          else if (
+            current.kind === 'spawner' ||
+            current.kind === 'group' ||
+            current.kind === 'door' ||
+            current.kind === 'platform' ||
+            current.kind === 'train'
+          )
+            pick({ kind: 'none' });
         },
         onTrader: (index) => handlers.current.reveal(index),
         onService: (index) => handlers.current.service(index),
+        onDoor: (id) => handlers.current.select({ kind: 'door', id }),
+        onPlatform: (id) => handlers.current.select({ kind: 'platform', id }),
+        onTrain: (id) => handlers.current.select({ kind: 'train', id }),
       }),
     [model, source],
   );
@@ -143,6 +190,9 @@ function StageMap({
       matches,
       resolved.kind === 'generator' ? resolved.index : null,
       litPins,
+      resolved.kind === 'door' ? resolved.id : null,
+      resolved.kind === 'platform' ? resolved.id : null,
+      resolved.kind === 'train' ? resolved.id : null,
     );
   });
 
@@ -198,11 +248,7 @@ function StageMap({
                 Zoom to matches
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => map.fit()}
-              title="Fit the map to the window (or double-click the map)"
-            >
+            <button type="button" onClick={() => map.fit()} title="Fit the map to the window">
               Fit
             </button>
           </div>

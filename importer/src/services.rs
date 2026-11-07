@@ -87,11 +87,9 @@ fn named_scripts(data: &[u8]) -> HashMap<String, String> {
     if !named.is_empty() {
         return named;
     }
-    let Ok(dirs) = crate::igb::parse_directory(data) else {
+    let Ok((_dirs, records)) = crate::igb::first_chain(data) else {
         return named;
     };
-    let mut records: Vec<_> = crate::igb::find_chains(data, &dirs, 0x800).into_iter().flatten().collect();
-    records.sort_by_key(|r| r.off);
     let mut scripts = Vec::new();
     for pair in records.windows(2) {
         if pair[0].class != "beLuaData" || pair[1].class != "beLuaDataObject" || pair[0].end != pair[1].off {

@@ -32,6 +32,9 @@ export type EnemyView = 'stats' | 'resist';
 /** What is picked on a map page. Spawners are named, so the address survives a difficulty change. */
 export type MapSelection =
   | { kind: 'none' }
+  | { kind: 'door'; id: string }
+  | { kind: 'platform'; id: string }
+  | { kind: 'train'; id: string }
   | { kind: 'spawner'; name: string }
   | { kind: 'group'; row: number }
   | { kind: 'item'; key: string }
@@ -75,6 +78,12 @@ function parseSettings(q: URLSearchParams): Partial<Settings> {
 }
 
 function parseSelection(q: URLSearchParams): MapSelection {
+  const train = q.get('train');
+  if (train) return { kind: 'train', id: train };
+  const platform = q.get('platform');
+  if (platform) return { kind: 'platform', id: platform };
+  const door = q.get('door');
+  if (door) return { kind: 'door', id: door };
   const item = q.get('item');
   if (item) return { kind: 'item', key: item };
   const enemy = q.get('enemy');
@@ -220,6 +229,9 @@ export function formatHash(route: Route, s: Settings): string {
       settingsQuery(s, q);
       const sel = route.selection;
       if (sel.kind === 'item') q.set('item', sel.key);
+      else if (sel.kind === 'door') q.set('door', sel.id);
+      else if (sel.kind === 'platform') q.set('platform', sel.id);
+      else if (sel.kind === 'train') q.set('train', sel.id);
       else if (sel.kind === 'species') q.set('enemy', sel.name);
       else if (sel.kind === 'spawner') q.set('spawner', sel.name);
       else if (sel.kind === 'group') q.set('group', String(sel.row));

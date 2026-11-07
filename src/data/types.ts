@@ -201,7 +201,75 @@ export interface Stage {
   services?: ServiceNpc[];
   landmarks?: ServiceNpc[];
   boatRoute?: [number, number, number][];
+  doors?: Door[];
+  platforms?: Platform[];
+  train?: TrainJourney;
   difficulties: Partial<Record<Difficulty, { generators: Generator[] }>>;
+}
+
+export interface DoorSwitch {
+  id: string;
+  label: string;
+  position: { x: number; y: number; z: number };
+  facing: number;
+  action?: 'activate' | 'destroy' | 'break' | 'hold';
+}
+
+/** Each alternative is a conjunction: all its switches, enemy groups and items are required. */
+export interface DoorActivation {
+  areas?: TriggerArea[];
+  difficulties: Difficulty[];
+  players: number[];
+  switches: DoorSwitch[];
+  generators: string[];
+  enemyModels: string[];
+  items: ItemRef[];
+  conditions: string[];
+  description: string | null;
+  unresolved: boolean;
+}
+
+export interface Door extends DoorSwitch {
+  model: string;
+  instance: number;
+  activations: DoorActivation[];
+}
+
+export interface TriggerArea {
+  id: string;
+  label: string;
+  position: { x: number; y: number; z: number };
+  bounds: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
+  allPlayers: boolean;
+  event?: 'enter' | 'leave';
+}
+
+export interface PlatformMovement {
+  id: string;
+  label: string;
+  destination: { x: number; y: number; z: number } | null;
+  activations: DoorActivation[];
+}
+
+export interface Platform extends Door {
+  movements: PlatformMovement[];
+}
+
+export interface TrainControl extends DoorSwitch {
+  model: string;
+  instance: number;
+  junction: number;
+  choice: 'straight' | 'left' | 'right' | 'gate';
+  preview: [number, number, number][];
+  previewDestination: string;
+}
+
+export interface TrainJourney {
+  controls: TrainControl[];
+  steps: { controlId: string; instruction: string }[];
+  points: [number, number, number][];
+  railFrames: number;
+  destination: string;
 }
 
 export type GearKind = 'weapon' | 'armor1' | 'armor2';

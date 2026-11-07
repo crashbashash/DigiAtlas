@@ -3,18 +3,17 @@
 [![Linux build](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-linux.yml/badge.svg?branch=main&event=push)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-linux.yml)
 [![Windows build](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-windows.yml/badge.svg?branch=main&event=push)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-windows.yml)
 
-**Maps, item drops and character calculators for Digimon World 4 and Digimon World X.**
+**Maps, enemy data, drop tables and calculators for Digimon World 4 and Digimon World X.**
 
 Find where an item drops, track down an enemy, or try a different character setup before you play.
 DigiAtlas reads the information from your own game disc image.
 
 ## What you can do
 
-- **Explore maps:** browse areas, rooms and floors, with enemy and object spawn locations.
-- **Find items:** see drop chances, the best places to farm, trades and appraisal results.
-- **Look up enemies:** compare stats, elemental resistances and spawn locations across difficulties.
-- **Plan your character:** calculate attack damage, hit and critical chances, and elemental bonuses. Try MP Tech damage, healing, buffs and status effects in one calculator.
-- **Load your save:** bring your Digimon, level, equipment and XData power into the calculators, then try changes.
+- **Map viewer:** explore interactive maps of the game's areas, rooms and floors.
+- **Enemy stats and spawns:** compare enemy stats and find their spawn locations across difficulties and player counts.
+- **Drop tables:** check item drop chances and find places to farm.
+- **Calculators:** plan your character's damage, healing, buffs and status effects using a custom setup or an imported save.
 
 ## Download and install
 

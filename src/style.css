@@ -538,6 +538,15 @@ a.trade-row:hover {
   align-items: center;
   gap: 8px 16px;
 }
+.train-steps {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.train-steps p {
+  margin: 6px 0 0;
+}
 .settings .field {
   display: flex;
   align-items: center;
@@ -1560,6 +1569,33 @@ a.calculator-tile:hover {
 }
 .chip-picker-popover {
   width: min(520px, calc(100vw - 32px));
+}
+.compact-picker-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 4px;
+  max-height: min(240px, calc(100vh - 16px));
+  overflow-y: auto;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.compact-picker-menu .chip-options {
+  max-height: none;
+}
+.compact-picker-menu .chip-option {
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+.compact-picker-menu .chip-option:hover {
+  background: var(--hover);
+}
+.compact-picker-menu .chip-option[aria-selected='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .chip-options {
   max-height: 340px;

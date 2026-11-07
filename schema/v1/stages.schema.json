@@ -836,7 +836,10 @@
                 "description": "Brighter floors are higher within this map."
               },
               "floorSource": {
-                "enum": ["collision", "terrain"]
+                "enum": [
+                  "collision",
+                  "terrain"
+                ]
               },
               "pixelsPerUnit": {
                 "type": "number",
@@ -1113,7 +1116,600 @@
                 }
               }
             }
+          },
+          "doors": {
+            "type": "array",
+            "description": "Authored doors and gates. Each activation is an alternative; its contained requirements are all required.",
+            "items": {
+              "$ref": "#/$defs/door"
+            }
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/platform"
+            }
+          },
+          "train": {
+            "$ref": "#/$defs/train"
           }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "doorSwitch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "position",
+        "facing"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "z"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "z": {
+              "type": "number"
+            }
+          }
+        },
+        "facing": {
+          "type": "number"
+        },
+        "action": {
+          "enum": [
+            "activate",
+            "destroy",
+            "break",
+            "hold"
+          ]
+        }
+      }
+    },
+    "doorActivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "difficulties",
+        "players",
+        "switches",
+        "generators",
+        "enemyModels",
+        "items",
+        "conditions",
+        "description",
+        "unresolved"
+      ],
+      "properties": {
+        "difficulties": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "normal",
+              "hard",
+              "veryhard"
+            ]
+          }
+        },
+        "players": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          }
+        },
+        "switches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/doorSwitch"
+          }
+        },
+        "generators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enemyModels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "category",
+              "id"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unresolved": {
+          "type": "boolean"
+        },
+        "areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/triggerArea"
+          }
+        }
+      }
+    },
+    "door": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "position",
+        "facing",
+        "model",
+        "instance",
+        "activations"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "z"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "z": {
+              "type": "number"
+            }
+          }
+        },
+        "facing": {
+          "type": "number"
+        },
+        "model": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "integer"
+        },
+        "activations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/doorActivation"
+          }
+        }
+      }
+    },
+    "triggerArea": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "position",
+        "bounds",
+        "allPlayers",
+        "event"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "z"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "z": {
+              "type": "number"
+            }
+          }
+        },
+        "bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minX",
+            "maxX",
+            "minY",
+            "maxY",
+            "minZ",
+            "maxZ"
+          ],
+          "properties": {
+            "minX": {
+              "type": "number"
+            },
+            "maxX": {
+              "type": "number"
+            },
+            "minY": {
+              "type": "number"
+            },
+            "maxY": {
+              "type": "number"
+            },
+            "minZ": {
+              "type": "number"
+            },
+            "maxZ": {
+              "type": "number"
+            }
+          }
+        },
+        "allPlayers": {
+          "type": "boolean"
+        },
+        "event": {
+          "enum": [
+            "enter",
+            "leave"
+          ]
+        }
+      }
+    },
+    "platformMovement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "destination",
+        "activations"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "destination": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "x",
+                "y",
+                "z"
+              ],
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "z": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/doorActivation"
+              },
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "areas"
+                    ],
+                    "properties": {
+                      "areas": {
+                        "minItems": 1
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "switches"
+                    ],
+                    "properties": {
+                      "switches": {
+                        "minItems": 1
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "generators"
+                    ],
+                    "properties": {
+                      "generators": {
+                        "minItems": 1
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "enemyModels"
+                    ],
+                    "properties": {
+                      "enemyModels": {
+                        "minItems": 1
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "items"
+                    ],
+                    "properties": {
+                      "items": {
+                        "minItems": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "position",
+        "facing",
+        "model",
+        "instance",
+        "activations",
+        "movements"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "z"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "z": {
+              "type": "number"
+            }
+          }
+        },
+        "facing": {
+          "type": "number"
+        },
+        "model": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "integer"
+        },
+        "activations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/doorActivation"
+          }
+        },
+        "movements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/platformMovement"
+          }
+        }
+      }
+    },
+    "trainControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "model",
+        "instance",
+        "label",
+        "junction",
+        "choice",
+        "position",
+        "facing",
+        "preview",
+        "previewDestination"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "integer"
+        },
+        "label": {
+          "type": "string"
+        },
+        "junction": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "choice": {
+          "enum": [
+            "straight",
+            "left",
+            "right",
+            "gate"
+          ]
+        },
+        "position": {
+          "$ref": "#/$defs/doorSwitch/properties/position"
+        },
+        "facing": {
+          "type": "number"
+        },
+        "preview": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "previewDestination": {
+          "type": "string"
+        }
+      }
+    },
+    "train": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controls",
+        "steps",
+        "points",
+        "railFrames",
+        "destination"
+      ],
+      "properties": {
+        "controls": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/trainControl"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "controlId",
+              "instruction"
+            ],
+            "properties": {
+              "controlId": {
+                "type": "string"
+              },
+              "instruction": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "points": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "railFrames": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "destination": {
+          "type": "string"
         }
       }
     }

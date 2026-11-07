@@ -284,9 +284,12 @@ pub fn find_chains(b: &[u8], dirs: &[ClassDef], lo: usize) -> Vec<Vec<Record>> {
         p += 1;
     }
     let ends: HashSet<usize> = hits.iter().map(|&(_, e)| e).collect();
-    let mut chains: Vec<Vec<Record>> = Vec::new();
+    let mut keep: Vec<Vec<Record>> = Vec::new();
+    let mut far = 0;
     for &(p, _) in &hits {
-        if ends.contains(&p) {
+        // Roots are already in byte order. Reject overlapping chains before decoding them;
+        // several roots can converge on the same long suffix of records.
+        if p < far || ends.contains(&p) {
             continue;
         }
         let mut recs = Vec::new();
@@ -295,32 +298,109 @@ pub fn find_chains(b: &[u8], dirs: &[ClassDef], lo: usize) -> Vec<Vec<Record>> {
             q = r.end;
             recs.push(r);
         }
-        chains.push(recs);
-    }
-    chains.sort_by_key(|c| c[0].off);
-    let mut keep: Vec<Vec<Record>> = Vec::new();
-    let mut far: i64 = -1;
-    for c in chains {
-        if (c[0].off as i64) < far {
-            continue;
-        }
-        far = far.max(c.last().unwrap().end as i64);
-        keep.push(c);
+        far = q;
+        keep.push(recs);
     }
     keep.sort_by_key(|c| std::cmp::Reverse(c.len()));
     keep
 }
 
-/// The type directory and the two multi-record chains.
-fn sections(b: &[u8]) -> Result<(Vec<ClassDef>, Vec<Record>, Vec<Record>)> {
-    let dirs = parse_directory(b)?;
-    let mut chains: Vec<Vec<Record>> = find_chains(b, &dirs, 0x800).into_iter().filter(|c| c.len() > 1).collect();
-    chains.sort_by_key(|c| c[0].off);
-    if chains.len() < 2 {
-        fail!("expected two object chains, found {}", chains.len());
+struct Sections {
+    directory_bytes: usize,
+    directory_count: usize,
+    objects: std::ops::Range<usize>,
+    object_count: usize,
+}
+
+impl Sections {
+    fn read(b: &[u8]) -> Result<Self> {
+        if b.len() < 32 {
+            fail!("truncated pack header");
+        }
+        let directory_bytes = u32_at(b, 0).unwrap() as usize;
+        let directory_count = u32_at(b, 4).unwrap() as usize;
+        let object_bytes = u32_at(b, 16).unwrap() as usize;
+        let object_count = u32_at(b, 20).unwrap() as usize;
+        let memory_bytes = u32_at(b, 24).unwrap() as usize;
+        let Some(end) = b.len().checked_sub(memory_bytes) else {
+            fail!("memory section is larger than the pack");
+        };
+        let Some(start) = end.checked_sub(object_bytes) else {
+            fail!("object section is larger than the pack");
+        };
+        if start < 32
+            || directory_count == 0
+            || directory_count > directory_bytes / 8
+            || directory_bytes > start
+            || object_count == 0
+            || object_count > object_bytes / 8
+        {
+            fail!("invalid section sizes or record counts in pack header");
+        }
+        Ok(Self { directory_bytes, directory_count, objects: start..end, object_count })
     }
-    let s2 = chains.remove(1);
-    let s1 = chains.remove(0);
+}
+
+/// Decode exactly one declared section. Never follow a plausible record into the next section
+/// or into the memory pool, and bound reservations by the bytes actually present in the pack.
+fn record_section(b: &[u8], dirs: &[ClassDef], range: std::ops::Range<usize>, count: usize) -> Option<Vec<Record>> {
+    if range.start > range.end || range.end > b.len() || count > (range.end - range.start) / 8 {
+        return None;
+    }
+    let mut records = Vec::with_capacity(count);
+    let mut at = range.start;
+    for _ in 0..count {
+        let record = decode_record(&b[..range.end], at, dirs)?;
+        at = record.end;
+        records.push(record);
+    }
+    (at == range.end).then_some(records)
+}
+
+/// Locate the directory using record headers only. The table directly after it must end at
+/// the declared object section. No candidate fields, strings or overlapping chains are built.
+fn directory_start(b: &[u8], dirs: &[ClassDef], layout: &Sections) -> Option<usize> {
+    let limit = layout.objects.start.checked_sub(layout.directory_bytes + 4)?;
+    for start in dirs.last()?.off..=limit {
+        let end = start + layout.directory_bytes;
+        if u32_at(b, end)? as usize != layout.objects.start - end - 4 {
+            continue;
+        }
+        let mut at = start;
+        let matches = (0..layout.directory_count).all(|_| {
+            if end - at < 8 {
+                return false;
+            }
+            let Some(class) = u32_at(b, at).and_then(|id| dirs.get(id as usize)) else { return false };
+            if !class.name.ends_with("DirEntry") {
+                return false;
+            }
+            let size = u32_at(b, at + 4).unwrap() as usize;
+            if size < 8 || size > end - at {
+                return false;
+            }
+            at += size;
+            true
+        });
+        if matches && at == end {
+            return Some(start);
+        }
+    }
+    None
+}
+
+/// Read the two declared record sections, rather than searching the payload for every possible
+/// chain. Geometry and bytecode in the trailing memory pool can look like overlapping records.
+fn sections(b: &[u8]) -> Result<(Vec<ClassDef>, Vec<Record>, Vec<Record>)> {
+    let layout = Sections::read(b)?;
+    // Type metadata precedes the object records. Avoid indexing strings in the memory pool.
+    let dirs = parse_directory(&b[..layout.objects.start])?;
+    let start = directory_start(b, &dirs, &layout)
+        .ok_or_else(|| Error("no directory section matches the pack header".into()))?;
+    let s1 = record_section(b, &dirs, start..start + layout.directory_bytes, layout.directory_count)
+        .ok_or_else(|| Error("invalid directory records in pack".into()))?;
+    let s2 = record_section(b, &dirs, layout.objects, layout.object_count)
+        .ok_or_else(|| Error("invalid object records in pack".into()))?;
     Ok((dirs, s1, s2))
 }
 
@@ -514,9 +594,129 @@ impl Graph {
     }
 }
 
-/// The first chain of a pack whose records name its files (the root manifest).
+/// Object records without resolving references, including the files in the root manifest.
 pub fn first_chain(b: &[u8]) -> Result<(Vec<ClassDef>, Vec<Record>)> {
-    let dirs = parse_directory(b)?;
-    let chain = find_chains(b, &dirs, 0x800).into_iter().next().ok_or_else(|| Error("no records".into()))?;
-    Ok((dirs, chain))
+    let (dirs, _directory, objects) = sections(b)?;
+    Ok((dirs, objects))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn word(bytes: &mut [u8], at: usize, value: u32) {
+        bytes[at..at + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    /// One named object and one raw memory block, with plausible extra records in metadata
+    /// and in the memory pool. The record sections deliberately start at an odd byte offset.
+    fn pack() -> (Vec<u8>, usize, usize) {
+        let mut bytes = vec![0; 0x801];
+        let types_start = bytes.len();
+        for (name, fields) in [
+            ("igObject", vec![]),
+            ("igObjectDirEntry", vec![(9u16, 11u16, 4u16)]),
+            ("igMemoryDirEntry", vec![(9, 7, 4)]),
+            ("igNamedObject", vec![(4, 2, 4)]),
+        ] {
+            bytes.extend_from_slice(name.as_bytes());
+            bytes.push(0);
+            if !bytes.len().is_multiple_of(2) {
+                bytes.push(0);
+            }
+            for (ty, ordinal, size) in fields {
+                for value in [ty, ordinal, size] {
+                    bytes.extend_from_slice(&value.to_le_bytes());
+                }
+            }
+        }
+        let types_bytes = bytes.len() - types_start;
+        bytes.extend_from_slice(&[0xff; 16]);
+        let entry = |bytes: &mut Vec<u8>, class: u32, value: u32| {
+            for field in [class, 12, value] {
+                bytes.extend_from_slice(&field.to_le_bytes());
+            }
+        };
+        // Same directory record count and size; its following table is invalid.
+        entry(&mut bytes, 1, 3);
+        entry(&mut bytes, 2, 4);
+        bytes.extend_from_slice(&[0xff; 17]);
+        let directory = bytes.len();
+        let memory_bytes = 128 * 1024;
+        entry(&mut bytes, 1, 3);
+        entry(&mut bytes, 2, memory_bytes);
+        // The table's leading byte size excludes its own four-byte length word.
+        for value in [8u32, 2] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [0u16, 1] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        let object = bytes.len();
+        for value in [3u32, 16, 4] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.extend_from_slice(b"map\0");
+        for _ in 0..memory_bytes / 8 {
+            bytes.extend_from_slice(&0u32.to_le_bytes());
+            bytes.extend_from_slice(&8u32.to_le_bytes());
+        }
+        for (at, value) in
+            [(0, 24), (4, 2), (8, types_bytes as u32), (12, 4), (16, 16), (20, 1), (24, memory_bytes), (28, 2)]
+        {
+            word(&mut bytes, at, value);
+        }
+        (bytes, directory, object)
+    }
+
+    #[test]
+    fn declared_sections_ignore_incidental_metadata_and_memory_records() {
+        let (bytes, directory, object) = pack();
+        assert_eq!(directory % 2, 1);
+        let graph = Graph::new(bytes.clone()).unwrap();
+        assert_eq!(graph.s1.len(), 2);
+        assert_eq!(graph.s1[0].off, directory);
+        assert_eq!(graph.s2.len(), 1);
+        assert_eq!(graph.s2[0].off, object);
+        assert_eq!(graph.s2[0].name.as_deref(), Some("map"));
+        assert_eq!(graph.block_size(1), Some(128 * 1024));
+        let (_types, records) = first_chain(&bytes).unwrap();
+        assert_eq!(records.len(), 1, "the longer chain in raw memory is not the object section");
+    }
+
+    #[test]
+    fn invalid_section_sizes_and_counts_are_rejected_before_allocating_records() {
+        let (bytes, _, _) = pack();
+        for (at, value) in
+            [(0, u32::MAX), (4, u32::MAX), (16, u32::MAX), (20, u32::MAX), (24, u32::MAX), (4, 0), (20, 0)]
+        {
+            let mut malformed = bytes.clone();
+            word(&mut malformed, at, value);
+            assert!(Graph::new(malformed).is_err(), "header word at {at} = {value}");
+        }
+        for len in [0, 4, 16, 31] {
+            assert!(Graph::new(bytes[..len].to_vec()).is_err());
+        }
+    }
+
+    #[test]
+    fn counts_must_match_exactly_and_fields_cannot_cross_section_boundaries() {
+        let (bytes, directory, _) = pack();
+        for (at, value) in [(4, 3), (4, 1), (20, 2), (directory + 4, 16)] {
+            let mut malformed = bytes.clone();
+            word(&mut malformed, at, value);
+            assert!(Graph::new(malformed).is_err(), "word at {at} = {value}");
+        }
+        let types = parse_directory(&bytes).unwrap();
+        let (_, _, object) = pack();
+        assert!(record_section(&bytes, &types, object..object + 12, 1).is_none());
+        assert!(record_section(&bytes, &types, object..bytes.len() + 1, 1).is_none());
+    }
+
+    #[test]
+    fn directory_table_must_end_at_the_declared_object_section() {
+        let (mut bytes, directory, _) = pack();
+        word(&mut bytes, directory + 24, 12);
+        assert!(Graph::new(bytes).is_err());
+    }
 }

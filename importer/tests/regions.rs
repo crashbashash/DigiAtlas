@@ -6,6 +6,42 @@ use importer::regions::{GAMECUBE_RELEASES, RELEASES};
 use serde_json::Value;
 
 #[test]
+fn battle_arena_map_covers_its_spawns() {
+    for release in RELEASES.into_iter().chain(GAMECUBE_RELEASES) {
+        let variable = format!("DIGIATLAS_{}_{}_ISO", release.platform.to_uppercase(), release.region.to_uppercase());
+        let Some(path) = std::env::var_os(&variable) else { continue };
+        let source = importer::iso::Source::open(Path::new(&path)).unwrap();
+        let files = if release.platform == "gc" {
+            importer::gamecube::list_files(&source)
+        } else {
+            importer::iso::list_files(&source)
+        }
+        .unwrap();
+        let ndmw =
+            importer::afs::Afs::open(importer::iso::open_disc_file(&source, &files, "NDMW.AFS").unwrap()).unwrap();
+        let stages = importer::stages::list_stages(&ndmw).unwrap();
+        let stage = stages.iter().find(|s| s.id == "stag0401").unwrap();
+        let spawns: Vec<_> = stage
+            .generator_packs
+            .iter()
+            .flat_map(|(_, entry)| {
+                importer::generators::Pack::new(ndmw.entry(*entry).unwrap()).unwrap().generators().unwrap()
+            })
+            .flat_map(|g| g.spawns())
+            .collect();
+        assert!(!spawns.is_empty(), "{} {}", release.platform, release.region);
+        // GameCube USA's type metadata contains an incidental two-record chain before
+        // the real directory. It must not make the geometry pack disappear.
+        let map = importer::maps::build(&ndmw, &stage.id, &stage.packs, &spawns, &[])
+            .unwrap()
+            .unwrap_or_else(|| panic!("{} {} Battle Arena has no map", release.platform, release.region));
+        assert!(map.coverage >= 0.95, "{} {}: {}", release.platform, release.region, map.coverage);
+        assert!(map.raster.fill() > 0.0);
+        assert!(map.png().unwrap().starts_with(b"\x89PNG"));
+    }
+}
+
+#[test]
 fn imports_supported_disc_regions() {
     let with_maps = std::env::var("DIGIATLAS_REGION_MAPS").as_deref() != Ok("0");
     for release in RELEASES.into_iter().chain(GAMECUBE_RELEASES) {

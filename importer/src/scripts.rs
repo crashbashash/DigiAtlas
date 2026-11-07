@@ -255,7 +255,24 @@ pub fn references(source: &str, digimon: &HashMap<String, String>, meanings: &Ha
     let mut refs = Vec::new();
     // A flag the chunk sets to 1 is a once-only latch when the same chunk tests it as not yet done.
     let latched: HashSet<i64> = latch_re().captures_iter(source).map(|m| int(&m[1])).collect();
-    let mut stack: Vec<Vec<String>> = Vec::new(); // per open block: the raw conditions that hold inside
+    for (stripped, raw) in statements(source) {
+        let Some(m) = call_re().captures(&stripped) else { continue };
+        if !VERBS.contains(&&m[2]) {
+            continue;
+        }
+        let args = split_args(m.get(3).map_or("", |a| a.as_str()));
+        let Some(first) = args.first() else { continue };
+        let (name, prefix) = target(first);
+        let when = raw.iter().map(|c| describe(c, digimon, meanings, &latched)).collect();
+        refs.push(Ref { verb: m[2].to_string(), target: name, prefix, when, raw });
+    }
+    refs
+}
+
+/// Statements with their enclosing branch conditions, preserving alternative branches.
+pub(crate) fn statements(source: &str) -> Vec<(String, Vec<String>)> {
+    let mut out = Vec::new();
+    let mut stack: Vec<Vec<String>> = Vec::new();
     let mut chain: HashMap<usize, Vec<String>> = HashMap::new(); // per level: if/elseif conditions so far
     let negated = |conds: &[String]| conds.iter().map(|c| format!("not ({c})")).collect::<Vec<_>>();
     for line in source.split('\n') {
@@ -288,18 +305,10 @@ pub fn references(source: &str, digimon: &HashMap<String, String>, meanings: &Ha
             stack.push(negated(chain.get(&level).map_or(&[][..], Vec::as_slice)));
             continue;
         }
-        let Some(m) = call_re().captures(stripped) else { continue };
-        if !VERBS.contains(&&m[2]) {
-            continue;
-        }
-        let args = split_args(m.get(3).map_or("", |a| a.as_str()));
-        let Some(first) = args.first() else { continue };
-        let (name, prefix) = target(first);
         let raw: Vec<String> = stack.iter().flatten().cloned().collect();
-        let when = raw.iter().map(|c| describe(c, digimon, meanings, &latched)).collect();
-        refs.push(Ref { verb: m[2].to_string(), target: name, prefix, when, raw });
+        out.push((stripped.to_string(), raw));
     }
-    refs
+    out
 }
 
 /// Every spawner reference in a stage's scripts, by spawner name and by built-name prefix.

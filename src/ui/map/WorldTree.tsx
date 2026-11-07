@@ -4,8 +4,8 @@ import { Link } from '../common';
 import { useApp } from '../context';
 
 /**
- * Worlds and their rooms. The current room's world is open and the others fold away so the list
- * stays short. Keyboard: Up/Down move, Right opens a world, Left closes it or goes up to it.
+ * Worlds and their rooms. Visiting a world opens it without closing other expanded worlds.
+ * Keyboard: Up/Down move, Right opens a world, Left closes it or goes up to it.
  */
 export function WorldTree({ currentId, keep }: { currentId: string; keep: MapSelection }) {
   const { model, settings } = useApp();
@@ -15,9 +15,10 @@ export function WorldTree({ currentId, keep }: { currentId: string; keep: MapSel
   const [open, setOpen] = useState<Set<string>>(() => new Set(currentWorld ? [currentWorld] : []));
   const tree = useRef<HTMLUListElement>(null);
 
-  // Moving to another world opens it and folds the rest.
+  // Room navigation preserves the user's other expanded worlds.
   useEffect(() => {
-    if (currentWorld) setOpen(new Set([currentWorld]));
+    if (currentWorld)
+      setOpen((prev) => (prev.has(currentWorld) ? prev : new Set([...prev, currentWorld])));
   }, [currentWorld]);
   useEffect(() => {
     tree.current?.querySelector('.room.active')?.scrollIntoView({ block: 'nearest' });

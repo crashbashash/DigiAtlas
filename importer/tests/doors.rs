@@ -52,8 +52,29 @@ fn doors_link_buttons_keys_and_enemy_groups_on_supported_discs() {
         let arena = arena_mechanisms.doors;
         let exit = arena.iter().find(|d| d.id == "g_entrywayz04:0").unwrap();
         assert!(exit.activations.iter().any(|a| a.items.iter().map(|item| item.id).collect::<Vec<_>>() == [9, 10]));
+        for (gate, platform, lever) in [(0, 2, 3), (1, 3, 2)] {
+            let door = arena.iter().find(|d| d.id == format!("g_dgate02z04:{gate}")).unwrap();
+            let lift = arena_mechanisms
+                .platforms
+                .iter()
+                .find(|p| p.placement.id == format!("g_upblockz04:{platform}"))
+                .unwrap();
+            for activations in std::iter::once(&door.activations).chain(lift.movements.iter().map(|m| &m.activations)) {
+                assert_eq!(activations.len(), 1, "{} {} Arena lever {lever}", release.platform, release.region);
+                assert_eq!(activations[0].switches.len(), 1);
+                assert_eq!(activations[0].switches[0].id, format!("g_lever01z04:{lever}"));
+            }
+        }
         let mummy = extract("stag0201");
         assert!(mummy.doors.is_empty(), "train models should be excluded");
+        let train = extract("stag0203");
+        for id in 0..2 {
+            let barrier = train.doors.iter().find(|d| d.id == format!("g_sandgate:{id}")).unwrap();
+            assert_eq!(barrier.activations.len(), 1, "{} {} train barrier {id}", release.platform, release.region);
+            assert_eq!(barrier.activations[0].switches.len(), 1);
+            assert_eq!(barrier.activations[0].switches[0].id, format!("g_gatesign:{id}"));
+            assert!(!barrier.activations[0].unresolved);
+        }
         let bridge = mummy.platforms.iter().find(|p| p.placement.model == "g_movepass01z02").unwrap();
         assert!(bridge
             .movements

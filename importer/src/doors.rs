@@ -1,6 +1,6 @@
 //! Authored doors and the script actions that open them. Alternatives remain separate;
 //! a switch, an enemy callback and prerequisites within one alternative are all required.
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::OnceLock;
 
 use regex::Regex;
@@ -365,6 +365,45 @@ fn split_boolean<'a>(text: &'a str, op: &str) -> Vec<&'a str> {
     parts
 }
 
+/// Evaluate only the callback's instance checks. Other runtime conditions stay unknown, so an
+/// unknown side of an OR cannot incorrectly exclude a possible control instance.
+fn instance_condition(raw: &str, instance: i64) -> Option<bool> {
+    let condition = unparen(raw.trim());
+    for (operator, decisive) in [(" or ", true), (" and ", false)] {
+        let parts = split_boolean(condition, operator);
+        if parts.len() > 1 {
+            let mut unknown = false;
+            for part in parts {
+                match instance_condition(part, instance) {
+                    Some(value) if value == decisive => return Some(decisive),
+                    None => unknown = true,
+                    _ => {}
+                }
+            }
+            return (!unknown).then_some(!decisive);
+        }
+    }
+    if let Some(inner) = condition.strip_prefix("not ") {
+        return instance_condition(inner, instance).map(|value| !value);
+    }
+    // Some decompiled callbacks retain spurious getter arguments. They still refer to the
+    // current callback instance, including nested MDLgetRamNo calls in Battle Arena.
+    let comparison = re!(r"^be:MDLgetRamNo\(.*\)\s*(==|~=|<=|>=|<|>)\s*(-?\d+)$").captures(condition)?;
+    let value = comparison[2].parse::<i64>().ok()?;
+    Some(match &comparison[1] {
+        "==" => instance == value,
+        "~=" => instance != value,
+        "<=" => instance <= value,
+        ">=" => instance >= value,
+        "<" => instance < value,
+        _ => instance > value,
+    })
+}
+
+fn instance_allowed(conditions: &[String], instance: i64) -> bool {
+    conditions.iter().all(|condition| instance_condition(condition, instance) != Some(false))
+}
+
 type ScriptConditions = (String, Vec<String>);
 
 struct Analysis {
@@ -392,13 +431,6 @@ impl Analysis {
             if model.starts_with("e_") || model.starts_with("f_") {
                 out.enemy_models.push(model.into());
             } else if model.starts_with("g_") {
-                let selected: BTreeSet<i64> = conditions
-                    .iter()
-                    .filter(|c| !c.starts_with("not "))
-                    .flat_map(|c| {
-                        re!(r"be:MDLgetRamNo\(.*?\)\s*==\s*(\d+)").captures_iter(c).filter_map(|m| m[1].parse().ok())
-                    })
-                    .collect();
                 let label = if model.contains("dktower") || model.contains("darktower") {
                     "Dark Tower"
                 } else if model.contains("ctower") {
@@ -407,7 +439,7 @@ impl Analysis {
                     "Destructible object"
                 };
                 for ((name, id), (position, facing)) in &self.placements {
-                    if name == model && (selected.is_empty() || selected.contains(id)) {
+                    if name == model && instance_allowed(conditions, *id) {
                         out.switches.push(Switch {
                             id: format!("{name}:{id}"),
                             label: if label == "Control tower" {
@@ -426,16 +458,9 @@ impl Analysis {
                 }
             }
         } else if let Some(model) = file.strip_prefix("hit_").and_then(|s| s.strip_suffix(".lua")) {
-            let selected: BTreeSet<i64> = conditions
-                .iter()
-                .filter(|c| !c.trim().starts_with("not "))
-                .flat_map(|c| {
-                    re!(r"be:MDLgetRamNo\(.*?\)\s*==\s*(\d+)").captures_iter(c).filter_map(|m| m[1].parse().ok())
-                })
-                .collect();
             let label = control_kind(model);
             for ((name, id), (position, facing)) in &self.placements {
-                if name == model && (selected.is_empty() || selected.contains(id)) {
+                if name == model && instance_allowed(conditions, *id) {
                     // Some party-size branches use different button models in the same
                     // physical control slot. Their shared action is one requirement.
                     let alias = self
@@ -1102,6 +1127,53 @@ mod tests {
         assert_eq!(doors[1].activations[0].switches.len(), 1);
         assert_eq!(doors[0].activations[0].switches[0].id, "g_dbutton1:0");
         assert_eq!(doors[1].activations[0].switches[0].id, "g_dbutton1:1");
+    }
+
+    #[test]
+    fn else_branches_exclude_earlier_hit_break_and_destruction_instances() {
+        let mut start = String::new();
+        for id in 0..3 {
+            for model in ["g_d1door", "g_dbutton1"] {
+                start += &format!(
+                    "be:sd(\"MODELCTRL\", \"{model}\", {id}, \"GENERATE\", \"V<{},20,30>/V<0,0,0>\")\n",
+                    id * 100
+                );
+            }
+        }
+        let callback = "if be:MDLgetRamNo() == 0 then\n    be:sd(\"MODELCTRL\", \"g_d1door\", 0, \"SQ_SWON\")\nelseif be:MDLgetRamNo() == 1 then\n    be:sd(\"MODELCTRL\", \"g_d1door\", 1, \"SQ_SWON\")\nelse\n    be:sd(\"MODELCTRL\", \"g_d1door\", 2, \"SQ_SWON\")\nend";
+        for (file, action) in
+            [("hit_g_dbutton1.lua", "activate"), ("ded_g_dbutton1.lua", "destroy"), ("br1_g_dbutton1.lua", "break")]
+        {
+            let doors = read(&[("start.lua", &start), (file, callback)], &[]);
+            assert_eq!(doors.len(), 3);
+            for (id, door) in doors.iter().enumerate() {
+                assert_eq!(door.activations.len(), 1, "{file}: door {id}");
+                let activation = &door.activations[0];
+                assert_eq!(activation.switches.len(), 1, "{file}: door {id}");
+                assert_eq!(activation.switches[0].id, format!("g_dbutton1:{id}"));
+                assert_eq!(activation.switches[0].action, action);
+            }
+        }
+    }
+
+    #[test]
+    fn inequality_guards_and_unknown_or_alternatives_keep_possible_instances() {
+        let start = format!("{DOOR}\nbe:sd(\"MODELCTRL\", \"g_dbutton1\", 0, \"GENERATE\", \"V<100,20,30>/V<0,0,0>\")\nbe:sd(\"MODELCTRL\", \"g_dbutton1\", 1, \"GENERATE\", \"V<200,20,30>/V<0,0,0>\")");
+        for condition in
+            ["be:MDLgetRamNo() ~= 0", "not (be:MDLgetRamNo() == 0)", "be:MDLgetRamNo(be:MDLgetRamNo(), be) == 1"]
+        {
+            let callback = format!("if {condition} then\n    be:sd(\"MODELCTRL\", \"g_d1door\", 0, \"SQ_SWON\")\nend");
+            let doors = read(&[("start.lua", &start), ("hit_g_dbutton1.lua", &callback)], &[]);
+            assert_eq!(doors[0].activations.len(), 1);
+            assert_eq!(doors[0].activations[0].switches[0].id, "g_dbutton1:1");
+        }
+        let callback = "if be:MDLgetRamNo() == 0 or be:MATisPlayer() == 1 then\n    be:sd(\"MODELCTRL\", \"g_d1door\", 0, \"SQ_SWON\")\nend";
+        let doors = read(&[("start.lua", &start), ("hit_g_dbutton1.lua", callback)], &[]);
+        assert_eq!(doors[0].activations.len(), 2);
+        assert_eq!(
+            doors[0].activations.iter().map(|a| a.switches[0].id.as_str()).collect::<Vec<_>>(),
+            ["g_dbutton1:0", "g_dbutton1:1"]
+        );
     }
 
     #[test]

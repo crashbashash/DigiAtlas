@@ -5,6 +5,9 @@ not move the pointer, send desktop keys, use the clipboard or bring a control in
 OS focus. DOM clicks/changes affect only DigiAtlas. Normal builds contain no agent
 commands or listener.
 
+When opening a rebuilt app, close older DigiAtlas instances first and verify that
+only one remains running. Preserve the loaded disc and current view when refreshing.
+
 Build and start it with a new private session file:
 
 ```sh

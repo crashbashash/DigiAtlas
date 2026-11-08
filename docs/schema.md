@@ -273,6 +273,14 @@ Importer 1.5.0 adds optional `saveStats.forms[].speedInitial`/`speedGrowth` from
 their main attribute. Attack damage uses them to reconstruct equipped Speed for
 the hit-chance roll. These are separate from the saved Strength upgrade counter.
 
+Importer 1.27.0 adds optional `hpInitial`/`hpGrowth`, `mpInitial`/`mpGrowth`,
+`defenseInitial`/`defenseGrowth` and `spiritInitial`/`spiritGrowth` to each form.
+They come from `MHP_INI`/`MHP_GROW`, `MMP_INI`/`MMP_GROW`, `AC_INI`/`AC_GROW`
+and `MND_INI`/`MND_GROW` in the loaded disc's `shinka` table. Together with the
+existing three pairs, they support all seven stats in the [growth viewer](stat-growth.md).
+The fields remain optional in schema v1 for older exports; the viewer asks for a
+re-import when data is missing, and desktop caches are refreshed by the importer version.
+
 Importer 1.6.0 adds optional `items[].normalHits` (integer 1–16). It is the
 verified number of ordinary damage-bearing phases per normal attack input,
 resolved from the weapon's sequence mapping and agreeing across all 16 character

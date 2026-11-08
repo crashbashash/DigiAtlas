@@ -63,6 +63,15 @@ folder instead of `data/generated/ps2`.
 
 `?import=welcome`, `?import=stale` and `?import=failed` preview the import screens with a mock importer.
 
+## Interface controls
+
+Use `SearchPicker` with `compact` for ordinary dropdowns, as in the Players selector
+and Stat growth controls. This opens a themed list anchored to its field, using the
+shared colors, selected/hover states and keyboard navigation. Avoid native `<select>`
+menus: their opened options can use the operating system's theme even when the field
+itself has app styling. Use the full searchable picker for long equipment/item lists
+that need a search dialog. Reuse the shared component and theme tokens for new controls.
+
 ## Checks
 
 ```sh
@@ -125,6 +134,7 @@ or missing versions show the disc-reload screen. [Update behavior](app-updates.m
 - [Export schema](schema.md)
 - [Attack damage calculations](weapon-damage.md)
 - [Power Up/Down calculations and save support](power-calculators.md)
+- [Natural stat growth viewer](stat-growth.md)
 - [Application updates and release process](app-updates.md)
 - [Opt-in direct app control](agent-control.md)
 

@@ -618,6 +618,9 @@ fn power_spell_data_and_save_growth() {
     assert!(data["saveStats"]["speedBoards"].is_array());
     assert!(forms.iter().all(|f| f["speedInitial"].is_i64() && f["speedGrowth"].is_i64()));
     assert!(forms.iter().all(|f| f["wisdomInitial"].is_i64() && f["wisdomGrowth"].is_i64()));
+    for stat in ["hp", "mp", "defense", "spirit"] {
+        assert!(forms.iter().all(|f| f[format!("{stat}Initial")].is_i64() && f[format!("{stat}Growth")].is_i64()));
+    }
 }
 
 #[test]

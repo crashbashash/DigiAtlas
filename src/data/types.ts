@@ -373,6 +373,14 @@ export interface SaveStats {
     strengthGrowth?: number;
     speedInitial?: number;
     speedGrowth?: number;
+    hpInitial?: number;
+    hpGrowth?: number;
+    mpInitial?: number;
+    mpGrowth?: number;
+    defenseInitial?: number;
+    defenseGrowth?: number;
+    spiritInitial?: number;
+    spiritGrowth?: number;
   }[];
   wisdomBoards: number[];
   strengthBoards?: number[];

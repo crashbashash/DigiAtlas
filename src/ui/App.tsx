@@ -9,6 +9,7 @@ import { AppContext, type AppServices } from './context';
 import { Calculators } from './Calculators';
 import { MpTechCalculator } from './MpTechCalculator';
 import { WeaponDamageCalculator } from './WeaponDamageCalculator';
+import { StatGrowthViewer } from './StatGrowthViewer';
 import { Home } from './Home';
 import { UpdateCenter } from './UpdateCenter';
 import { ItemPage } from './ItemPage';
@@ -24,7 +25,7 @@ function pageTitle(model: Model, route: Route): string {
     case 'home':
       return 'DigiAtlas';
     case 'calculator':
-      return `${route.calculator === 'attack-damage' ? 'Attack damage' : 'MP Tech calculator'} · DigiAtlas`;
+      return `${route.calculator === 'stat-growth' ? 'Stat growth' : route.calculator === 'attack-damage' ? 'Attack damage' : 'MP Tech calculator'} · DigiAtlas`;
     case 'calculators':
       return 'Calculators · DigiAtlas';
     case 'search':
@@ -192,6 +193,8 @@ export function App({
           {route.page === 'calculator' &&
             (route.calculator === 'attack-damage' ? (
               <WeaponDamageCalculator />
+            ) : route.calculator === 'stat-growth' ? (
+              <StatGrowthViewer />
             ) : (
               <MpTechCalculator
                 initialTechnique={route.calculator === 'power-up' ? 'power-up' : 'power-down'}

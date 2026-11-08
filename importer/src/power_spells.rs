@@ -1,4 +1,4 @@
-//! Player-cast Power Up/Down base durations from the retail pcTech table.
+//! Power Up/Down durations and per-form character growth from the loaded disc.
 use serde_json::{json, Value};
 
 use crate::database::{Cell, Tables};
@@ -34,6 +34,10 @@ pub fn save_stats(tables: &Tables) -> Result<Value> {
         forms.push(json!({"species": species, "name": name, "model": model,
             "wisdomInitial": number("INT_INI")?, "wisdomGrowth": number("INT_GROW")?,
             "strengthInitial": number("STR_INI")?, "strengthGrowth": number("STR_GROW")?,
+            "hpInitial": number("MHP_INI")?, "hpGrowth": number("MHP_GROW")?,
+            "mpInitial": number("MMP_INI")?, "mpGrowth": number("MMP_GROW")?,
+            "defenseInitial": number("AC_INI")?, "defenseGrowth": number("AC_GROW")?,
+            "spiritInitial": number("MND_INI")?, "spiritGrowth": number("MND_GROW")?,
             "speedInitial": number("DEX_INI")?, "speedGrowth": number("DEX_GROW")?}));
     }
     if forms.len() != 16 {
@@ -66,4 +70,46 @@ pub fn save_stats(tables: &Tables) -> Result<Value> {
     Ok(
         json!({"forms": forms, "wisdomBoards": wisdom_boards, "strengthBoards": strength_boards, "speedBoards": speed_boards}),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Row;
+
+    fn tables() -> Tables {
+        let rows = (0..16)
+            .map(|species| {
+                let mut row = Row::new();
+                for (index, prefix) in ["MHP", "MMP", "STR", "AC", "INT", "MND", "DEX"].iter().enumerate() {
+                    row.insert(format!("{prefix}_INI"), Cell::Int(species * 100 + index as i64));
+                    row.insert(format!("{prefix}_GROW"), Cell::Int(10 + index as i64));
+                }
+                row
+            })
+            .collect();
+        Tables::from([("shinka".into(), rows)])
+    }
+
+    #[test]
+    fn exports_all_seven_growth_parameters_for_each_form() {
+        let data = save_stats(&tables()).unwrap();
+        for species in 0..16 {
+            for (index, stat) in ["hp", "mp", "strength", "defense", "wisdom", "spirit", "speed"].iter().enumerate() {
+                assert_eq!(data["forms"][species][format!("{stat}Initial")], species * 100 + index);
+                assert_eq!(data["forms"][species][format!("{stat}Growth")], 10 + index);
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_incomplete_growth_data() {
+        let mut data = tables();
+        data.get_mut("shinka").unwrap()[3].remove("MHP_GROW");
+        assert!(save_stats(&data).unwrap_err().to_string().contains("shinka row 3: missing MHP_GROW"));
+        data.get_mut("shinka").unwrap().truncate(15);
+        // Restore the field so the row-count check is reached.
+        data.get_mut("shinka").unwrap()[3].insert("MHP_GROW".into(), Cell::Int(10));
+        assert!(save_stats(&data).unwrap_err().to_string().contains("expected sixteen species"));
+    }
 }

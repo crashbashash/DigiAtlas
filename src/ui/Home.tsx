@@ -41,7 +41,9 @@ export function Home() {
 
       <div class="sections">
         <section class="section-card">
-          <h2>Maps and spawns</h2>
+          <h2>
+            <Link to={routes.map(null)}>Maps and spawns</Link>
+          </h2>
           <p class="muted">Every room with its enemies, boxes, traders and what drops there.</p>
           <ul class="link-list">
             {model.worlds.map((w) => (
@@ -56,7 +58,9 @@ export function Home() {
         </section>
 
         <section class="section-card">
-          <h2>Items</h2>
+          <h2>
+            <Link to={routes.items()}>Items</Link>
+          </h2>
           <p class="muted">Stats, the best places to farm them, trades and appraisal.</p>
           <ul class="link-list">
             {categories.map((c) => (
@@ -72,7 +76,9 @@ export function Home() {
         </section>
 
         <section class="section-card">
-          <h2>Enemies</h2>
+          <h2>
+            <Link to={routes.enemies()}>Enemies</Link>
+          </h2>
           <p class="muted">
             Stats, resistances and where each one appears. Search any enemy by name.
           </p>
@@ -93,8 +99,12 @@ export function Home() {
           <h2>
             <Link to={routes.calculators()}>Calculators</Link>
           </h2>
-          <p class="muted">Work out damage, spell durations and effects.</p>
+          <p class="muted">Compare stat growth and work out damage, spell durations and effects.</p>
           <ul class="link-list">
+            <li>
+              <Link to={routes.calculator('stat-growth')}>Stat growth</Link>
+              <span class="muted">Stats by level</span>
+            </li>
             <li>
               <Link to={routes.calculator('attack-damage')}>Attack damage</Link>
               <span class="muted">Damage range</span>

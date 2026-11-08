@@ -14,6 +14,7 @@ DigiAtlas reads the information from your own game disc image.
 - **Enemy stats and spawns:** compare enemy stats and find their spawn locations across difficulties and player counts.
 - **Drop tables:** check item drop chances and find places to farm.
 - **Calculators:** plan your character's damage, healing, buffs and status effects using a custom setup or an imported save.
+- **Stat growth:** graph all seven natural stats through level 999, compare Digimon forms and check exact gains at each level.
 
 ## Download and install
 
@@ -53,6 +54,11 @@ DigiAtlas remembers the imported data between launches, and you can browse it of
 Use **Re-import from disc** on the home page to switch to another image.
 
 ## Using the calculators
+
+Open **Calculators → Stat growth** to choose a Digimon and stat. The graph always shows levels
+1–999. Add a second form to compare growth, then drag the graph's vertical marker or use the
+level input or slider to inspect a level. Values show natural stats before equipment and permanent
+upgrades, using each form's data from your loaded disc.
 
 Choose your Digimon and level, add equipment and XData power, then select the enemy and variant
 you want to compare against when the technique targets an enemy. The totals update as you change

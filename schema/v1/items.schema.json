@@ -433,6 +433,30 @@
               },
               "speedGrowth": {
                 "type": "integer"
+              },
+              "hpInitial": {
+                "type": "integer"
+              },
+              "hpGrowth": {
+                "type": "integer"
+              },
+              "mpInitial": {
+                "type": "integer"
+              },
+              "mpGrowth": {
+                "type": "integer"
+              },
+              "defenseInitial": {
+                "type": "integer"
+              },
+              "defenseGrowth": {
+                "type": "integer"
+              },
+              "spiritInitial": {
+                "type": "integer"
+              },
+              "spiritGrowth": {
+                "type": "integer"
               }
             }
           }

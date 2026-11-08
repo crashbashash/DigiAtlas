@@ -1,5 +1,6 @@
 import type { Item, SaveStats } from './types';
 import { equipmentStats, type WeaponEquipment } from './weapon-equipment';
+import { levelGrowth } from './stat-growth';
 
 export interface XDataPower {
   strength: number;
@@ -8,24 +9,7 @@ export interface XDataPower {
 }
 
 export function levelStat(initial: number, growth: number, level: number, power: number) {
-  const limits = [5, 10, 20, 30, 50, 70, 110, 150, 230, 999];
-  const origins = [1, 5, 10, 20, 30, 50, 70, 110, 150, 230];
-  const offsets = [0, 40, 85, 165, 235, 355, 455, 615, 735, 895];
-  const rates = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
-  const segment = limits.findIndex((limit) => level <= limit);
-  if (
-    !Number.isInteger(level) ||
-    level < 1 ||
-    segment < 0 ||
-    !Number.isInteger(power) ||
-    power < 0 ||
-    power > 9999 ||
-    !Number.isFinite(initial) ||
-    !Number.isFinite(growth)
-  )
-    return NaN;
-  const factor = offsets[segment] + rates[segment] * (level - origins[segment]);
-  return Math.min(9999, power + initial + Math.trunc(Math.imul(growth, factor) / 100));
+  return levelGrowth(initial, growth, level, power, 'stat');
 }
 
 export function characterStats(

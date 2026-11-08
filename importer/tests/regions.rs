@@ -97,6 +97,12 @@ fn imports_supported_disc_regions() {
         assert_eq!(techs[54]["revive"]["experiencePercent"], 95);
         assert_eq!(techs[40]["healBase"], 300);
         assert_eq!(items["saveStats"]["forms"].as_array().unwrap().len(), 16);
+        for form in items["saveStats"]["forms"].as_array().unwrap() {
+            for stat in ["hp", "mp", "strength", "defense", "wisdom", "spirit", "speed"] {
+                assert!(form[format!("{stat}Initial")].is_i64());
+                assert!(form[format!("{stat}Growth")].is_i64());
+            }
+        }
         assert!(items["items"]
             .as_array()
             .unwrap()

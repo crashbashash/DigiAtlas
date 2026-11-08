@@ -1,9 +1,11 @@
-# DigiAtlas
+# DigiAtlas: Digimon World 4 Maps, Drops & Calculators
+
+DigiAtlas is a desktop companion for **Digimon World 4 (DW4)** and **Digimon World X**,
+with interactive maps, enemy stats and spawns, item drop tables and character
+calculators for **Windows and Linux**.
 
 [![Linux build](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-linux.yml/badge.svg?branch=main&event=push)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-linux.yml)
 [![Windows build](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-windows.yml/badge.svg?branch=main&event=push)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-windows.yml)
-
-**Maps, enemy data, drop tables and calculators for Digimon World 4 and Digimon World X.**
 
 Find where an item drops, track down an enemy, or try a different character setup before you play.
 DigiAtlas reads the information from your own game disc image.

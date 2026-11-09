@@ -19,7 +19,11 @@ fn battle_arena_map_covers_its_spawns() {
         .unwrap();
         let ndmw =
             importer::afs::Afs::open(importer::iso::open_disc_file(&source, &files, "NDMW.AFS").unwrap()).unwrap();
-        let stages = importer::stages::list_stages(&ndmw).unwrap();
+        let directory = importer::manifest::read_files(
+            importer::iso::open_disc_file(&source, &files, "NDMW.IGB").unwrap().read_all().unwrap(),
+        )
+        .unwrap();
+        let stages = importer::stages::list_stages(&ndmw, &directory).unwrap();
         let stage = stages.iter().find(|s| s.id == "stag0401").unwrap();
         let spawns: Vec<_> = stage
             .generator_packs

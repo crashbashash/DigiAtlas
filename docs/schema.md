@@ -43,7 +43,8 @@ drops.pools.*.entries[] (category, id)  ------------> items[] (category, id)
 - **Difficulty is a first-class axis.** A stage's generator pack exists once per difficulty and
   usually points the same spawner at a stronger row (Guard Room goblins: rows 2 / 6 / 10 on
   Normal / Hard / Very Hard). Five stages even differ in which generators exist, so the
-  difficulties are stored separately and are not merged.
+  difficulties are stored separately and are not merged. Generator files are resolved by
+  their names in `NDMW.IGB`, independently of appended model and sound files.
 - **Pools have import-local keys.** Identical named tables share one record; different contents
   with the same name receive distinct keys (`name@1`, etc.). Crown Drops clones enemy loot while
   preserving original prop and special reward tables, so the name alone cannot identify a pool.

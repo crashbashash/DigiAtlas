@@ -16,7 +16,11 @@ fn train_controls_and_fastest_rail_route_match_the_supported_discs() {
             if release.platform == "gc" { importer::gamecube::list_files(&source) } else { iso::list_files(&source) }
                 .unwrap();
         let ndmw = Afs::open(iso::open_disc_file(&source, &files, "NDMW.AFS").unwrap()).unwrap();
-        let stages = stages::list_stages(&ndmw).unwrap();
+        let directory = importer::manifest::read_files(
+            iso::open_disc_file(&source, &files, "NDMW.IGB").unwrap().read_all().unwrap(),
+        )
+        .unwrap();
+        let stages = stages::list_stages(&ndmw, &directory).unwrap();
         let stage = stages.iter().find(|s| s.id == "stag0203").unwrap();
         let packs = stage.packs.iter().map(|i| ndmw.entry(*i).unwrap()).collect::<Vec<_>>();
         let journey = train::extract(&packs).unwrap_or_else(|| panic!("{} {} train", release.platform, release.region));

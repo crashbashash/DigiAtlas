@@ -18,7 +18,11 @@ fn doors_link_buttons_keys_and_enemy_groups_on_supported_discs() {
             if release.platform == "gc" { importer::gamecube::list_files(&source) } else { iso::list_files(&source) }
                 .unwrap();
         let ndmw = Afs::open(iso::open_disc_file(&source, &files, "NDMW.AFS").unwrap()).unwrap();
-        let all = stages::list_stages(&ndmw).unwrap();
+        let directory = importer::manifest::read_files(
+            iso::open_disc_file(&source, &files, "NDMW.IGB").unwrap().read_all().unwrap(),
+        )
+        .unwrap();
+        let all = stages::list_stages(&ndmw, &directory).unwrap();
         let extract = |id| {
             let stage = all.iter().find(|s| s.id == id).unwrap();
             let packs = stage.packs.iter().map(|entry| ndmw.entry(*entry).unwrap()).collect::<Vec<_>>();

@@ -15,7 +15,7 @@ git (`data/generated/` is ignored). Pure Rust, so it builds the same on Linux, W
 | `iso.rs`, `afs.rs`                    | ISO9660 files and CRI AFS archive entries                                                                                |
 | `igb.rs`                              | igBinary stage packs: type directory, record chains, id remap table, list pool                                           |
 | `generators.rs`                       | Spawn generators and drop pools from a generator pack                                                                    |
-| `stages.rs`                           | Stage manifests (`NDMW.AFS` entries 80-177) and their generator packs                                                    |
+| `stages.rs`                           | Stage manifests (`NDMW.AFS` entries 80-177) and generator files resolved through `NDMW.IGB`                                                    |
 | `database.rs`                         | The game's databases from `AREA.AFS` entry 9 (English): named columns for items and enemies                              |
 | `stats.rs`                            | Enemy stat rows built from the `enemy` database                                                                          |
 | `appraisal.rs`                        | What the Central appraiser turns unidentified items into                                                                 |
@@ -76,7 +76,9 @@ the same importer as PS2. Set `DIGIATLAS_GC_USA_ISO` and/or
 `DIGIATLAS_GC_JAPAN_ISO` to run the regional map/schema tests against those discs.
 
 Enemy spawns use the localized database in the generator pack's virtual directory, including
-Crown Mod's stage-local replacement models and stats. Local variants receive distinct export
+Crown Mod's stage-local replacement models and stats. Generator packs are resolved by
+their named virtual-directory files, so appended Normal/Hard/Very Hard model and sound
+variants cannot hide spawn data or make an empty stage borrow another stage’s generators. Local variants receive distinct export
 IDs so different stages can reuse a physical row without confusing maps or enemy searches.
 GameCube indexed geometry is decoded through its vertex index buffers for complete map floors.
 
@@ -86,9 +88,11 @@ Run the Crown Mod regression checks with randomized images from either platform:
 DIGIATLAS_CROWN_GC_ISO="/path/to/randomized-gc.iso" DIGIATLAS_CROWN_PS2_ISO="/path/to/randomized-ps2.iso" cargo test --test crown_mod -- --nocapture
 ```
 
-These compare every live generator's model, name, stats and positions against its local disc
-database on all three difficulties, check Goblin Pass and Abyss of Grief map coverage, and
-validate the exported JSON schemas.
+These compare every live generator’s model, name, stats and positions against its local disc
+database on all three difficulties, require all 27 dungeon-boss encounters, check Goblin Pass
+and Abyss of Grief map coverage, and validate the exported JSON schemas. Set
+`DIGIATLAS_CROWN_OUT` to retain the resulting exports in `GC/` and `PS2/` subdirectories.
+Importer 1.28.0 invalidates older caches, so the desktop app requests a fresh import.
 
 For Crown Drops, the importer keeps different tables with the same name distinct, follows
 the actual difficulty-list order for common rewards, and preserves empty party profiles.

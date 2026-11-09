@@ -6,12 +6,13 @@ use regex::bytes::Regex;
 use serde_json::{json, Value as Json};
 
 use crate::afs::Afs;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::generators;
+use crate::manifest::ArchiveFile;
 
 const MANIFEST_RANGE: std::ops::Range<usize> = 80..178;
-/// Three consecutive generator packs follow a stage's data packs, in this order.
-const GENERATOR_DIFFICULTIES: [&str; 3] = ["hard", "normal", "veryhard"];
+const GENERATOR_FILES: [(&str, &str); 3] =
+    [("hard", "generatorh.igb"), ("normal", "generatorn.igb"), ("veryhard", "generatorv.igb")];
 
 pub struct Stage {
     pub id: String,
@@ -68,7 +69,7 @@ fn parse_manifest(data: &[u8]) -> (Option<String>, Vec<usize>) {
     (ids.last().map(|t| String::from_utf8_lossy(t).into_owned()), packs)
 }
 
-pub fn list_stages(ndmw: &Afs) -> Result<Vec<Stage>> {
+pub fn list_stages(ndmw: &Afs, files: &[ArchiveFile]) -> Result<Vec<Stage>> {
     let mut stages = Vec::new();
     for entry in MANIFEST_RANGE {
         if entry >= ndmw.count() {
@@ -83,23 +84,28 @@ pub fn list_stages(ndmw: &Afs) -> Result<Vec<Stage>> {
         packs.dedup();
         stages.push(Stage { id, manifest_entry: entry, packs, generator_packs: Vec::new() });
     }
-    let mut starts: Vec<usize> = stages.iter().flat_map(|s| s.packs.iter().copied()).collect();
-    starts.sort();
-    starts.dedup();
     for stage in &mut stages {
-        let last = *stage.packs.iter().max().unwrap();
-        let first = last + 1;
-        // The generator packs sit between this stage's packs and the next stage's first pack.
-        let later = starts.iter().copied().find(|&p| p > last);
-        let stop = [Some(first + 12), Some(ndmw.count()), later].into_iter().flatten().min().unwrap();
-        let mut found = Vec::new();
-        for idx in first..stop {
-            if generators::has_generators(&ndmw.entry(idx)?) {
-                found.push(idx);
+        // Model and sound selectors can reference appended difficulty variants.
+        // Generator identity belongs to the native virtual directory, independently
+        // of archive order or the highest model entry in the stage manifest.
+        for (difficulty, name) in GENERATOR_FILES {
+            let mut matches = files.iter().filter(|file| {
+                file.archive == "NDMW.AFS"
+                    && file.directory.len() == 2
+                    && file.directory[0].eq_ignore_ascii_case(&stage.id)
+                    && file.directory[1].eq_ignore_ascii_case("separate")
+                    && file.name.eq_ignore_ascii_case(name)
+            });
+            let Some(file) = matches.next() else { continue };
+            if matches.any(|other| other.entry != file.entry) {
+                return Err(Error(format!("stage {} has ambiguous {difficulty} generator files", stage.id)));
             }
-        }
-        if found.len() >= 3 && found[1] == found[0] + 1 && found[2] == found[0] + 2 {
-            stage.generator_packs = GENERATOR_DIFFICULTIES.iter().copied().zip(found[..3].iter().copied()).collect();
+            if file.entry >= ndmw.count() {
+                return Err(Error(format!("stage {} generator entry {} is outside NDMW.AFS", stage.id, file.entry)));
+            }
+            if generators::has_generators(&ndmw.entry(file.entry)?) {
+                stage.generator_packs.push((difficulty, file.entry));
+            }
         }
     }
     Ok(stages)
@@ -126,5 +132,47 @@ mod tests {
     fn reads_a_stage_manifest() {
         let (id, packs) = parse_manifest(b"\x00[0.231]\x00xx[0.230]\x00stag0102\x00junk");
         assert_eq!((id.as_deref(), packs), (Some("stag0102"), vec![231, 230]));
+    }
+
+    fn randomized_archive(name: &str) -> (crate::iso::tests::TempFile, Afs, Vec<ArchiveFile>) {
+        use crate::iso::tests::{build_afs, TempFile};
+        let mut entries: Vec<&[u8]> = vec![b""; 200];
+        entries[80] = b"\0[0.120]|[0.190]|[0.191]\0[0.119]/s\0stag0101\0";
+        entries[81] = b"\0[0.121]\0dngq5b1e\0";
+        entries[99] = b"beGeneraterData\0";
+        entries[101] = b"beGeneraterData\0";
+        entries[115] = b"beGeneraterData\0";
+        let file = TempFile::new(name, &build_afs(&entries));
+        let afs = Afs::open(crate::iso::Source::open(&file.0).unwrap()).unwrap();
+        let files = [("generatorh.igb", 101), ("generatorn.igb", 115), ("generatorv.igb", 99)]
+            .map(|(name, entry)| ArchiveFile {
+                name: name.into(),
+                archive: "NDMW.AFS",
+                entry,
+                directory: vec!["stag0101".into(), "separate".into()],
+            })
+            .to_vec();
+        (file, afs, files)
+    }
+
+    #[test]
+    fn appended_models_do_not_hide_generators_or_lend_them_to_an_empty_stage() {
+        let (_file, afs, files) = randomized_archive("stage-variants.afs");
+        let stages = list_stages(&afs, &files).unwrap();
+        assert_eq!(stages[0].packs, [119, 120, 190, 191]);
+        assert_eq!(stages[0].generator_packs, [("hard", 101), ("normal", 115), ("veryhard", 99)]);
+        assert!(stages[1].generator_packs.is_empty());
+    }
+
+    #[test]
+    fn ambiguous_or_out_of_archive_generator_files_fail_instead_of_losing_spawns() {
+        let (_file, afs, mut files) = randomized_archive("stage-invalid.afs");
+        let mut duplicate = files[0].clone();
+        duplicate.entry = 102;
+        files.push(duplicate);
+        assert!(list_stages(&afs, &files).err().unwrap().0.contains("ambiguous"));
+        files.pop();
+        files[0].entry = afs.count();
+        assert!(list_stages(&afs, &files).err().unwrap().0.contains("outside NDMW.AFS"));
     }
 }

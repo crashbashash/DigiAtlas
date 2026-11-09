@@ -10,7 +10,11 @@ use serde_json::Value;
 fn randomized_spawns_match_each_stages_own_database_on_every_difficulty() {
     for platform in ["GC", "PS2"] {
         let Some(path) = std::env::var_os(format!("DIGIATLAS_CROWN_{platform}_ISO")) else { continue };
-        let out = std::env::temp_dir().join(format!("digiatlas-crown-{platform}-{}", std::process::id()));
+        let retained = std::env::var_os("DIGIATLAS_CROWN_OUT");
+        let out = retained
+            .as_ref()
+            .map(|dir| Path::new(dir).join(platform))
+            .unwrap_or_else(|| std::env::temp_dir().join(format!("digiatlas-crown-{platform}-{}", std::process::id())));
         let image = path.clone();
         let worker_out = out.clone();
         let metadata = std::thread::Builder::new()
@@ -38,9 +42,39 @@ fn randomized_spawns_match_each_stages_own_database_on_every_difficulty() {
         let stages = load("stages.json");
         let mut checked = 0;
         let mut variants = 0;
+        let mut boss_encounters = 0;
         let mut physical: BTreeMap<usize, BTreeSet<(String, i64, u64)>> = BTreeMap::new();
         for stage in stages["stages"].as_array().unwrap() {
+            let boss_generator = match stage["id"].as_str().unwrap() {
+                "dng101b2" => Some("GENE-08"),
+                "dng102b3" => Some("GENE-12"),
+                "dng204b2" => Some("GENE-13"),
+                "dng205b3" => Some("GENE-15"),
+                "dng307b2" => Some("GENE-11"),
+                "dng308b3" => Some("GENE-19"),
+                "dng309b4" => Some("GENE-24"),
+                "dng411b3" => Some("GENE-23"),
+                "dng412b4" => Some("GENE-21"),
+                _ => None,
+            };
             for difficulty in ["normal", "hard", "veryhard"] {
+                if let Some(generator) = boss_generator {
+                    assert!(
+                        stage["generatorPacks"][difficulty].is_u64(),
+                        "{} {difficulty}: missing boss pack",
+                        stage["id"]
+                    );
+                    assert!(
+                        stage["difficulties"][difficulty]["generators"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .any(|g| g["name"] == generator),
+                        "{} {difficulty}: missing boss encounter",
+                        stage["id"]
+                    );
+                    boss_encounters += 1;
+                }
                 let Some(pack) = stage["generatorPacks"][difficulty].as_u64() else { continue };
                 let entry = manifest::stage_database(&directory, pack as usize).unwrap().unwrap();
                 let tables = database::read_tables(area.entry(entry).unwrap()).unwrap();
@@ -84,6 +118,7 @@ fn randomized_spawns_match_each_stages_own_database_on_every_difficulty() {
         }
         assert!(checked > 1000);
         assert!(variants > 100);
+        assert_eq!(boss_encounters, 27, "all nine dungeon bosses export on all difficulties");
         assert!(
             physical.values().any(|rows| rows.iter().map(|(m, hp, _)| (m, hp)).collect::<BTreeSet<_>>().len() > 1),
             "physical rows are reused with different enemies or stats across stages"
@@ -96,7 +131,9 @@ fn randomized_spawns_match_each_stages_own_database_on_every_difficulty() {
             let errors: Vec<_> = validator.iter_errors(&data).map(|e| e.to_string()).collect();
             assert!(errors.is_empty(), "{platform} {schema}: {errors:?}");
         }
-        eprintln!("{platform}: checked {checked} spawns, {variants} local variants, all difficulties and schemas");
-        std::fs::remove_dir_all(out).unwrap();
+        eprintln!("{platform}: checked {checked} spawns, {variants} local variants, {boss_encounters} boss encounters, all difficulties and schemas");
+        if retained.is_none() {
+            std::fs::remove_dir_all(out).unwrap();
+        }
     }
 }

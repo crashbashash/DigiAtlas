@@ -416,9 +416,34 @@ struct Analysis {
     meanings: HashMap<i64, String>,
     powered_controls: BTreeMap<(String, i64), Vec<ScriptConditions>>,
     held_controls: HashSet<String>,
+    /// Held controls whose hit script latches them in single player (Crown Mod's Solo co-op buttons).
+    solo_latched: HashSet<String>,
 }
 
 impl Analysis {
+    /// A solo-latched button stays down once pressed, so one player activates each in turn
+    /// instead of holding them together. Larger parties still hold them.
+    fn solo_routes(&self, paths: Vec<Activation>) -> Vec<Activation> {
+        let latched =
+            |s: &Switch| s.action == "hold" && s.id.split(':').next().is_some_and(|m| self.solo_latched.contains(m));
+        paths
+            .into_iter()
+            .flat_map(|path| {
+                if !path.players.contains(&1) || !path.switches.iter().any(latched) {
+                    return vec![path];
+                }
+                let mut solo = path.clone();
+                solo.players = vec![1];
+                for s in solo.switches.iter_mut().filter(|s| latched(s)) {
+                    s.action = "activate".into();
+                }
+                let mut party = path;
+                party.players.retain(|&n| n != 1);
+                std::iter::once(solo).chain((!party.players.is_empty()).then_some(party)).collect()
+            })
+            .collect()
+    }
+
     fn base(&self, file: &str, conditions: &[String]) -> Vec<Activation> {
         let mut out = Activation::default();
         if let Some(names) = self.callbacks.get(file) {
@@ -724,6 +749,7 @@ fn analyze_sources(
         meanings: scripts::load_flag_names(),
         powered_controls: BTreeMap::new(),
         held_controls: HashSet::new(),
+        solo_latched: HashSet::new(),
     };
     for (file, statements) in &a.files {
         let Some(model) = file.strip_prefix("off_").and_then(|s| s.strip_suffix(".lua")) else { continue };
@@ -734,6 +760,15 @@ fn analyze_sources(
                 .is_some_and(|m| hit.iter().any(|s| s.text == format!("{} = 1", &m[1])))
         }) {
             a.held_controls.insert(model.into());
+        }
+    }
+    for (file, statements) in &a.files {
+        let Some(model) = file.strip_prefix("hit_").and_then(|s| s.strip_suffix(".lua")) else { continue };
+        if statements.iter().any(|s| {
+            s.text == r#"be:MDLsetSD("SETLABEL", "SQ_SWOF/OFF")"#
+                && s.conditions.iter().any(|c| c == "be:SYSgetPlayerNinzu() <= 1")
+        }) {
+            a.solo_latched.insert(model.into());
         }
     }
     for (file, statements) in &a.files {
@@ -795,7 +830,7 @@ fn doors_from_analysis(a: &Analysis) -> Vec<Door> {
                 {
                     continue;
                 }
-                let mut paths = a.resolve(file, &statement.conditions, &HashSet::new(), 0);
+                let mut paths = a.solo_routes(a.resolve(file, &statement.conditions, &HashSet::new(), 0));
                 for p in &mut paths {
                     if !p.meaningful() {
                         p.unresolved = true;
@@ -901,7 +936,7 @@ fn platforms_from_analysis(a: &Analysis) -> Vec<Platform> {
                 if !matches!(verb, "SQ_SWON" | "SQ_SWOF" | "MOVETRANS") {
                     continue;
                 }
-                let mut paths = a.resolve(file, &statement.conditions, &HashSet::new(), 0);
+                let mut paths = a.solo_routes(a.resolve(file, &statement.conditions, &HashSet::new(), 0));
                 // No animation is exported without a located control, trigger area,
                 // enemy-completion callback or explicit key-item requirement.
                 paths.retain(|p| p.has_trigger() && !p.difficulties.is_empty() && !p.players.is_empty());
@@ -1421,5 +1456,29 @@ mod tests {
             assert_eq!(paths[0].switches.iter().filter(|s| s.action == "break").count(), 4);
             assert_eq!(paths[0].areas.len(), 1);
         }
+    }
+
+    #[test]
+    fn solo_latched_button_pairs_are_pressed_in_turn_by_one_player() {
+        let start = format!(
+            "{DOOR}\nbe:sd(\"MODELCTRL\", \"g_dbutton2\", 0, \"GENERATE\", \"V<100,0,0>/V<0,0,0>\")\nbe:sd(\"MODELCTRL\", \"g_dbutton2\", 1, \"GENERATE\", \"V<140,0,0>/V<0,0,0>\")"
+        );
+        let pair = "if be:MDLgetRamNo() == 0 then\n    g_button0 = 1\nelseif be:MDLgetRamNo() == 1 then\n    g_button1 = 1\nend\nif g_button0 == 1 and g_button1 == 1 then\n    be:sd(\"MODELCTRL\", \"g_d1door\", 0, \"SQ_SWON\")\nend";
+        let off = "if be:MDLgetRamNo() == 0 then\n    g_button0 = 0\nelseif be:MDLgetRamNo() == 1 then\n    g_button1 = 0\nend";
+        // Crown Mod's Solo co-op buttons prefix, as DigiAtlas decompiles it.
+        let latch = "if be:SYSgetPlayerNinzu() <= 1 then\n    be:MDLsetSD(\"SETLABEL\", \"SQ_SWOF/OFF\")\n    be:MDLsetSeq(\"SQ_ONLOOP\")\nend\n";
+        let actions = |hit: String| {
+            let doors = read(&[("start.lua", &start), ("hit_g_dbutton2.lua", &hit), ("off_g_dbutton2.lua", off)], &[]);
+            (1..=4)
+                .map(|players| {
+                    let paths: Vec<_> = doors[0].activations.iter().filter(|a| a.players.contains(&players)).collect();
+                    assert_eq!(paths.len(), 1, "party {players}: {paths:#?}");
+                    assert_eq!(paths[0].switches.len(), 2, "party {players}: {paths:#?}");
+                    paths[0].switches[0].action.clone()
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(actions(pair.into()), ["hold"; 4]);
+        assert_eq!(actions(format!("{latch}{pair}")), ["activate", "hold", "hold", "hold"]);
     }
 }

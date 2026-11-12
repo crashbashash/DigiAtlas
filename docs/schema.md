@@ -341,7 +341,9 @@ same position are treated as part of their moving platform.
 Activation `areas` identify `beMatCtrlData` volumes, retaining their world bounds, whether all
 players are required, and whether entering or leaving the area activates/rearms the movement.
 Controls distinguish `activate`, `hold`, `break` and `destroy`; pressure buttons must remain occupied,
-and tower break callbacks are linked to their placed objects. Controls inherit the conditions that
+and tower break callbacks are linked to their placed objects. A held button pair whose hit script
+latches it in single player (Crown Mod's Solo co-op buttons) is `activate` for one player and stays
+`hold` for larger parties. Controls inherit the conditions that
 power them on. Four-slot joined-player counting loops supply the actual party-size restrictions,
 including buttons completed automatically for unused player slots. A Dark Tower destruction callback
 is not shown as a button press. Co-located button model variants are one physical control. Boolean completion-flag

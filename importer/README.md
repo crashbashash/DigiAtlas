@@ -92,7 +92,7 @@ These compare every live generator’s model, name, stats and positions against 
 database on all three difficulties, require all 27 dungeon-boss encounters, check Goblin Pass
 and Abyss of Grief map coverage, and validate the exported JSON schemas. Set
 `DIGIATLAS_CROWN_OUT` to retain the resulting exports in `GC/` and `PS2/` subdirectories.
-Importer 1.28.0 invalidates older caches, so the desktop app requests a fresh import.
+Importer 1.29.0 invalidates older caches, so the desktop app requests a fresh import.
 
 For Crown Drops, the importer keeps different tables with the same name distinct, follows
 the actual difficulty-list order for common rewards, and preserves empty party profiles.

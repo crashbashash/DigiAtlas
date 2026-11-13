@@ -7,6 +7,8 @@ calculators for **Windows and Linux**.
 [![Linux build](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-linux.yml/badge.svg?branch=main&event=push)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-linux.yml)
 [![Windows build](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-windows.yml/badge.svg?branch=main&event=push)](https://github.com/crashbashash/DigiAtlas/actions/workflows/ci-windows.yml)
 
+<a href="https://ko-fi.com/crashbashash"><img src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy me a coffee at ko-fi.com" height="36"></a>
+
 Find where an item drops, track down an enemy, or try a different character setup before you play.
 DigiAtlas reads the information from your own game disc image.
 
